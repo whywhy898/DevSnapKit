@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production outputs
+dist/
+dist-*/
+build/
+
+# Cloudflare Pages / Wrangler cache
+.wrangler/
+.cache/
+
+# Local Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor & OS files
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db
+
+# Test scripts, fixtures and evidence
+test_evidence_round8/
+scratch/
+test_*.mjs
+verify_*.mjs

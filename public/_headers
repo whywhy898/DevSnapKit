@@ -1,0 +1,16 @@
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.paypal.com https://www.sandbox.paypal.com https://*.paypalobjects.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https: https://*.paypalobjects.com; connect-src 'self' https: https://www.paypal.com https://www.sandbox.paypal.com https://cloudflareinsights.com; frame-src 'self' https://www.paypal.com https://www.sandbox.paypal.com;
+  Cache-Control: public, max-age=0, must-revalidate
+
+/sitemap.xml
+  Cache-Control: public, max-age=0, must-revalidate
+  Content-Type: application/xml
+
+/robots.txt
+  Cache-Control: public, max-age=0, must-revalidate
+  Content-Type: text/plain

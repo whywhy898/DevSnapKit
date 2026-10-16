@@ -1,0 +1,1607 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    @apply font-sans;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  html.theme-dark, body.theme-dark {
+    @apply bg-slate-950 text-slate-100;
+  }
+
+  html.theme-light, body.theme-light {
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+}
+
+.bg-dot-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.studio-canvas-viewport {
+  flex: none;
+  width: 100%;
+  height: min(70dvh, 640px);
+  min-height: 360px;
+}
+
+@media (min-width: 1024px) {
+  .studio-canvas-viewport {
+    flex: 1 1 0%;
+    width: auto;
+    height: calc(100dvh - 64px);
+    min-height: 0;
+  }
+}
+
+.studio-canvas-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.5);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.8);
+}
+
+/* ========================================================================= */
+/* LIGHT THEME SYSTEM (DevSnapKit Studio Light Mode)                        */
+/* ========================================================================= */
+
+.theme-light {
+  color-scheme: light;
+}
+
+/* 1. Page Root & Main Layout */
+.theme-light.min-h-screen,
+body.theme-light .min-h-screen {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.theme-light main {
+  background-color: #f1f5f9 !important;
+}
+
+.theme-light .studio-canvas-grid {
+  background-image: radial-gradient(rgba(15, 23, 42, 0.08) 1px, transparent 1px) !important;
+  background-size: 28px 28px !important;
+}
+
+.theme-light .bg-dot-grid {
+  background-image: radial-gradient(rgba(15, 23, 42, 0.08) 1px, transparent 1px) !important;
+}
+
+/* 2. Top Header Navbar */
+.theme-light header {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.03) !important;
+}
+
+.theme-light header .font-extrabold {
+  color: #0f172a !important;
+}
+
+.theme-light header .font-extrabold .text-cyan-400 {
+  color: #0e7490 !important;
+}
+
+.theme-light header .bg-slate-900 {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light header span.bg-slate-800\/90 {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Sample presets pill in Header */
+.theme-light header .bg-white\/\[0\.03\] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light header .text-white\/40 {
+  color: #64748b !important;
+}
+
+.theme-light header button.text-white\/50 {
+  color: #475569 !important;
+}
+
+.theme-light header button.text-white\/50:hover {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+}
+
+.theme-light header button.bg-white\/15 {
+  background-color: #ffffff !important;
+  color: #4f46e5 !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.06) !important;
+}
+
+/* Header Action Buttons (Key & Pro) */
+.theme-light header button.text-slate-400 {
+  color: #475569 !important;
+}
+
+.theme-light header button.text-slate-400:hover {
+  color: #0f172a !important;
+  background-color: #f1f5f9 !important;
+}
+
+/* Header Pro ($1) button - High Contrast Amber Theme */
+.theme-light header button.text-amber-300,
+.theme-light header button[class*="from-amber-500"] {
+  background: linear-gradient(to right, #fef3c7, #fed7aa) !important;
+  border-color: #f59e0b !important;
+  color: #92400e !important; /* amber-800 */
+  box-shadow: 0 1px 2px rgba(180, 83, 9, 0.1) !important;
+}
+
+.theme-light header button.text-amber-300:hover,
+.theme-light header button[class*="from-amber-500"]:hover {
+  background: linear-gradient(to right, #fde68a, #fdba74) !important;
+  border-color: #d97706 !important;
+  color: #78350f !important; /* amber-900 */
+}
+
+.theme-light header button.text-amber-300 svg,
+.theme-light header button[class*="from-amber-500"] svg {
+  fill: #b45309 !important;
+  color: #b45309 !important;
+}
+
+.theme-light header button.text-amber-300 span,
+.theme-light header button[class*="from-amber-500"] span {
+  color: #92400e !important;
+  font-weight: 700 !important;
+}
+
+/* Export Settings Popover Dropdown */
+.theme-light .export-popover,
+.theme-light header .bg-slate-900.border-slate-700\/80 {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 20px 40px -4px rgba(15, 23, 42, 0.16) !important;
+}
+
+.theme-light .export-popover .border-b,
+.theme-light header .bg-slate-900.border-slate-700\/80 .border-b.border-slate-800 {
+  border-bottom-color: #e2e8f0 !important;
+}
+
+.theme-light .export-popover .text-white,
+.theme-light header .bg-slate-900.border-slate-700\/80 .text-white {
+  color: #0f172a !important;
+}
+
+.theme-light .export-popover .text-slate-300,
+.theme-light header .bg-slate-900.border-slate-700\/80 .text-slate-300 {
+  color: #334155 !important;
+}
+
+.theme-light .export-popover .bg-slate-950,
+.theme-light header .bg-slate-900.border-slate-700\/80 .bg-slate-950 {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+}
+
+.theme-light .export-popover .bg-slate-950:hover,
+.theme-light header .bg-slate-900.border-slate-700\/80 .bg-slate-950:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+.theme-light .export-popover .bg-indigo-600\/30,
+.theme-light .export-popover .bg-indigo-600\/20,
+.theme-light header .bg-slate-900.border-slate-700\/80 .bg-indigo-600\/30 {
+  background-color: #eef2ff !important;
+  border-color: #6366f1 !important;
+  color: #4338ca !important;
+}
+
+.theme-light .export-popover button.bg-indigo-600 {
+  background-color: #4f46e5 !important;
+  color: #ffffff !important;
+}
+
+.theme-light .export-popover button.bg-indigo-600:hover {
+  background-color: #4338ca !important;
+}
+
+.theme-light .export-popover button.bg-indigo-600 svg,
+.theme-light .export-popover button.bg-indigo-600 span {
+  color: #ffffff !important;
+}
+
+/* Starter Demo Dropdown Popover */
+.theme-light .starter-demo-popover {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.16) !important;
+}
+
+.theme-light .starter-demo-popover .text-white,
+.theme-light .starter-demo-popover button span {
+  color: #0f172a !important;
+}
+
+.theme-light .starter-demo-popover .text-white\/70 {
+  color: #334155 !important;
+}
+
+.theme-light .starter-demo-popover .text-white\/40 {
+  color: #64748b !important;
+}
+
+.theme-light .starter-demo-popover button.bg-indigo-600\/30 {
+  background-color: #eef2ff !important;
+  border-color: #6366f1 !important;
+}
+
+.theme-light .starter-demo-popover button.bg-indigo-600\/30 span:first-child {
+  color: #4338ca !important;
+  font-weight: 700 !important;
+}
+
+.theme-light .starter-demo-popover button:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.theme-light .starter-demo-popover button:hover span {
+  color: #0f172a !important;
+}
+
+/* 3. Top Canvas Floating Action Bar */
+.theme-light main div.bg-\[\#0c0d14\]\/85 {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08) !important;
+}
+
+.theme-light main div.bg-\[\#0c0d14\]\/85 button {
+  color: #0f172a !important;
+  font-weight: 500 !important;
+}
+
+.theme-light main div.bg-\[\#0c0d14\]\/85 button svg {
+  color: #0f172a !important;
+}
+
+.theme-light main div.bg-\[\#0c0d14\]\/85 button:hover:not(:disabled) {
+  color: #0f172a !important;
+  background-color: #f1f5f9 !important;
+}
+
+
+.theme-light main div.bg-\[\#0c0d14\]\/85 button:disabled {
+  color: #94a3b8 !important;
+  opacity: 0.75 !important;
+  cursor: not-allowed !important;
+}
+
+.theme-light main div.bg-\[\#0c0d14\]\/85 button:disabled svg {
+  color: #94a3b8 !important;
+}
+
+.theme-light main div.bg-\[\#0c0d14\]\/85 button:disabled span {
+  color: #94a3b8 !important;
+}
+
+.theme-light main div.bg-\[\#0c0d14\]\/85 div.bg-white\/10 {
+  background-color: #cbd5e1 !important;
+}
+
+.theme-light main div.bg-\[\#0c0d14\]\/85 kbd {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+}
+
+/* 4. Middle-Right Dedicated Live 3D Perspective Rail */
+.theme-light aside.hidden.lg\:flex {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06) !important;
+}
+
+.theme-light aside.hidden.lg\:flex .text-white,
+.theme-light aside.hidden.lg\:flex span {
+  color: #0f172a !important;
+}
+
+.theme-light aside.hidden.lg\:flex .text-white\/70,
+.theme-light aside.hidden.lg\:flex .text-white\/80 {
+  color: #334155 !important;
+}
+
+.theme-light aside.hidden.lg\:flex .text-white\/50,
+.theme-light aside.hidden.lg\:flex .text-white\/40 {
+  color: #64748b !important;
+}
+
+.theme-light aside.hidden.lg\:flex .border-b.border-white\/\[0\.06\] {
+  border-bottom-color: #e2e8f0 !important;
+}
+
+.theme-light aside.hidden.lg\:flex button {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+.theme-light aside.hidden.lg\:flex button:hover {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.theme-light aside.hidden.lg\:flex button[class*="border-indigo"],
+.theme-light aside.hidden.lg\:flex button[class*="ring-indigo"],
+.theme-light aside.hidden.lg\:flex button[class*="border-white/30"],
+.theme-light aside.hidden.lg\:flex button[class*="ring-white"] {
+  background-color: #eef2ff !important;
+  border-color: #a5b4fc !important;
+  color: #1e1b4b !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+}
+
+/* 4b. Dark Mode Dedicated Live 3D Perspective Rail */
+.theme-dark aside.hidden.lg\:flex,
+.dark aside.hidden.lg\:flex {
+  background-color: rgba(12, 13, 20, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.theme-dark aside.hidden.lg\:flex button,
+.dark aside.hidden.lg\:flex button {
+  background-color: #151726 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.theme-dark aside.hidden.lg\:flex button:hover,
+.dark aside.hidden.lg\:flex button:hover {
+  background-color: #1e2136 !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+
+.theme-dark aside.hidden.lg\:flex button[class*="border-indigo"],
+.theme-dark aside.hidden.lg\:flex button[class*="ring-indigo"],
+.theme-dark aside.hidden.lg\:flex button[class*="border-white/30"],
+.theme-dark aside.hidden.lg\:flex button[class*="ring-white"],
+.dark aside.hidden.lg\:flex button[class*="border-indigo"],
+.dark aside.hidden.lg\:flex button[class*="ring-indigo"],
+.dark aside.hidden.lg\:flex button[class*="border-white/30"],
+.dark aside.hidden.lg\:flex button[class*="ring-white"] {
+  background-color: #242746 !important;
+  border-color: #6366f1 !important;
+  color: #ffffff !important;
+}
+
+/* 5. Right Studio Inspector */
+.theme-light aside.studio-inspector {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06) !important;
+}
+
+.theme-light aside.studio-inspector .border-b.border-white\/\[0\.08\] {
+  border-bottom-color: #e2e8f0 !important;
+}
+
+.theme-light aside.studio-inspector h2,
+.theme-light aside.studio-inspector h3,
+.theme-light aside.studio-inspector h4 {
+  color: #0f172a !important;
+}
+
+.theme-light aside.studio-inspector button.text-white\/50 {
+  color: #64748b !important;
+}
+
+.theme-light aside.studio-inspector button.text-white\/50:hover {
+  color: #0f172a !important;
+}
+
+/* 4-Tab Segmented Control in Inspector */
+.theme-light aside.studio-inspector div.grid.grid-cols-4.bg-white\/\[0\.03\] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light aside.studio-inspector div.grid.grid-cols-4 button.bg-white\/10 {
+  background-color: #ffffff !important;
+  color: #4f46e5 !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+}
+
+/* Active Brand tab button in Inspector */
+.theme-light aside.studio-inspector div.grid.grid-cols-4 button.bg-amber-500\/15,
+.theme-light aside.studio-inspector button.bg-amber-500\/15 {
+  background-color: #fef3c7 !important;
+  border-color: #f59e0b !important;
+  color: #92400e !important;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.15) !important;
+}
+
+.theme-light aside.studio-inspector div.grid.grid-cols-4 button.bg-amber-500\/15 span,
+.theme-light aside.studio-inspector button.bg-amber-500\/15 span {
+  color: #92400e !important;
+  font-weight: 700 !important;
+}
+
+.theme-light aside.studio-inspector div.grid.grid-cols-4 button.bg-amber-500\/15 svg,
+.theme-light aside.studio-inspector button.bg-amber-500\/15 svg {
+  color: #d97706 !important;
+}
+
+.theme-light aside.studio-inspector div.grid.grid-cols-4 button.text-white\/50 {
+  color: #334155 !important;
+}
+
+.theme-light aside.studio-inspector div.grid.grid-cols-4 button.text-white\/50:hover {
+  color: #0f172a !important;
+  background-color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* Setting Cards / Box Containers */
+.theme-light aside.studio-inspector .bg-white\/\[0\.03\].border-white\/10,
+.theme-light aside.studio-inspector .bg-white\/\[0\.02\].border-white\/10,
+.theme-light aside.studio-inspector .bg-white\/\[0\.02\].border-white\/\[0\.06\] {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light aside.studio-inspector label,
+.theme-light aside.studio-inspector .text-white {
+  color: #0f172a !important;
+}
+
+.theme-light aside.studio-inspector .text-white\/40,
+.theme-light aside.studio-inspector .text-white\/50,
+.theme-light aside.studio-inspector .text-white\/60 {
+  color: #475569 !important;
+}
+
+.theme-light aside.studio-inspector .text-white\/70,
+.theme-light aside.studio-inspector .text-white\/80 {
+  color: #1e293b !important;
+}
+
+.theme-light aside.studio-inspector .text-indigo-300 {
+  color: #3730a3 !important;
+}
+
+.theme-light aside.studio-inspector .bg-indigo-950\/80,
+.theme-light aside.studio-inspector .bg-indigo-500\/20,
+.theme-light aside.studio-inspector .bg-indigo-600\/30 {
+  background-color: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: #3730a3 !important;
+}
+
+/* Inner selection buttons inside cards */
+.theme-light aside.studio-inspector button.bg-white\/\[0\.02\],
+.theme-light aside.studio-inspector button.bg-white\/\[0\.03\],
+.theme-light aside.studio-inspector button.bg-white\/\[0\.04\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #334155 !important;
+}
+
+.theme-light aside.studio-inspector button.bg-white\/\[0\.02\]:hover,
+.theme-light aside.studio-inspector button.bg-white\/\[0\.03\]:hover,
+.theme-light aside.studio-inspector button.bg-white\/\[0\.04\]:hover {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.theme-light aside.studio-inspector button.bg-white\/15,
+.theme-light aside.studio-inspector button.bg-white\/\[0\.12\],
+.theme-light aside.studio-inspector button.bg-white\/\[0\.08\],
+.theme-light aside.studio-inspector button.bg-white\/20 {
+  background-color: #eef2ff !important;
+  border-color: #a5b4fc !important;
+  color: #4338ca !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+}
+
+.theme-light aside.studio-inspector button.text-white\/40,
+.theme-light aside.studio-inspector button.text-white\/60 {
+  color: #475569 !important;
+}
+
+/* Universal Amber & Gold Palette in Light Theme (Ensures AAA contrast on light bg) */
+.theme-light .text-amber-200,
+.theme-light .text-amber-300 {
+  color: #92400e !important; /* rich dark amber */
+}
+
+.theme-light .text-amber-400,
+.theme-light .text-amber-500 {
+  color: #b45309 !important;
+}
+
+.theme-light svg.text-amber-400,
+.theme-light svg.text-amber-300 {
+  color: #d97706 !important;
+}
+
+.theme-light .text-white\/70,
+.theme-light .text-white\/80 {
+  color: #334155 !important;
+}
+
+.theme-light .text-white\/40,
+.theme-light .text-white\/50,
+.theme-light .text-white\/60 {
+  color: #64748b !important;
+}
+
+/* Shuffle Studio Palette button in Inspector */
+.theme-light aside.studio-inspector button.text-amber-300,
+.theme-light button.text-amber-300 {
+  background-color: #fef3c7 !important;
+  border-color: #fcd34d !important;
+  color: #92400e !important;
+}
+
+.theme-light aside.studio-inspector button.text-amber-300:hover,
+.theme-light button.text-amber-300:hover {
+  background-color: #fde68a !important;
+  color: #78350f !important;
+}
+
+.theme-light aside.studio-inspector button.text-amber-300 svg,
+.theme-light button.text-amber-300 svg {
+  color: #b45309 !important;
+}
+
+/* Brand Tab Value Callout Header Card */
+.theme-light aside.studio-inspector .bg-gradient-to-r.from-amber-500\/10 {
+  background: linear-gradient(to right, #fffbeb, #ffffff, #fffbeb) !important;
+  border-color: #fde68a !important;
+}
+
+.theme-light aside.studio-inspector .bg-gradient-to-r.from-amber-500\/10 p {
+  color: #475569 !important;
+}
+
+/* PRO Badges in Tabs, Headers & Cards */
+.theme-light .text-amber-400.bg-amber-500\/20,
+.theme-light .text-amber-400.bg-amber-500\/10,
+.theme-light [class*="bg-amber-500/20"].text-amber-400 {
+  background-color: #fef3c7 !important;
+  border-color: #fcd34d !important;
+  color: #92400e !important;
+}
+
+/* Free Badge & Slot Badges */
+.theme-light .text-emerald-400.bg-emerald-500\/10,
+.theme-light .text-emerald-400.bg-emerald-500\/20,
+.theme-light aside.studio-inspector .text-emerald-300,
+.theme-light aside.studio-inspector .text-emerald-400,
+.theme-light aside.studio-inspector span.bg-emerald-500\/20 {
+  background-color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+  color: #065f46 !important;
+}
+
+/* Primary CTA in Export Tab */
+.theme-light aside.studio-inspector button.bg-white.text-black {
+  background-color: #4f46e5 !important;
+  color: #ffffff !important;
+}
+
+.theme-light aside.studio-inspector button.bg-white.text-black:hover {
+  background-color: #4338ca !important;
+}
+
+/* Inputs, Numbers, Range sliders & Selects */
+.theme-light aside.studio-inspector input[type="text"],
+.theme-light aside.studio-inspector input[type="number"],
+.theme-light aside.studio-inspector select {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.theme-light aside.studio-inspector input[type="text"]:focus,
+.theme-light aside.studio-inspector input[type="number"]:focus,
+.theme-light aside.studio-inspector select:focus {
+  border-color: #6366f1 !important;
+  outline: none !important;
+}
+
+.theme-light input[type="range"] {
+  background-color: #e2e8f0 !important;
+}
+
+/* Dark Mode Inspector Contrast Enhancements (WCAG AA >= 4.5:1) */
+.theme-dark aside.studio-inspector .text-white\/40 {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
+/* 6. Floating Bottom Studio Dock */
+.theme-light .mt-2.flex.flex-nowrap .bg-black\/40 {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08) !important;
+}
+
+.theme-light .mt-2.flex.flex-nowrap .bg-black\/40 button {
+  color: #475569 !important;
+}
+
+.theme-light .mt-2.flex.flex-nowrap .bg-black\/40 button:hover {
+  color: #0f172a !important;
+  background-color: #f1f5f9 !important;
+}
+
+.theme-light .mt-2.flex.flex-nowrap .bg-black\/40 button.bg-white\/15 {
+  background-color: #eef2ff !important;
+  color: #4338ca !important;
+  border-color: #c7d2fe !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+}
+
+/* Replace Image Button in Dock */
+.theme-light button[title*="Upload screenshot"],
+.theme-light button[title*="Replace Image"],
+.theme-light button[title*="starter demo"],
+.theme-light .mt-2.flex.flex-nowrap button[title*="Replace Image"],
+.theme-light .mt-2.flex.flex-nowrap button[title*="Upload screenshot"] {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08) !important;
+}
+
+.theme-light button[title*="Upload screenshot"]:hover,
+.theme-light button[title*="starter demo"]:hover,
+.theme-light button[title*="Replace Image"]:hover,
+.theme-light .mt-2.flex.flex-nowrap button[title*="Replace Image"]:hover {
+  background-color: #f8fafc !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+.theme-light button[title*="Upload screenshot"] svg,
+.theme-light button[title*="starter demo"] svg,
+.theme-light button[title*="Replace Image"] svg,
+.theme-light .mt-2.flex.flex-nowrap button[title*="Replace Image"] svg {
+  color: #4f46e5 !important;
+}
+
+.theme-light button[title*="Upload screenshot"] span,
+.theme-light button[title*="starter demo"] span,
+.theme-light button[title*="Replace Image"] span,
+.theme-light .mt-2.flex.flex-nowrap button[title*="Replace Image"] span {
+  color: #0f172a !important;
+  font-weight: 600 !important;
+}
+
+/* Shuffle Button in Dock */
+.theme-light button[title*="Randomize"],
+.theme-light .mt-2.flex.flex-nowrap button[title*="Randomize"] {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08) !important;
+}
+
+.theme-light button[title*="Randomize"]:hover,
+.theme-light .mt-2.flex.flex-nowrap button[title*="Randomize"]:hover {
+  background-color: #f8fafc !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+.theme-light button[title*="Randomize"] svg,
+.theme-light .mt-2.flex.flex-nowrap button[title*="Randomize"] svg {
+  color: #d97706 !important;
+}
+
+.theme-light button[title*="Randomize"] span,
+.theme-light .mt-2.flex.flex-nowrap button[title*="Randomize"] span {
+  color: #0f172a !important;
+  font-weight: 600 !important;
+}
+
+/* Popover inside bottom dock */
+.theme-light .dock-more-ratios-popover {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14) !important;
+}
+
+.theme-light .dock-more-ratios-popover .text-white\/40,
+.theme-light .dock-more-ratios-popover .text-slate-400,
+.theme-light .dock-more-ratios-popover .text-slate-500 {
+  color: #64748b !important;
+}
+
+.theme-light .dock-more-ratios-popover button {
+  color: #334155 !important;
+}
+
+.theme-light .dock-more-ratios-popover button:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+.theme-light .dock-more-ratios-popover button.bg-white\/15,
+.theme-light .dock-more-ratios-popover button.bg-indigo-600\/30 {
+  background-color: #eef2ff !important;
+  color: #4338ca !important;
+  border-color: #c7d2fe !important;
+}
+
+.theme-light .mt-2.flex.flex-nowrap .bg-white\/10 {
+  background-color: #cbd5e1 !important;
+}
+
+/* 7. Modals - Full High-Contrast Light Theme Overrides */
+.theme-light .fixed.inset-0.bg-black\/80,
+.theme-light .fixed.inset-0.bg-slate-950\/80 {
+  background-color: rgba(15, 23, 42, 0.5) !important;
+}
+
+.theme-light .fixed.inset-0 .bg-slate-900 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.15) !important;
+}
+
+/* Headings in Modals */
+.theme-light .fixed.inset-0 .bg-slate-900 h2,
+.theme-light .fixed.inset-0 .bg-slate-900 h3,
+.theme-light .fixed.inset-0 .bg-slate-900 h4 {
+  color: #0f172a !important;
+}
+
+/* ALL body text, paragraphs, lists and descriptions in Modals */
+.theme-light .fixed.inset-0 .bg-slate-900 p,
+.theme-light .fixed.inset-0 .bg-slate-900 div.text-slate-300,
+.theme-light .fixed.inset-0 .bg-slate-900 div.text-slate-400,
+.theme-light .fixed.inset-0 .bg-slate-900 span.text-slate-300,
+.theme-light .fixed.inset-0 .bg-slate-900 span.text-slate-400,
+.theme-light .fixed.inset-0 .bg-slate-900 li,
+.theme-light .fixed.inset-0 .bg-slate-900 .text-slate-300,
+.theme-light .fixed.inset-0 .bg-slate-900 .text-slate-400 {
+  color: #334155 !important;
+  line-height: 1.625;
+}
+
+.theme-light .fixed.inset-0 .bg-slate-900 strong {
+  color: #0f172a !important;
+}
+
+/* Meta dates and secondary labels */
+.theme-light .fixed.inset-0 .bg-slate-900 p.text-xs.text-slate-400,
+.theme-light .fixed.inset-0 .bg-slate-900 .text-xs.text-slate-400,
+.theme-light .fixed.inset-0 .bg-slate-900 p.text-slate-500,
+.theme-light .fixed.inset-0 .bg-slate-900 .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Zero-Upload Guarantee box (Green callout banner) */
+.theme-light .fixed.inset-0 .bg-emerald-500\/10 {
+  background-color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+}
+
+.theme-light .fixed.inset-0 .bg-emerald-500\/10,
+.theme-light .fixed.inset-0 .bg-emerald-500\/10 div,
+.theme-light .fixed.inset-0 .bg-emerald-500\/10 p,
+.theme-light .fixed.inset-0 .bg-emerald-500\/10 .text-emerald-300 {
+  color: #065f46 !important;
+}
+
+.theme-light .fixed.inset-0 .bg-emerald-500\/10 strong {
+  color: #047857 !important;
+}
+
+.theme-light .fixed.inset-0 .bg-emerald-500\/10 svg {
+  color: #059669 !important;
+}
+
+/* Card / Box containers inside Modals */
+.theme-light .fixed.inset-0 .bg-slate-950 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #334155 !important;
+}
+
+.theme-light .fixed.inset-0 .bg-slate-950 .text-white,
+.theme-light .fixed.inset-0 .bg-slate-950 strong,
+.theme-light .fixed.inset-0 .bg-slate-950 p.font-semibold {
+  color: #0f172a !important;
+}
+
+.theme-light .fixed.inset-0 .bg-slate-950 span.text-slate-300,
+.theme-light .fixed.inset-0 .bg-slate-950 span.text-slate-400,
+.theme-light .fixed.inset-0 .bg-slate-950 p {
+  color: #334155 !important;
+}
+
+.theme-light .fixed.inset-0 .bg-slate-950 .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Inline code in Modals */
+.theme-light .fixed.inset-0 code {
+  background-color: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #4338ca !important;
+}
+
+/* Keyboard shortcuts in Modals */
+.theme-light .fixed.inset-0 kbd {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+}
+
+/* Links inside Modals */
+.theme-light .fixed.inset-0 a.text-indigo-400 {
+  color: #4f46e5 !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+
+.theme-light .fixed.inset-0 a.text-indigo-400:hover {
+  color: #3730a3 !important;
+}
+
+/* Pro Modal checklist items & prices */
+.theme-light .fixed.inset-0 .bg-slate-950 div.text-white.font-semibold,
+.theme-light .fixed.inset-0 .bg-slate-950 p.text-white.font-semibold,
+.theme-light .fixed.inset-0 .bg-slate-950 span.text-white.font-semibold {
+  color: #0f172a !important;
+}
+
+.theme-light .fixed.inset-0 span.text-4xl.font-black.text-white,
+.theme-light .fixed.inset-0 span.text-3xl.font-black.text-white,
+.theme-light .fixed.inset-0 span[class*="font-black"].text-white {
+  color: #0f172a !important;
+}
+
+/* Dividers & Borders in Modals */
+.theme-light .fixed.inset-0 .border-slate-800,
+.theme-light .fixed.inset-0 .border-slate-800\/80,
+.theme-light .fixed.inset-0 .border-slate-700,
+.theme-light .fixed.inset-0 .border-slate-700\/80,
+.theme-light .fixed.inset-0 .divide-slate-800\/80 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e2e8f0 !important;
+}
+
+/* Close button / Secondary action button in Modals */
+.theme-light .fixed.inset-0 button.bg-slate-800 {
+  background-color: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  font-weight: 600 !important;
+}
+
+.theme-light .fixed.inset-0 button.bg-slate-800:hover {
+  background-color: #e2e8f0 !important;
+  color: #000000 !important;
+}
+
+.theme-light .fixed.inset-0 button.bg-slate-800 * {
+  color: #0f172a !important;
+}
+
+/* Close (X) icon button */
+.theme-light .fixed.inset-0 button.text-slate-400 {
+  color: #64748b !important;
+  background-color: #f1f5f9 !important;
+}
+
+.theme-light .fixed.inset-0 button.text-slate-400:hover {
+  color: #0f172a !important;
+  background-color: #e2e8f0 !important;
+}
+
+/* Inputs inside Modals */
+.theme-light .fixed.inset-0 input.bg-slate-950,
+.theme-light .fixed.inset-0 input.bg-slate-900 {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.theme-light .fixed.inset-0 input.bg-slate-950::placeholder,
+.theme-light .fixed.inset-0 input.bg-slate-900::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Tab buttons inside Claim modal */
+.theme-light .fixed.inset-0 .bg-slate-950 button.bg-white\/10 {
+  background-color: #ffffff !important;
+  color: #4f46e5 !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+}
+
+.theme-light .fixed.inset-0 .bg-slate-950 button.text-slate-400 {
+  color: #64748b !important;
+}
+
+.theme-light .fixed.inset-0 .bg-slate-950 button.text-slate-400:hover {
+  color: #0f172a !important;
+}
+
+/* 8. Footer - Crisp Light Theme Links & Copyright */
+.theme-light footer {
+  background-color: #ffffff !important;
+  border-top-color: #e2e8f0 !important;
+}
+
+.theme-light footer .flex.flex-wrap button,
+.theme-light footer .flex.flex-wrap button span,
+.theme-light footer .flex.flex-wrap a,
+.theme-light footer .flex.flex-wrap a span {
+  color: #334155 !important;
+  font-weight: 600 !important;
+}
+
+.theme-light footer .flex.flex-wrap button:hover,
+.theme-light footer .flex.flex-wrap button:hover span,
+.theme-light footer .flex.flex-wrap a:hover,
+.theme-light footer .flex.flex-wrap a:hover span {
+  color: #4f46e5 !important;
+}
+
+.theme-light footer .flex.flex-wrap button svg,
+.theme-light footer .flex.flex-wrap a svg {
+  color: #475569 !important;
+}
+
+.theme-light footer .flex.flex-wrap button:hover svg,
+.theme-light footer .flex.flex-wrap a:hover svg {
+  color: #4f46e5 !important;
+}
+
+/* Bullet separator ONLY (direct child span) */
+.theme-light footer .flex.flex-wrap > span {
+  color: #cbd5e1 !important;
+  font-weight: 400 !important;
+}
+
+.theme-light footer p.text-white\/40,
+.theme-light footer p {
+  color: #475569 !important;
+  font-weight: 400 !important;
+}
+
+/* 9. Light Scrollbars */
+.theme-light ::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.8) !important;
+}
+
+.theme-light ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.5) !important;
+}
+
+.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.8) !important;
+}
+
+/* ========================================================================= */
+/* EXPORT PURITY PROTECTION (Prevent overlays from being baked into export)  */
+/* ========================================================================= */
+[data-exporting="true"] .media-hover-overlay,
+[data-exporting="true"] [data-export-ignore="true"],
+.is-exporting .media-hover-overlay,
+.is-exporting [data-export-ignore="true"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* ========================================================================= */
+/* WELCOME OVERLAY (First-Visit Onboarding)                                  */
+/* ========================================================================= */
+.welcome-container {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.welcome-modal {
+  position: relative;
+  width: 100%;
+  max-width: 1000px;
+  height: min(984px, calc(100vh - 32px));
+  height: min(984px, calc(100dvh - 32px));
+  background: #eeeeee;
+  border-radius: 24px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.24);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.welcome-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 180px;
+}
+
+@media (max-width: 640px) {
+  .welcome-scroll {
+    padding-bottom: 240px;
+  }
+}
+
+.welcome-skip {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 30;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.welcome-skip:hover {
+  background: rgba(0, 0, 0, 0.18);
+  color: #0f172a;
+  transform: scale(1.05);
+}
+
+.welcome-hero {
+  position: relative;
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 70px 24px 50px;
+  overflow: hidden;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .welcome-hero {
+    min-height: calc(100dvh - 100px);
+    min-height: calc(100vh - 100px);
+    padding: 60px 20px 90px;
+  }
+}
+
+.welcome-hero-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  background: #e2e8f0;
+}
+
+.welcome-hero-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.58) 0%, rgba(248, 250, 252, 0.82) 100%);
+  pointer-events: none;
+}
+
+.welcome-hero-content {
+  position: relative;
+  z-index: 10;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.welcome-logo-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  padding: 6px 14px 6px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.welcome-hero-title {
+  font-size: clamp(34px, 5.2vw, 56px);
+  font-weight: 900;
+  line-height: 1.1;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+  margin: 0;
+}
+
+.welcome-hero-subtitle {
+  font-size: clamp(15px, 2vw, 18px);
+  color: #475569;
+  max-width: 580px;
+  line-height: 1.5;
+  font-weight: 500;
+  margin: 0;
+}
+
+.welcome-section {
+  padding: 48px 32px;
+}
+
+.welcome-section-header {
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto 32px;
+}
+
+.welcome-section-title {
+  font-size: clamp(24px, 3.5vw, 34px);
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.welcome-section-subtitle {
+  font-size: 14px;
+  color: #64748b;
+  margin-top: 8px;
+  line-height: 1.5;
+  margin-bottom: 0;
+}
+
+/* Features Grid */
+.welcome-features-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1023px) {
+  .welcome-features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .welcome-features-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.welcome-feature-card {
+  background: #ffffff;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.welcome-feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+}
+
+.welcome-card-img-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+
+.welcome-card-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.welcome-card-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.welcome-card-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(6px);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+.welcome-card-body {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.welcome-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.welcome-card-desc {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Showcase Grid */
+.welcome-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .welcome-showcase-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.welcome-showcase-item {
+  background: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.welcome-showcase-img-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: #1e293b;
+}
+
+.welcome-showcase-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.welcome-showcase-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.welcome-showcase-meta {
+  padding: 10px 12px;
+}
+
+.welcome-secondary-explore-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.welcome-secondary-explore-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+/* Brand Section */
+.welcome-brand-card {
+  background: #ffffff;
+  border-radius: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+}
+
+@media (max-width: 768px) {
+  .welcome-brand-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+.welcome-brand-content {
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+
+.welcome-brand-tag {
+  color: #4f46e5;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.welcome-brand-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+.welcome-brand-desc {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.welcome-brand-pricing {
+  margin-top: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.welcome-brand-price {
+  font-size: 20px;
+  font-weight: 800;
+  color: #059669;
+}
+
+.welcome-brand-nopay {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.welcome-brand-visual {
+  position: relative;
+  min-height: 240px;
+  background: #0f172a;
+  overflow: hidden;
+}
+
+.welcome-brand-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.welcome-brand-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Fixed CTA Overlay */
+.welcome-cta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  padding: 36px 16px 20px;
+  background: linear-gradient(180deg, rgba(238, 238, 238, 0) 0%, rgba(238, 238, 238, 0.92) 28%, #eeeeee 50%, #eeeeee 100%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.welcome-cta > * {
+  pointer-events: auto;
+}
+
+.welcome-start-btn {
+  background: linear-gradient(120deg, #ff6432 25%, #ff0065 45%, #7b2eff 75%);
+  background-size: 200% 200%;
+  animation: welcome-gradient 2s infinite linear;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 14px 44px;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(255, 0, 101, 0.35);
+  cursor: pointer;
+  border: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.welcome-start-btn:hover {
+  transform: scale(1.03);
+  box-shadow: 0 10px 28px rgba(255, 0, 101, 0.45);
+}
+
+.welcome-start-btn:active {
+  transform: scale(0.98);
+}
+
+.welcome-legal {
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+}
+
+.welcome-legal button {
+  color: #475569;
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+}
+
+.welcome-legal button:hover {
+  color: #0f172a;
+}
+
+@keyframes welcome-gradient {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+@keyframes welcome-kenburns {
+  0%   { transform: scale(1.0) translate(0, 0); }
+  50%  { transform: scale(1.12) translate(-2%, -2%); }
+  100% { transform: scale(1.0) translate(0, 0); }
+}
+
+.welcome-kenburns-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: welcome-kenburns 20s ease-in-out infinite;
+  will-change: transform;
+}
+
+.welcome-hero-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1000ms ease-in-out;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.welcome-hero-slide.active {
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.welcome-hero-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+  z-index: 10;
+}
+
+.welcome-hero-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.22);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.welcome-hero-dot:hover {
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.welcome-hero-dot.active {
+  width: 26px;
+  background: #6366f1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-kenburns-img, .welcome-start-btn {
+    animation: none !important;
+  }
+  .welcome-hero-slide {
+    transition: none !important;
+  }
+}
+
+

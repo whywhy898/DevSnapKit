@@ -1,0 +1,5 @@
+# DevSnapKit robots.txt
+User-agent: *
+Allow: /
+
+Sitemap: https://devsnapkit.com/sitemap.xml
