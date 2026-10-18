@@ -11,6 +11,8 @@ build/
 # Cloudflare Pages / Wrangler cache
 .wrangler/
 .cache/
+wrangler.toml
+
 
 # Local Environment Variables & Secrets
 .env
