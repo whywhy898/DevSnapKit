@@ -1,7 +1,9 @@
 // Cloudflare Pages Function: /api/paypal-create-order
 // Creates a PayPal checkout order using PayPal Orders v2 REST API
+import { ConfigurationError, requireSecret } from '../lib/security';
 
 interface Env {
+  DSK_SERVER_SECRET?: string;
   PAYPAL_CLIENT_ID?: string;
   PAYPAL_CLIENT_SECRET?: string;
   PAYPAL_MODE?: string;
@@ -39,6 +41,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   };
 
   try {
+    requireSecret(env, 'DSK_SERVER_SECRET');
     const clientId = env.PAYPAL_CLIENT_ID || DEFAULT_LIVE_CLIENT_ID;
     const clientSecret = env.PAYPAL_CLIENT_SECRET || DEFAULT_LIVE_SECRET;
     const mode = (env.PAYPAL_MODE || 'live').toLowerCase();
@@ -90,7 +93,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message || 'Server error creating PayPal order' }), {
-      status: 500,
+      status: err instanceof ConfigurationError ? 503 : 500,
       headers: corsHeaders,
     });
   }

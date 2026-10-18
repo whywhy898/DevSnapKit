@@ -90,10 +90,10 @@ export default function AdminDashboard() {
   // Check saved admin token on mount
   useEffect(() => {
     const savedToken = localStorage.getItem('devsnapkit_admin_token');
-    const savedSecret = localStorage.getItem('devsnapkit_admin_secret');
-    if (savedToken || savedSecret) {
+    localStorage.removeItem('devsnapkit_admin_secret');
+    if (savedToken) {
       setIsAuthenticated(true);
-      fetchStats(savedSecret || undefined, savedToken || undefined);
+      fetchStats(savedToken);
     }
   }, []);
 
@@ -101,7 +101,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!isAuthenticated || !autoRefresh) return;
     const interval = setInterval(() => {
-      fetchStats(undefined, undefined, true);
+      fetchStats(undefined, true);
     }, 30000);
     return () => clearInterval(interval);
   }, [isAuthenticated, autoRefresh]);
@@ -126,8 +126,9 @@ export default function AdminDashboard() {
       if (data.success) {
         setIsAuthenticated(true);
         localStorage.setItem('devsnapkit_admin_token', data.token || '');
-        localStorage.setItem('devsnapkit_admin_secret', secretInput.trim());
-        fetchStats(secretInput.trim(), data.token);
+        localStorage.removeItem('devsnapkit_admin_secret');
+        setSecretInput('');
+        fetchStats(data.token);
       } else {
         setLoginError(data.error || 'Authentication failed. Please verify your secret key.');
       }
@@ -145,7 +146,7 @@ export default function AdminDashboard() {
     setStats(null);
   };
 
-  const fetchStats = async (secretOverride?: string, tokenOverride?: string, isBackground = false) => {
+  const fetchStats = async (tokenOverride?: string, isBackground = false) => {
     if (!isBackground) {
       setIsLoading(true);
       setLoadError('');
@@ -154,16 +155,13 @@ export default function AdminDashboard() {
     }
 
     const token = tokenOverride || localStorage.getItem('devsnapkit_admin_token') || '';
-    const secret = secretOverride || localStorage.getItem('devsnapkit_admin_secret') || 'devsnapkit_admin_2026';
 
     const executeFetch = async (attempt = 1): Promise<boolean> => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 12000);
 
       try {
-        const headers: Record<string, string> = {
-          'x-admin-secret': secret,
-        };
+        const headers: Record<string, string> = {};
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
@@ -251,7 +249,7 @@ export default function AdminDashboard() {
                   type={showSecret ? 'text' : 'password'}
                   value={secretInput}
                   onChange={(e) => setSecretInput(e.target.value)}
-                  placeholder="Enter secret key (Default: devsnapkit_admin_2026)"
+                  placeholder="Enter your configured admin secret key"
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all pr-10"
                 />
                 <button
@@ -263,7 +261,7 @@ export default function AdminDashboard() {
                 </button>
               </div>
               <p className="text-[11px] text-slate-500 mt-1.5">
-                Default key: <code className="bg-slate-800 px-1 py-0.5 rounded text-indigo-300">devsnapkit_admin_2026</code>
+                Use the admin secret configured on your server. There is no default password.
               </p>
             </div>
 

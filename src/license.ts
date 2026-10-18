@@ -47,14 +47,14 @@ export async function verifyLicenseWithServer(licenseKey: string): Promise<Licen
 }
 
 /**
- * Claims a Pro license key using PayPal Transaction ID or Payer Email via the Cloudflare Edge API.
+ * Claims a Pro license key using a confirmed PayPal Order ID or Transaction ID.
  */
-export async function claimLicenseViaApi(orderId: string, payerEmail: string): Promise<{ success: boolean; licenseKey?: string; error?: string }> {
+export async function claimLicenseViaApi(orderId: string): Promise<{ success: boolean; licenseKey?: string; error?: string }> {
   try {
     const res = await fetch('/api/claim-license', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId, payerEmail }),
+      body: JSON.stringify({ orderId }),
     });
 
     const data = await res.json();

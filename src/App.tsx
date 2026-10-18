@@ -704,7 +704,6 @@ export default function App() {
   const [licenseError, setLicenseError] = useState<string>('');
   const [isVerifyingKey, setIsVerifyingKey] = useState<boolean>(false);
   const [claimOrderId, setClaimOrderId] = useState<string>('');
-  const [claimEmail, setClaimEmail] = useState<string>('');
   const [claimError, setClaimError] = useState<string>('');
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
   const [purchasedLicenseKey, setPurchasedLicenseKey] = useState<string>('');
@@ -1619,8 +1618,8 @@ export default function App() {
 
   // Claim Pro License via PayPal order proof
   const handleClaimLicense = async () => {
-    if (!claimOrderId && !claimEmail) {
-      setClaimError('Please provide your PayPal Transaction ID or Payer Email.');
+    if (!claimOrderId.trim()) {
+      setClaimError('Please provide your PayPal Order ID or Transaction ID. Email alone cannot retrieve a license.');
       return;
     }
 
@@ -1628,7 +1627,7 @@ export default function App() {
     setClaimError('');
 
     try {
-      const result = await claimLicenseViaApi(claimOrderId, claimEmail);
+      const result = await claimLicenseViaApi(claimOrderId.trim());
       if (result.success && result.licenseKey) {
         setPurchasedLicenseKey(result.licenseKey);
         setIsProUnlocked(true);
@@ -4773,7 +4772,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               /* Tab 2: Claim via PayPal Receipt */
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-slate-400">PayPal Transaction ID (Optional if Email provided)</label>
+                  <label className="text-[11px] font-semibold text-slate-400">PayPal Order ID / Transaction ID (Required)</label>
                   <input
                     type="text"
                     value={claimOrderId}
@@ -4783,16 +4782,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-slate-400">PayPal Payer Email</label>
-                  <input
-                    type="email"
-                    value={claimEmail}
-                    onChange={(e) => setClaimEmail(e.target.value)}
-                    placeholder="your-paypal-email@example.com"
-                    className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+                <p className="text-[11px] text-slate-400">Find your order or transaction ID on your PayPal receipt.</p>
 
                 {claimError && (
                   <p className="text-[11px] text-rose-400">{claimError}</p>

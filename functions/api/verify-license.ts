@@ -1,27 +1,9 @@
 // Cloudflare Pages Function: /api/verify-license
 // Authenticates a license key using HMAC-SHA256 signature verification
+import { ConfigurationError, licenseCheck, requireSecret } from '../lib/security';
 
 interface Env {
   DSK_SERVER_SECRET?: string;
-}
-
-// Rotated master signing secret (Revokes all leaked/test keys from vulnerability window)
-export const SERVER_SECRET = 'DSK_MASTER_HMAC_PRO_KEY_2026_V3_REVOKED_ALL_OLD_LEAKS';
-
-async function computeExpectedCheck(secret: string, part1: string, part2: string): Promise<string> {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const data = enc.encode(`DSK:${part1}:${part2}`);
-  const signature = await crypto.subtle.sign('HMAC', key, data);
-  const hashArray = Array.from(new Uint8Array(signature));
-  const hex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-  return hex.slice(0, 4);
 }
 
 export const onRequestPost = async ({ request, env }: { request: Request; env: Env }) => {
@@ -30,9 +12,11 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
   };
 
   try {
+    const secret = requireSecret(env, 'DSK_SERVER_SECRET');
     const body: any = await request.json().catch(() => ({}));
     const { licenseKey } = body;
 
@@ -54,10 +38,9 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     }
 
     const [, part1, part2, check] = match;
-    const secret = env?.DSK_SERVER_SECRET || SERVER_SECRET;
 
     // Cryptographically compute expected HMAC checksum of part1 and part2
-    const expectedCheck = await computeExpectedCheck(secret, part1, part2);
+    const expectedCheck = await licenseCheck(secret, part1, part2);
 
     if (check !== expectedCheck) {
       return new Response(
@@ -83,7 +66,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   } catch (err: any) {
     return new Response(
       JSON.stringify({ valid: false, error: err.message || 'Server verification failed' }),
-      { status: 500, headers: corsHeaders }
+      { status: err instanceof ConfigurationError ? 503 : 500, headers: corsHeaders }
     );
   }
 };

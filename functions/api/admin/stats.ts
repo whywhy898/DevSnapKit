@@ -1,5 +1,6 @@
 // Cloudflare Pages Function: /api/admin/stats
 // Returns aggregated metrics, traffic trends, and real-time orders for the Admin Dashboard
+import { requireSecret, verifyAdminToken } from '../../lib/security';
 
 interface Env {
   ADMIN_SECRET?: string;
@@ -10,39 +11,22 @@ interface Env {
   NOTIFICATION_EMAIL?: string;
 }
 
-const DEFAULT_ADMIN_SECRET = 'devsnapkit_admin_2026';
-
-function verifyAuth(request: Request, env: Env): boolean {
-  const expected = (env.ADMIN_SECRET || DEFAULT_ADMIN_SECRET).trim();
-  const authHeader = request.headers.get('Authorization') || '';
-  const secretHeader = request.headers.get('x-admin-secret') || '';
-  const url = new URL(request.url);
-  const querySecret = url.searchParams.get('secret') || '';
-
-  if (secretHeader && secretHeader.trim() === expected) return true;
-  if (querySecret && querySecret.trim() === expected) return true;
-
-  if (authHeader.startsWith('Bearer ')) {
-    const token = authHeader.slice(7).trim();
-    try {
-      const decoded = atob(token);
-      const [tokenSecret] = decoded.split(':');
-      if (tokenSecret === expected) return true;
-    } catch {}
-  }
-
-  return false;
-}
-
 export const onRequestGet = async ({ request, env }: { request: Request; env: Env }) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-secret',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
   };
 
-  if (!verifyAuth(request, env)) {
+  let secret: string;
+  try { secret = requireSecret(env, 'ADMIN_SECRET'); }
+  catch {
+    return new Response(JSON.stringify({ success: false, error: 'Admin access is not configured.' }), { status: 503, headers: corsHeaders });
+  }
+  const authorization = request.headers.get('Authorization') || '';
+  if (!authorization.startsWith('Bearer ') || !await verifyAdminToken(authorization.slice(7).trim(), secret)) {
     return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
       status: 401,
       headers: corsHeaders,
@@ -367,7 +351,7 @@ export const onRequestOptions = async () => {
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-secret',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   });
 };

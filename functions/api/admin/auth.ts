@@ -1,11 +1,10 @@
 // Cloudflare Pages Function: /api/admin/auth
 // Authenticates admin dashboard access using a secure secret key
+import { ADMIN_SESSION_SECONDS, ConfigurationError, createAdminToken, requireSecret } from '../../lib/security';
 
 interface Env {
   ADMIN_SECRET?: string;
 }
-
-const DEFAULT_ADMIN_SECRET = 'devsnapkit_admin_2026';
 
 export const onRequestPost = async ({ request, env }: { request: Request; env: Env }) => {
   const corsHeaders = {
@@ -13,13 +12,13 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
   };
 
   try {
+    const expectedSecret = requireSecret(env, 'ADMIN_SECRET');
     const body: any = await request.json().catch(() => ({}));
     const { secret } = body;
-
-    const expectedSecret = env.ADMIN_SECRET || DEFAULT_ADMIN_SECRET;
 
     if (!secret || typeof secret !== 'string') {
       return new Response(JSON.stringify({ success: false, error: 'Secret key required' }), {
@@ -35,20 +34,19 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
       });
     }
 
-    // Success! Generate simple session token
-    const token = btoa(`${expectedSecret}:${Date.now()}`);
+    const token = await createAdminToken(expectedSecret);
 
     return new Response(JSON.stringify({
       success: true,
       token,
-      expiresIn: 86400 * 7,
+      expiresIn: ADMIN_SESSION_SECONDS,
     }), {
       status: 200,
       headers: corsHeaders,
     });
   } catch (err: any) {
     return new Response(JSON.stringify({ success: false, error: err.message }), {
-      status: 500,
+      status: err instanceof ConfigurationError ? 503 : 500,
       headers: corsHeaders,
     });
   }

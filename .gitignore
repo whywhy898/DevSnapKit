@@ -18,6 +18,8 @@ wrangler.toml
 .env
 .env.local
 .env.*.local
+.dev.vars
+.dev.vars.*
 
 # Logs
 *.log

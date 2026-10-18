@@ -3,8 +3,10 @@
 
 import { generateSignedKey, markTransactionVerified } from './claim-license';
 import { sendOrderNotification } from './notify';
+import { ConfigurationError, requireSecret } from '../lib/security';
 
 interface Env {
+  DSK_SERVER_SECRET?: string;
   PAYPAL_CLIENT_ID?: string;
   PAYPAL_CLIENT_SECRET?: string;
   PAYPAL_MODE?: string;
@@ -48,6 +50,8 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   };
 
   try {
+    // Validate issuance configuration before making any request that can charge a buyer.
+    const signingSecret = requireSecret(env, 'DSK_SERVER_SECRET');
     const body: any = await request.json().catch(() => ({}));
     const { orderId } = body;
 
@@ -99,7 +103,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     if (txnId) markTransactionVerified(txnId);
 
     // Issue cryptographic license key
-    const licenseKey = await generateSignedKey(txnId);
+    const licenseKey = await generateSignedKey(txnId, signingSecret);
 
     const orderRecord = {
       orderId: orderId.trim(),
@@ -179,7 +183,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     });
   } catch (err: any) {
     return new Response(JSON.stringify({ success: false, error: err.message || 'Internal server error capturing PayPal payment' }), {
-      status: 500,
+      status: err instanceof ConfigurationError ? 503 : 500,
       headers: corsHeaders,
     });
   }
