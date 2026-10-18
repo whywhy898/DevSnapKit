@@ -5,7 +5,7 @@ import {
   Search, Shield, Check, Copy, ExternalLink,
   Lock, Eye, EyeOff, BarChart3, AlertTriangle,
   Sparkles, Database, Layers, Upload,
-  Settings, X, Tag, Palette, CreditCard, Download
+  Settings, X, Tag, Palette, CreditCard, Download, Trash2
 } from 'lucide-react';
 
 interface StatsData {
@@ -220,6 +220,37 @@ export default function AdminDashboard() {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
+  const [isClearing, setIsClearing] = useState<boolean>(false);
+
+  const handleClearVisits = async () => {
+    if (!window.confirm('确定要清空所有的历史访问与行为数据吗？\n\n注意：此操作将清空 PV、UV、试用与导出等所有统计记录（不会影响真实付费订单）。')) {
+      return;
+    }
+
+    setIsClearing(true);
+    try {
+      const token = localStorage.getItem('devsnapkit_admin_token') || '';
+      const res = await fetch('/api/admin/stats', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStats();
+        alert('已成功清空所有访问记录！');
+      } else {
+        alert('清空失败: ' + (data.error || '未知错误'));
+      }
+    } catch (err: any) {
+      alert('清空请求出错: ' + err.message);
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   const toggleRevealKey = (id: string) => {
     setRevealedKeys(prev => ({ ...prev, [id]: !prev[id] }));
   };
@@ -407,6 +438,15 @@ export default function AdminDashboard() {
             title="Refresh Data"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-indigo-400' : ''}`} />
+          </button>
+
+          <button
+            onClick={handleClearVisits}
+            disabled={isClearing || isLoading}
+            className="p-2 text-rose-400 hover:text-white bg-rose-950/40 hover:bg-rose-900/60 rounded-lg transition-colors border border-rose-800/50"
+            title="清空历史访问记录 (Clear Visit Logs)"
+          >
+            <Trash2 className={`w-4 h-4 ${isClearing ? 'animate-pulse' : ''}`} />
           </button>
 
           <a

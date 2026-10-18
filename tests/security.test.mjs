@@ -136,3 +136,34 @@ test('blank and short admin configuration is rejected', async () => {
     assert.equal((await post(admin.onRequestPost, { secret: value }, { ADMIN_SECRET: value })).status, 503);
   }
 });
+
+test('stats delete rejects unauthorized request', async () => {
+  const res = await stats.onRequestDelete({ request: new Request('https://qa.invalid/api/admin/stats', { method: 'DELETE' }), env });
+  assert.equal(res.status, 401);
+});
+
+test('stats delete clears D1 events and KV stats with valid admin token', async () => {
+  let executedSql = '';
+  const deletedKeys = [];
+  const mockDB = { prepare: (sql) => ({ run: async () => { executedSql = sql; return { success: true }; } }) };
+  const mockKV = {
+    list: async () => ({ keys: [{ name: 'stats:2026-10-17' }, { name: 'stats:2026-10-18' }] }),
+    delete: async (name) => { deletedKeys.push(name); }
+  };
+  const { token } = await (await post(admin.onRequestPost, { secret: adminSecret })).json();
+  const res = await stats.onRequestDelete({
+    request: new Request('https://qa.invalid/api/admin/stats', {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer ' + token }
+    }),
+    env: { ...env, DB: mockDB, DSK_KV: mockKV }
+  });
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.success, true);
+  assert.equal(data.d1Cleared, true);
+  assert.equal(data.kvClearedCount, 2);
+  assert.ok(executedSql.includes('DELETE FROM events'));
+  assert.deepEqual(deletedKeys, ['stats:2026-10-17', 'stats:2026-10-18']);
+});
+

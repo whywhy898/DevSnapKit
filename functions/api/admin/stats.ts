@@ -345,13 +345,79 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
   }
 };
 
+export const onRequestDelete = async ({ request, env }: { request: Request; env: Env }) => {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
+  };
+
+  let secret: string;
+  try { secret = requireSecret(env, 'ADMIN_SECRET'); }
+  catch {
+    return new Response(JSON.stringify({ success: false, error: 'Admin access is not configured.' }), { status: 503, headers: corsHeaders });
+  }
+  const authorization = request.headers.get('Authorization') || '';
+  if (!authorization.startsWith('Bearer ') || !await verifyAdminToken(authorization.slice(7).trim(), secret)) {
+    return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+      status: 401,
+      headers: corsHeaders,
+    });
+  }
+
+  try {
+    let d1Cleared = false;
+    let kvClearedCount = 0;
+
+    // 1. Delete all events from D1
+    if (env.DB) {
+      await env.DB.prepare('DELETE FROM events').run();
+      d1Cleared = true;
+    }
+
+    // 2. Delete all stats keys from KV if bound
+    const kv = env.DSK_KV || env.DSK_ORDERS;
+    if (kv && kv.list) {
+      try {
+        const listRes = await kv.list({ prefix: 'stats:' });
+        if (listRes?.keys) {
+          for (const key of listRes.keys) {
+            await kv.delete(key.name);
+            kvClearedCount++;
+          }
+        }
+      } catch (kvErr) {
+        console.error('[Admin KV Clear Error]', kvErr);
+      }
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'All visit and telemetry records have been cleared successfully.',
+      d1Cleared,
+      kvClearedCount,
+    }), {
+      status: 200,
+      headers: corsHeaders,
+    });
+  } catch (err: any) {
+    return new Response(JSON.stringify({ success: false, error: err.message }), {
+      status: 500,
+      headers: corsHeaders,
+    });
+  }
+};
+
 export const onRequestOptions = async () => {
   return new Response(null, {
     status: 204,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   });
 };
+
