@@ -20,6 +20,10 @@ export class AssetRegistry {
   register(asset: PosterAsset) { this.records.set(asset.id, asset); return asset; }
   get(id: string | null | undefined) { return id ? this.records.get(id) : undefined; }
   resolve(id: string | null | undefined) { return this.get(id)?.url; }
+  getBlob(url: string) {
+    for (const asset of this.records.values()) if (asset.url === url) return asset.blob;
+    return undefined;
+  }
   async add(file: File): Promise<PosterAsset> {
     if (this.disposed) throw new Error('This editing session has closed.');
     const check = validateAssetFile(file);

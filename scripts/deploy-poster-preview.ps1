@@ -18,8 +18,17 @@ try {
   [IO.File]::WriteAllText($headers, $headerText)
   [IO.File]::WriteAllText((Join-Path $stage 'public/robots.txt'), "User-agent: *`nDisallow: /`n")
   Push-Location $stage
+  $previousGitDir = $env:GIT_DIR
+  $previousGitWorkTree = $env:GIT_WORK_TREE
   try {
+    # Staging lives in the outer workspace repository; resolve metadata against the product.
+    $env:GIT_DIR = Join-Path $productRoot '.git'
+    $env:GIT_WORK_TREE = $productRoot
     npx wrangler pages deploy public --project-name devsnapkit --branch poster-v1-review --commit-hash $commit --commit-dirty=true
     if ($LASTEXITCODE -ne 0) { throw "Preview deployment failed with exit code $LASTEXITCODE." }
-  } finally { Pop-Location }
+  } finally {
+    $env:GIT_DIR = $previousGitDir
+    $env:GIT_WORK_TREE = $previousGitWorkTree
+    Pop-Location
+  }
 } finally { Pop-Location }

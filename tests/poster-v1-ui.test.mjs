@@ -226,3 +226,30 @@ test('export releases an existing captured gesture and freezes its position unti
     assert.deepEqual(await position(page,'main'),frozen,'gesture completion cannot alter the downloaded composition');
   }finally{await browser.close();}
 });
+
+test('uploaded image exports under the unchanged production Content-Security-Policy',{timeout:60000},async()=>{
+  const browser=await launchBrowser();
+  try{
+    const page=await browser.newPage();
+    const response=await page.goto(url,{waitUntil:'networkidle0'});
+    const policy=response.headers()['content-security-policy'];
+    assert.ok(policy,'browser runner must serve the production CSP');
+    const productionHeaders=await fs.readFile(new URL('../public/_headers',import.meta.url),'utf8');
+    assert.equal(policy,productionHeaders.match(/^\s+Content-Security-Policy:\s*(.+)$/m)?.[1].trim());
+    const connect=policy.split(';').find(value=>value.trim().startsWith('connect-src'));
+    assert.ok(connect&&!connect.includes('blob:'),'production connect-src still blocks fetching blob URLs');
+    await page.close();
+    const editor=await open(browser);
+    const violations=[];
+    await editor.evaluate(()=>{window.__posterCspViolations=[];document.addEventListener('securitypolicyviolation',event=>window.__posterCspViolations.push({directive:event.effectiveDirective,blocked:event.blockedURI}));});
+    await upload(editor,'main','square.png');
+    assert.match(await source(editor,'main'),/^blob:/,'replacement uses the real decoded local file');
+    const result=await downloadPng(editor,path.join(evidence,'csp'),'uploaded-production-csp.png',()=>clickButton(editor,'Download PNG'));
+    const metadata=await sharp(result.path).metadata();assert.equal(metadata.width,1600);assert.equal(metadata.height,1200);
+    const pixels=await sharp(result.path).resize(80,60).removeAlpha().raw().toBuffer();
+    let nonPaper=0;for(let index=0;index<pixels.length;index+=3)if(pixels[index]<200||pixels[index+1]<200)nonPaper++;
+    assert.ok(nonPaper>100,'download must contain the actual template and image, not only a paper background');
+    violations.push(...await editor.evaluate(()=>window.__posterCspViolations.filter(event=>event.directive==='connect-src'&&event.blocked.startsWith('blob:'))));
+    assert.deepEqual(violations,[],'export must embed uploaded bytes without a forbidden blob fetch');
+  }finally{await browser.close();}
+});

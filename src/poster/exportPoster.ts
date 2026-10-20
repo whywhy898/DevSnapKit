@@ -1,6 +1,22 @@
 import { getFontEmbedCSS, toPng } from 'html-to-image';
 
 let fontCSS: Promise<string> | undefined;
+const imageData = new WeakMap<Blob, Promise<string>>();
+
+function inlineLocalImage(blob: Blob): Promise<string> {
+  let cached = imageData.get(blob);
+  if (!cached) {
+    cached = new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Local image could not be prepared.'));
+      reader.onerror = () => reject(new Error('Local image could not be prepared.'));
+      reader.readAsDataURL(blob);
+    });
+    imageData.set(blob, cached);
+    cached.catch(() => imageData.delete(blob));
+  }
+  return cached;
+}
 
 export async function preparePoster(root: HTMLElement) {
   await Promise.all([
@@ -24,7 +40,7 @@ export function posterTextIssues(root: HTMLElement): string[] {
 
 /** Export the exact artwork DOM. Only the preview shell is scaled; its ancestor
  * scale is removed by cloning the root at its stable 1600 × 1200 logical size. */
-export async function exportPoster(root: HTMLElement, pixelRatio: 1 | 2): Promise<string> {
+export async function exportPoster(root: HTMLElement, pixelRatio: 1 | 2, resolveBlob?: (url: string) => Blob | undefined): Promise<string> {
   await preparePoster(root);
   const issues = posterTextIssues(root);
   if (issues.length) throw new Error(issues.join('\n'));
@@ -32,11 +48,28 @@ export async function exportPoster(root: HTMLElement, pixelRatio: 1 | 2): Promis
   fontCSS ??= getFontEmbedCSS(root).catch(error => { fontCSS = undefined; throw error; });
   const fontEmbedCSS = await fontCSS;
   if (!fontEmbedCSS.includes('data:')) throw new Error('Poster font embedding failed. Please try again.');
-  return toPng(root, { width: 1600, height: 1200, pixelRatio, fontEmbedCSS,
-    backgroundColor: '#fbf8eb', cacheBust: false,
-    style: { transform: 'none', transformOrigin: 'top left', margin: '0' },
-    filter: node => !(node instanceof HTMLElement && node.dataset.exportIgnore === 'true'),
-  });
+  // The production CSP intentionally disallows fetch(blob:). Read original local
+  // Blobs directly instead of relaxing connect-src or changing the user's preview.
+  const artwork = root.cloneNode(true) as HTMLElement;
+  for (const image of artwork.querySelectorAll('img')) {
+    if (!image.src.startsWith('blob:')) continue;
+    const blob = resolveBlob?.(image.src);
+    if (!blob) throw new Error(`${image.alt || 'Poster image'} is no longer available. Replace it and try again.`);
+    image.src = await inlineLocalImage(blob);
+  }
+  const host = document.createElement('div');
+  Object.assign(host.style, { position: 'absolute', left: '-100000px', top: '0', width: '1600px', height: '1200px', pointerEvents: 'none' });
+  host.setAttribute('aria-hidden', 'true');
+  host.appendChild(artwork);
+  root.parentElement!.appendChild(host);
+  try {
+    await Promise.all([...artwork.querySelectorAll('img')].map(image => image.decode()));
+    return await toPng(artwork, { width: 1600, height: 1200, pixelRatio, fontEmbedCSS,
+      backgroundColor: '#fbf8eb', cacheBust: false,
+      style: { transform: 'none', transformOrigin: 'top left', margin: '0' },
+      filter: node => !(node instanceof HTMLElement && node.dataset.exportIgnore === 'true'),
+    });
+  } finally { host.remove(); }
 }
 
 export function downloadPoster(dataUrl: string, pixelRatio: 1 | 2) {

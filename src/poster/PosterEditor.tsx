@@ -133,7 +133,7 @@ export function PosterEditor({ isProUnlocked, active = true, onExportingChange }
     if (doc.detailVisible && !doc.assets.detail) { setError('Detail image is missing. Replace it or hide the detail card.'); return; }
     if (clipped.length && !confirmed) { setCropConfirmation(true); return; }
     setCropConfirmation(false); setExporting(true); onExportingChange?.(true);
-    try { downloadPoster(await exportPoster(root.current, pixelRatio), pixelRatio); trackEvent('poster_export_success', { scale: pixelRatio }); }
+    try { downloadPoster(await exportPoster(root.current, pixelRatio, url => registry.current?.getBlob(url)), pixelRatio); trackEvent('poster_export_success', { scale: pixelRatio }); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Poster export failed. Please try again.'); trackEvent('poster_export_failed', { code: 'render_failed' }); }
     finally { setExporting(false); onExportingChange?.(false); }
   };

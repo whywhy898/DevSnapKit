@@ -7,7 +7,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const port = 5197;
 const origin = `http://127.0.0.1:${port}`;
 const vite = path.join(path.dirname(require.resolve('vite/package.json')), 'bin/vite.js');
-const server = spawn(process.execPath, [vite, '--host', '127.0.0.1', '--port', String(port), '--strictPort'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+const server = spawn(process.execPath, [vite, '--config', 'tests/vite-poster.config.mjs', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
 let serverErrors = '';
 server.stderr.on('data', chunk => { serverErrors = (serverErrors + chunk).slice(-4000); });
 server.stdout.on('data', () => {});
