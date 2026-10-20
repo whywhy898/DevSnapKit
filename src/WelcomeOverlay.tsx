@@ -70,6 +70,7 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
 }) => {
   const [heroIndex, setHeroIndex] = useState(0);
   const [visible, setVisible] = useState<boolean>(() => {
+    if (new URLSearchParams(window.location.search).get('editor') === '1') return false;
     try {
       return !localStorage.getItem(STORAGE_KEY);
     } catch {
@@ -177,11 +178,11 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
               </div>
 
               <h1 className="welcome-hero-title">
-                Create Amazing Mockups
+                Turn Screenshots into Beautiful Product Mockups
               </h1>
 
               <p className="welcome-hero-subtitle">
-                Beautiful mockups, OpenGraph cards and branded visuals — in seconds.
+                Add device frames, backgrounds, and 3D angles to your screenshots. Create polished launch visuals directly in your browser.
               </p>
 
               {/* Carousel Indicators */}
@@ -332,10 +333,10 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
             onClick={close}
             className="welcome-start-btn"
           >
-            Start Creating
+            Create Your First Mockup
           </button>
           <p className="welcome-legal">
-            By clicking "Start Creating" you agree to our{' '}
+            By clicking "Create Your First Mockup" you agree to our{' '}
             <button
               type="button"
               onClick={() => handleLegal('terms')}
@@ -352,6 +353,9 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
               Privacy Policy
             </button>
           </p>
+          <a href="/screenshot-beautifier/" className="text-[11px] text-slate-600 underline hover:text-slate-900">
+            Explore the screenshot beautifier
+          </a>
         </div>
       </div>
     </div>

@@ -1595,6 +1595,42 @@ body.theme-light .min-h-screen {
   background: #6366f1;
 }
 
+/* Keep the longer welcome copy clear of the fixed CTA on narrow phones. */
+@media (max-width: 380px) {
+  .welcome-hero {
+    padding: 60px 16px 140px;
+    justify-content: flex-start;
+  }
+
+  .welcome-hero-content {
+    gap: 12px;
+  }
+
+  .welcome-hero-title {
+    font-size: 28px;
+    line-height: 1.12;
+  }
+
+  .welcome-hero-subtitle {
+    font-size: 14px;
+  }
+
+  .welcome-cta {
+    padding: 20px 16px 16px;
+    gap: 8px;
+  }
+
+  .welcome-start-btn {
+    padding: 14px 20px;
+    max-width: 100%;
+  }
+
+  .welcome-legal {
+    display: block;
+    text-align: center;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .welcome-kenburns-img, .welcome-start-btn {
     animation: none !important;
