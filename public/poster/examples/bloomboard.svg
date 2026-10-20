@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1000" viewBox="0 0 1440 1000">
+<rect width="1440" height="1000" fill="#fafbf7"/><rect width="250" height="1000" fill="#f0f2e9"/>
+<text x="36" y="68" font-family="sans-serif" font-size="27" font-weight="bold" fill="#354339">✳ Bloomboard</text>
+<g font-family="sans-serif" font-size="19" fill="#657164"><text x="38" y="160">◫  Overview</text><text x="38" y="222">▤  Projects</text><text x="38" y="284">◉  Notes</text><text x="38" y="346">✓  My tasks</text><text x="38" y="916">Your space to grow</text></g>
+<g font-family="sans-serif" fill="#354339"><text x="310" y="100" font-size="17" fill="#7d8a79">YOUR WORK, IN ONE GOOD PLACE</text><text x="310" y="163" font-size="45" font-weight="bold">A fresh start for big ideas.</text><text x="310" y="210" font-size="20" fill="#7d8a79">Make a little progress. Find a little more room.</text></g>
+<rect x="310" y="267" width="1057" height="210" rx="22" fill="#e3e9d3"/>
+<g font-family="sans-serif" fill="#43533f"><text x="350" y="320" font-size="19">THIS WEEK</text><text x="350" y="387" font-size="43" font-weight="bold">Build something that matters.</text><text x="350" y="432" font-size="19">Three projects moving forward. One clear next step.</text></g>
+<g fill="white" stroke="#e2e5dc"><rect x="310" y="520" width="322" height="300" rx="18"/><rect x="677" y="520" width="322" height="300" rx="18"/><rect x="1044" y="520" width="322" height="300" rx="18"/></g>
+<g font-family="sans-serif" font-size="24" font-weight="bold" fill="#354339"><text x="342" y="579">Brand refresh</text><text x="709" y="579">Our next chapter</text><text x="1076" y="579">The small details</text></g>
+<g fill="#e8e3d5"><rect x="342" y="614" width="256" height="103" rx="9"/><rect x="709" y="614" width="256" height="103" rx="9"/><rect x="1076" y="614" width="256" height="103" rx="9"/></g>
+<g font-family="sans-serif" font-size="16" fill="#7d8a79"><text x="342" y="765">4 tasks · In progress</text><text x="709" y="765">2 tasks · Planning</text><text x="1076" y="765">6 tasks · Looking good</text><text x="310" y="917">Original demo interface. Illustrative content only.</text></g>
+</svg>

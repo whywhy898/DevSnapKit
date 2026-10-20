@@ -28,6 +28,7 @@ import { WindowTheme } from './MockupUnit';
 import { DuoThumbnail, DuoLayoutType } from './DuoThumbnail';
 import { useEditorHistory, EditorSnapshot } from './useHistory';
 import { CanvasStage, DeviceComposition, FittedScene, SceneSize } from './CanvasLayout';
+import { PosterEditor } from './poster/PosterEditor';
 
 // Helper to get true outer rendered DOM dimensions of canvas node (including padding/border)
 function getCanvasRenderedDimensions(el: HTMLElement | null): { width: number; height: number } {
@@ -581,6 +582,8 @@ export default function App() {
   const [secondarySrc, setSecondarySrc] = useState<string | null>(null);
   const [secondaryName, setSecondaryName] = useState<string>('');
   const [layoutMode, setLayoutMode] = useState<'single' | 'duo'>('single');
+  const [studioMode, setStudioMode] = useState<'mockup' | 'poster'>('mockup');
+  const [posterExporting, setPosterExporting] = useState(false);
   const [duoLayout, setDuoLayout] = useState<DuoLayoutType>('side');
   const [isSlot2Dragging, setIsSlot2Dragging] = useState<boolean>(false);
   const secondaryFileInputRef = useRef<HTMLInputElement>(null);
@@ -1199,6 +1202,7 @@ export default function App() {
   // Global Clipboard Paste Support (Shots.so style: press Ctrl+V anywhere)
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
+      if (studioMode !== 'mockup') return;
       const items = e.clipboardData?.items;
       if (!items) return;
       for (let i = 0; i < items.length; i++) {
@@ -1230,7 +1234,7 @@ export default function App() {
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [layoutMode, secondarySrc]);
+  }, [layoutMode, secondarySrc, studioMode]);
 
   // Handle Custom Background Image Upload (F3)
   const handleBgImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1692,6 +1696,7 @@ export default function App() {
       el instanceof HTMLElement && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || (el as HTMLElement)?.isContentEditable);
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (studioMode !== 'mockup') return;
       if (isEditable(e.target)) return;
 
       if (e.key === 'Escape') {
@@ -1754,7 +1759,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, handleDownload, layoutMode, secondarySrc, showExportMenu, showDemoTemplatesMenu]);
+  }, [undo, redo, handleDownload, layoutMode, secondarySrc, showExportMenu, showDemoTemplatesMenu, studioMode]);
 
   // Handle Starter Preset Template Application
   const handleApplyPreset = (preset: typeof MOCKUP_PRESETS[0]) => {
@@ -1933,6 +1938,14 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
         </div>
       </header>
 
+      <nav aria-label="Studio mode" className="flex justify-center gap-2 p-2 border-b border-slate-700">
+        <button type="button" disabled={posterExporting} aria-pressed={studioMode === 'mockup'} onClick={() => setStudioMode('mockup')} className="px-4 py-2 rounded-lg border border-slate-400 text-sm">Mockup</button>
+        <button type="button" disabled={posterExporting} aria-pressed={studioMode === 'poster'} onClick={() => setStudioMode('poster')} className="px-4 py-2 rounded-lg border border-slate-400 text-sm">Poster</button>
+      </nav>
+      <div hidden={studioMode !== 'poster'}>
+        <PosterEditor active={studioMode === 'poster'} isProUnlocked={isProUnlocked} onRequestPro={() => setShowProModal(true)} onExportingChange={setPosterExporting} />
+      </div>
+      <div hidden={studioMode !== 'mockup'}>
       {/* Main Studio Workspace - Edge-to-Edge Shots.so Layout */}
       <main className="flex-1 w-full flex flex-col lg:flex-row lg:h-[calc(100vh-64px)] lg:overflow-hidden bg-[#08090d]">
         
@@ -2188,6 +2201,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             {/* Transparent checkerboard hint (only in transparent mode for preview) */}
             {bgType === 'transparent' && (
               <div 
+                data-export-ignore="true"
                 className="absolute inset-0 z-0 pointer-events-none opacity-30 bg-[radial-gradient(#475569_1.5px,transparent_1.5px)] [background-size:16px_16px]" 
               />
             )}
@@ -4518,6 +4532,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
         </aside>
 
       </main>
+      </div>
 
       {/* Footer with Real Legal & Trust Links */}
       <footer className="border-t border-white/[0.06] bg-[#07080c] py-8 px-4 sm:px-6 lg:px-8 text-center text-xs text-white/40 space-y-3">

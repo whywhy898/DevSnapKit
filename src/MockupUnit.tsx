@@ -24,6 +24,7 @@ export interface MockupUnitProps {
   cornerStyle?: CornerStyle;
   roundedCorners?: number;
   windowTitle?: string;
+  windowTitleStyle?: React.CSSProperties;
   hideFrame?: boolean;
   zoomStyle?: React.CSSProperties;
 }
@@ -110,6 +111,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
   cornerStyle = 'default',
   roundedCorners = 12,
   windowTitle = '',
+  windowTitleStyle,
   hideFrame = false,
   zoomStyle,
 }) => {
@@ -381,7 +383,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
 
             <div className="flex-1 max-w-sm mx-auto bg-black/40 border border-white/10 rounded-lg px-2.5 py-1 flex items-center gap-1.5 text-[11px] text-slate-300 font-mono shadow-inner">
               <Lock className="w-3 h-3 text-emerald-400 shrink-0" />
-              <span className="truncate select-none">{windowTitle || 'https://devsnapkit.com'}</span>
+              <span className="truncate select-none" style={windowTitleStyle} data-poster-text={windowTitleStyle ? 'browserTitle' : undefined}>{windowTitleStyle ? windowTitle : windowTitle || 'https://devsnapkit.com'}</span>
               <RotateCw className="w-2.5 h-2.5 text-slate-500 shrink-0 ml-auto" />
             </div>
 

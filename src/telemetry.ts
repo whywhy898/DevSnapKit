@@ -58,7 +58,11 @@ export type TelemetryEventType =
   | 'zoom_change'
   | 'mockup_zoom_change'
   | 'bg_image_upload'
-  | 'theme_mode_toggle';
+  | 'theme_mode_toggle'
+  | 'poster_open'
+  | 'poster_asset_replaced'
+  | 'poster_export_success'
+  | 'poster_export_failed';
 
 export function trackEvent(eventType: TelemetryEventType, metadata?: Record<string, any>) {
   if (typeof window === 'undefined') return;

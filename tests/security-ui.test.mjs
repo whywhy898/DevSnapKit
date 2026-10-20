@@ -22,7 +22,7 @@ test('admin UI stores only a token and removes legacy saved passwords', { skip: 
         request.respond({ status: 503, contentType: 'application/json', body: JSON.stringify({ success: false, error: 'QA stats unavailable' }) });
       } else request.continue();
     });
-    await page.goto(process.env.TEST_UI_URL + '/admin', { waitUntil: 'networkidle0' });
+    await page.goto(new URL('/admin', process.env.TEST_UI_URL).href, { waitUntil: 'networkidle0' });
     assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_admin_secret')), null);
     assert.ok(!await page.evaluate(() => document.body.innerText.includes('devsnapkit_admin_2026')));
     await page.type('input[type=password]', password);
