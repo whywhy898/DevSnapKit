@@ -27,7 +27,8 @@ import {
 import { WindowTheme } from './MockupUnit';
 import { DuoThumbnail, DuoLayoutType } from './DuoThumbnail';
 import { useEditorHistory, EditorSnapshot } from './useHistory';
-import { CanvasStage, DeviceComposition, FittedScene, SceneSize } from './CanvasLayout';
+import { CanvasStage, SceneSize } from './CanvasLayout';
+import { MockupArtwork } from './MockupArtwork';
 import { PosterEditor } from './poster/PosterEditor';
 import { emptyTextDocument } from './text/document';
 
@@ -2173,162 +2174,16 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
           {/* Canvas Node Captured by html-to-image */}
           <CanvasStage width={canvasLogicalSize.width} height={canvasLogicalSize.height}>
-          <div 
-            ref={canvasRef}
-            id="studio-canvas"
-            data-canvas-root="true"
-            className={`absolute left-0 top-0 rounded-2xl flex flex-col items-center justify-center overflow-hidden shadow-2xl ${
-              bgType === 'gradient' && !isCustomGradient
-                ? gradient.className
-                : bgType === 'transparent'
-                ? 'bg-transparent ring-1 ring-white/10'
-                : bgType === 'pattern' && selectedPattern === 'dots'
-                ? 'bg-slate-950 bg-[radial-gradient(rgba(255,255,255,0.22)_1.5px,transparent_1.5px)] [background-size:24px_24px]'
-                : bgType === 'pattern' && selectedPattern === 'grid'
-                ? 'bg-slate-950 bg-[linear-gradient(to_right,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.07)_1px,transparent_1px)] [background-size:32px_32px]'
-                : bgType === 'pattern' && selectedPattern === 'spotlight'
-                ? 'bg-[#0a0c14] bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.35),rgba(255,255,255,0))]'
-                : bgType === 'pattern' && selectedPattern === 'aurora'
-                ? 'bg-[#060814] bg-[radial-gradient(circle_at_20%_20%,rgba(99,102,241,0.4)_0%,transparent_50%),radial-gradient(circle_at_80%_80%,rgba(236,72,153,0.35)_0%,transparent_50%)]'
-                : ''
-            }`}
-            style={{ 
-              width: canvasLogicalSize.width,
-              height: canvasLogicalSize.height,
-              transform: 'scale(var(--canvas-preview-scale, 1))',
-              transformOrigin: 'top left',
-              padding: `${effectivePaddingY}px ${effectivePaddingX}px`,
-              backgroundColor: bgType === 'solid' ? solidColor : undefined,
-              backgroundImage: bgType === 'gradient' && isCustomGradient 
-                ? `linear-gradient(${customGradAngle}deg, ${customGradColor1}, ${customGradColor2})` 
-                : undefined
-            }}
-          >
-            {/* Transparent checkerboard hint (only in transparent mode for preview) */}
-            {bgType === 'transparent' && (
-              <div 
-                data-export-ignore="true"
-                className="absolute inset-0 z-0 pointer-events-none opacity-30 bg-[radial-gradient(#475569_1.5px,transparent_1.5px)] [background-size:16px_16px]" 
-              />
-            )}
-
-            {/* Custom Image Background Layer (F3) */}
-            {bgType === 'image' && bgImageSrc && (
-              <div 
-                className="absolute inset-0 z-0 pointer-events-none overflow-hidden"
-                style={{ opacity: bgImageOpacity / 100 }}
-              >
-                <img 
-                  src={bgImageSrc} 
-                  alt="Canvas Background"
-                  className="w-full h-full block" 
-                  style={{ 
-                    objectFit: bgImageFit, 
-                    filter: bgImageBlur > 0 ? `blur(${bgImageBlur}px)` : undefined,
-                    transform: bgImageBlur > 0 ? 'scale(1.06)' : undefined,
-                    transformOrigin: 'center center',
-                  }} 
-                />
-              </div>
-            )}
-
-            {/* VFX 1: Ambient Backlight Glow (Shots.so Aesthetic) */}
-            {vfxGlow && bgType !== 'transparent' && (
-              <div 
-                className="absolute pointer-events-none rounded-full blur-[100px] transition-all duration-300 -z-0"
-                style={{
-                  width: '65%',
-                  height: '65%',
-                  backgroundColor: vfxGlowColor,
-                  opacity: (vfxGlowOpacity / 100),
-                  transform: 'translate(-50%, -50%)',
-                  top: '50%',
-                  left: '50%',
-                }}
-              />
-            )}
-
-            {/* VFX 2: Film Grain & Organic Noise (Shots.so Tactile Filter) */}
-            {vfxNoise && (
-              <div 
-                className="absolute inset-0 pointer-events-none z-30 mix-blend-overlay"
-                style={{
-                  opacity: vfxNoiseOpacity / 100,
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
-                }}
-              />
-            )}
-
-            <FittedScene
-              width={canvasLogicalSize.width} height={canvasLogicalSize.height}
-              paddingX={effectivePaddingX} paddingY={effectivePaddingY}
-              basisWidth={layoutMode === 'single' && isPhoneTheme ? 375 : 1024}
-              zoom={mockupZoom} offsetX={mockupOffsetX} offsetY={mockupOffsetY}
-              projection={layoutPreset} onNaturalSize={handleNaturalSceneSize}
-            >
-              <DeviceComposition
-                mode={layoutMode} duoLayout={duoLayout}
-                theme={windowTheme} imageSrc={imageSrc} imageName={imageName}
-                onReplace={() => fileInputRef.current?.click()}
-                shadowLevel={shadowLevel} shadowOpacity={shadowOpacity}
-                cornerStyle={cornerStyle} roundedCorners={roundedCorners}
-                windowTitle={windowTitle} hideFrame={hideMockup} zoomStyle={zoomStyle}
-                secondarySrc={secondarySrc} secondaryName={secondaryName}
-                onReplaceSecondary={() => secondaryFileInputRef.current?.click()}
-                emptySlot={renderEmptySlot2()}
-              />
-            </FittedScene>
-
-            {/* Pro Feature: Custom Brand Logo */}
-            {isProUnlocked && logoDataUrl && (
-              <img
-                src={logoDataUrl}
-                alt="Brand Logo"
-                className="absolute object-contain select-none pointer-events-none transition-all z-20"
-                style={{
-                  [logoPos.includes('bottom') ? 'bottom' : 'top']: `${Math.max(12, Math.round(padding * 0.45))}px`,
-                  [logoPos.includes('right') ? 'right' : 'left']: `${Math.max(12, Math.round(padding * 0.45))}px`,
-                  height: `${logoScale}%`,
-                  maxHeight: `${logoScale}%`,
-                  opacity: logoOpacity,
-                }}
-              />
-            )}
-
-            {/* Pro Feature: Dynamic QR Code */}
-            {isProUnlocked && qrDataUrl && (
-              <div
-                className="absolute select-none pointer-events-none transition-all z-20 flex items-center justify-center p-1 bg-white/95 backdrop-blur-md rounded-lg shadow-lg border border-white/40"
-                style={{
-                  [qrPos.includes('bottom') ? 'bottom' : 'top']: `${Math.max(12, Math.round(padding * 0.45))}px`,
-                  [qrPos.includes('left') ? 'left' : 'right']: `${Math.max(12, Math.round(padding * 0.45))}px`,
-                  height: `${qrScale}%`,
-                  aspectRatio: '1/1',
-                }}
-              >
-                <img
-                  src={qrDataUrl}
-                  alt="QR Code"
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            )}
-
-            {/* Pro Feature: Custom Brand Text Badge */}
-            {isProUnlocked && customBrandWatermark.trim() && (
-              <div 
-                className="absolute text-[11px] font-semibold text-white/90 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-md border border-white/20 select-none whitespace-nowrap shrink-0 pointer-events-none tracking-wide z-10 shadow-lg flex items-center gap-1.5"
-                style={{
-                  bottom: `${Math.max(10, Math.round(padding * 0.35))}px`,
-                  right: `${Math.max(12, Math.round(padding * 0.45))}px`,
-                }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block shadow-sm" />
-                <span>{customBrandWatermark.trim()}</span>
-              </div>
-            )}
-
-          </div>
+          <MockupArtwork
+            {...currentSnapshot}
+            canvasRef={canvasRef} gradient={gradient} canvasLogicalSize={canvasLogicalSize}
+            effectivePaddingX={effectivePaddingX} effectivePaddingY={effectivePaddingY}
+            isPhoneTheme={isPhoneTheme} zoomStyle={zoomStyle}
+            handleNaturalSceneSize={handleNaturalSceneSize}
+            onReplace={() => fileInputRef.current?.click()}
+            onReplaceSecondary={() => secondaryFileInputRef.current?.click()}
+            emptySlot={renderEmptySlot2()} isProUnlocked={isProUnlocked} qrDataUrl={qrDataUrl}
+          />
 
           {/* Floating Bottom Studio Dock */}
           </CanvasStage>

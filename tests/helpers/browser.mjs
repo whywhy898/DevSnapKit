@@ -4,12 +4,12 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const puppeteer = require('puppeteer-core');
 
-export async function launchBrowser() {
+export async function launchBrowser(extraArgs = []) {
   const candidates = [process.env.BROWSER_EXECUTABLE, 'C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].filter(Boolean);
   let executablePath;
   for (const candidate of candidates) { try { await fs.access(candidate); executablePath = candidate; break; } catch {} }
   if (!executablePath) throw new Error('Install Chrome/Edge or set BROWSER_EXECUTABLE');
-  return puppeteer.launch({ executablePath, headless: true, args: ['--no-sandbox', '--no-proxy-server'] });
+  return puppeteer.launch({ executablePath, headless: true, args: ['--no-sandbox', '--no-proxy-server', ...extraArgs] });
 }
 
 export async function clickButton(page, text) {
