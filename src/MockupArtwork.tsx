@@ -62,12 +62,14 @@ export interface MockupArtworkProps extends Pick<EditorSnapshot,
   isProUnlocked: boolean;
   qrDataUrl: string | null;
   preview?: boolean;
+  editingTextId?: string | null;
 }
 
 /** Original artwork tree; App retains the stage, state, history and export ownership. */
 export function MockupArtwork({
   textDocument,
   preview = true,
+  editingTextId,
   bgType,
   isCustomGradient,
   selectedPattern,
@@ -279,7 +281,7 @@ export function MockupArtwork({
         </div>
       )}
 
-      <CanvasTextLayerRenderer document={textDocument} size={canvasLogicalSize} />
+      <CanvasTextLayerRenderer document={textDocument} size={canvasLogicalSize} editingId={preview ? editingTextId : null} />
     </div>
   );
 }

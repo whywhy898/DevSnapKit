@@ -30,7 +30,10 @@ import { CanvasStage, SceneSize } from './CanvasLayout';
 import { MockupArtwork, type MockupArtworkProps } from './MockupArtwork';
 import { exportMockup, freezeArtworkProps } from './export/exportMockup';
 import { PosterEditor } from './poster/PosterEditor';
-import { addText, emptyTextDocument, initialTextColor, updateText } from './text/document';
+import { emptyTextDocument } from './text/document';
+import { useCanvasTextEditor } from './text/useCanvasTextEditor';
+import { CanvasTextOverlay } from './text/CanvasTextOverlay';
+import { TextControls } from './text/TextControls';
 
 // Helper to get true outer rendered DOM dimensions of canvas node (including padding/border)
 function getCanvasRenderedDimensions(el: HTMLElement | null): { width: number; height: number } {
@@ -723,9 +726,7 @@ export default function App() {
 
   // Snapshot for History (Undo / Redo - F1)
   const [textDocument, setTextDocument] = useState(emptyTextDocument);
-  const [activeTextId, setActiveTextId] = useState<string | null>(null);
   const [textError, setTextError] = useState('');
-  const cancelledTextBlur = useRef(false);
   const exportLock = useRef(false);
   const frozenArtwork = useRef<MockupArtworkProps | null>(null);
   const currentSnapshot: EditorSnapshot = useMemo(() => ({
@@ -892,6 +893,7 @@ export default function App() {
   );
   const effectivePaddingX = Math.min(padding, Math.max(0, (canvasLogicalSize.width - 120) / 2));
   const effectivePaddingY = Math.min(padding, Math.max(0, (canvasLogicalSize.height - 120) / 2));
+  const textEditor = useCanvasTextEditor(currentSnapshot, setTextDocument, canvasLogicalSize, { beginTransaction, commitTransaction, cancelTransaction });
   const dynamicExportDimensions = getCanonicalDimensions(
     aspectRatio.id, exportScale, canvasDomSize.width, canvasDomSize.height,
     canonicalAutoW, canonicalAutoH, customCanvasSize.width, customCanvasSize.height
@@ -1216,6 +1218,8 @@ export default function App() {
     const handlePaste = (e: ClipboardEvent) => {
       if (exportLock.current) { e.preventDefault(); return; }
       if (studioMode !== 'mockup') return;
+      if (e.target instanceof HTMLElement && (e.target.closest('input,textarea,select,[contenteditable="true"]'))) return;
+      if (!textEditor.finish()) { e.preventDefault(); return; }
       const items = e.clipboardData?.items;
       if (!items) return;
       for (let i = 0; i < items.length; i++) {
@@ -1247,7 +1251,7 @@ export default function App() {
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [layoutMode, secondarySrc, studioMode]);
+  }, [layoutMode, secondarySrc, studioMode, textEditor]);
 
   // Handle Custom Background Image Upload (F3)
   const handleBgImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1414,6 +1418,7 @@ export default function App() {
   });
   const beginExport = () => {
     if (exportLock.current) return false;
+    if (!textEditor.finish()) return false;
     flush(currentSnapshot);
     frozenArtwork.current = freezeArtworkProps(artworkProps());
     exportLock.current = true; setIsExporting(true); setTextError('');
@@ -1650,9 +1655,11 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (exportLock.current) { e.preventDefault(); return; }
       if (studioMode !== 'mockup') return;
-      if (isEditable(e.target)) return;
+      if (isEditable(e.target) || e.isComposing) return;
 
       if (e.key === 'Escape') {
+        if (textEditor.session) textEditor.cancel();
+        else textEditor.select(null);
         setShowShortcutsModal(false);
         setShowExportMenu(false);
         setShowDemoTemplatesMenu(false);
@@ -1660,6 +1667,9 @@ export default function App() {
       }
 
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      const changesTool = isCmdOrCtrl ? ['z', 'y', 's'].includes(e.key.toLowerCase())
+        : ['1', '2', 'Delete', 'Backspace', '?'].includes(e.key) || (e.key === '/' && e.shiftKey);
+      if (changesTool && !textEditor.finish()) { e.preventDefault(); return; }
 
       if (isCmdOrCtrl) {
         if (!e.shiftKey && e.key.toLowerCase() === 'z') {
@@ -1691,6 +1701,7 @@ export default function App() {
           return;
         }
         if (e.key === 'Delete' || e.key === 'Backspace') {
+          if (textEditor.activeId) { e.preventDefault(); textEditor.remove(); return; }
           if (layoutMode === 'duo') {
             setSecondarySrc(null);
             setSecondaryName('');
@@ -1786,19 +1797,8 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
     </div>
   );
 
-  const activeText = textDocument.layers.find(layer => layer.id === activeTextId) ?? textDocument.layers.at(-1);
-  const handleAddText = () => {
-    if (exportLock.current) return;
-    try {
-      const next = addText(textDocument, canvasLogicalSize, initialTextColor(bgType, solidColor));
-      beginTransaction(currentSnapshot); setTextDocument(next);
-      commitTransaction({ ...currentSnapshot, textDocument: next });
-      setActiveTextId(next.layers[next.layers.length - 1].id); setTextError('');
-    } catch (error) { setTextError((error as Error).message); }
-  };
-
   return (
-    <div {...(isExporting ? { inert: '' } : {})} aria-busy={isExporting} className={`min-h-screen ${themeMode === 'light' ? 'theme-light bg-slate-50 text-slate-900' : 'theme-dark bg-slate-950 text-slate-100'} flex flex-col font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-200`}>
+    <div onPointerDownCapture={textEditor.guard} onClickCapture={textEditor.guard} onChangeCapture={textEditor.guard} onDropCapture={textEditor.guard} {...(isExporting ? { inert: '' } : {})} aria-busy={isExporting} className={`min-h-screen ${themeMode === 'light' ? 'theme-light bg-slate-50 text-slate-900' : 'theme-dark bg-slate-950 text-slate-100'} flex flex-col font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-200`}>
       
       {/* Top Navbar (Edge-to-Edge Desktop Studio Header) */}
       <header className="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40">
@@ -2130,24 +2130,12 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           </div>
 
           {/* Canvas Node Captured by html-to-image */}
-          <div className="flex items-center gap-3 py-2 px-4 flex-wrap" data-canvas-text-controls>
-            <button type="button" aria-label="Add text" onClick={handleAddText} disabled={isExporting || textDocument.layers.length >= 20}
-              className="px-3 py-1.5 rounded-lg border border-white/20 text-sm bg-slate-800 text-white disabled:opacity-50">Add text</button>
-            {activeText && <label className="flex items-center gap-2 text-xs text-slate-400">Content
-              <textarea aria-label="Text content" rows={1} value={activeText.content} disabled={isExporting}
-                className="bg-slate-800 text-white border border-slate-600 rounded px-2 py-1 w-64"
-                onFocus={() => { cancelledTextBlur.current = false; beginTransaction(currentSnapshot); }}
-                onBlur={() => { if (!cancelledTextBlur.current) commitTransaction(currentSnapshot); cancelledTextBlur.current = false; }}
-                onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); cancelledTextBlur.current = true; cancelTransaction(); event.currentTarget.blur(); } }}
-                onChange={event => {
-                  try { setTextDocument(updateText(textDocument, activeText.id, { content: event.target.value })); setTextError(''); }
-                  catch (error) { setTextError((error as Error).message); }
-                }} />
-            </label>}
-            {textError && <p role="alert" className="text-sm text-red-400 whitespace-pre-wrap">{textError}</p>}
-          </div>
-          <CanvasStage width={canvasLogicalSize.width} height={canvasLogicalSize.height}>
-          <MockupArtwork {...artworkProps()} />
+          <TextControls document={textDocument} editor={textEditor} disabled={isExporting} exportError={textError} />
+          <CanvasStage width={canvasLogicalSize.width} height={canvasLogicalSize.height} freezePreviewWhileEditing={!!textEditor.editingId} onDeselect={() => textEditor.select(null)}>
+          <MockupArtwork {...artworkProps()} editingTextId={textEditor.editingId} />
+          <CanvasTextOverlay document={textDocument} size={canvasLogicalSize} activeId={textEditor.activeId} editingId={textEditor.editingId}
+            draft={textEditor.session?.kind === 'content' ? textEditor.session.value : ''} light={themeMode === 'light'}
+            onEdit={textEditor.edit} onChange={textEditor.change} onDone={textEditor.finish} onCancel={textEditor.cancel} onDeselect={() => textEditor.select(null)} />
 
           {/* Floating Bottom Studio Dock */}
           </CanvasStage>

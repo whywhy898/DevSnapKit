@@ -37,10 +37,13 @@ test('M1 real upload, plain canvas text, separate Add/edit undo, 1x and 2x PNG u
     await page.keyboard.down('Control'); await page.keyboard.press('y'); await page.keyboard.up('Control');
     await page.waitForFunction(() => document.querySelector('[data-canvas-text]')?.textContent === 'Launch today');
     await fs.mkdir(output, { recursive: true });
+    await page.select('[aria-label="Current text"]', '');
     await (await page.$('#studio-canvas')).screenshot({ path: path.join(output, 'launch-preview.png') });
     const rows = [];
     const snapshot = await page.evaluate(() => JSON.stringify(window.__mockupBaseline.snapshot));
     for (const scale of [1, 2]) {
+      await page.$eval('[data-text-hit]', button => button.click());
+      assert.ok(await page.$('[aria-label="Text content"]'), 'Valid content is still being edited immediately before export');
       const file = await exportPNG(page, `launch-${scale}x.png`, scale);
       const { data, info } = await sharp(file.path).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
       assert.equal(info.width, 1600 * scale); assert.equal(info.height, 1200 * scale);
@@ -198,7 +201,7 @@ test('delayed real font embedding freezes editor tools, keyboard, paste and mode
         for(let i=0;i<50&&!pending.length;i++) await new Promise(resolve=>setTimeout(resolve,100));
         assert.ok(pending.length,'Actual font resource request is held');
         await page.click('[aria-label="Add text"]');
-        await page.click('[aria-label="Text content"]'); await page.keyboard.type('Blocked');
+        await page.click('[aria-label="Text size"]'); await page.keyboard.type('999');
         await page.keyboard.press('2');
         await page.keyboard.down('Control'); await page.keyboard.press('z'); await page.keyboard.up('Control');
         await page.evaluate(()=>window.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true})));

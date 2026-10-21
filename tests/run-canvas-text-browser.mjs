@@ -15,6 +15,6 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   const pattern = process.env.CANVAS_TEXT_TEST_PATTERN ? [`--test-name-pattern=${process.env.CANVAS_TEXT_TEST_PATTERN}`] : [];
-  const runner = spawn(process.execPath, ['--test', '--test-concurrency=1', ...pattern, 'tests/canvas-text-v1-export.test.mjs'], { cwd: root, env: { ...process.env, TEST_UI_URL: origin + '/?editor=1' }, stdio: 'inherit', windowsHide: true });
+  const runner = spawn(process.execPath, ['--test', '--test-concurrency=1', ...pattern, 'tests/canvas-text-v1-ui.test.mjs', 'tests/canvas-text-v1-export.test.mjs'], { cwd: root, env: { ...process.env, TEST_UI_URL: origin + '/?editor=1' }, stdio: 'inherit', windowsHide: true });
   process.exitCode = await new Promise(resolve => runner.on('exit', code => resolve(code ?? 1)));
 } finally { server.kill(); }

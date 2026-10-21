@@ -8,7 +8,7 @@ interface Bounds extends SceneSize { x: number; y: number }
 const close = (a: number, b: number) => Math.abs(a - b) < 0.05;
 
 /** Only the preview is scaled; all artwork stays in stable logical coordinates. */
-export function CanvasStage({ width, height, children }: SceneSize & { children: React.ReactNode }) {
+export function CanvasStage({ width, height, children, freezePreviewWhileEditing = false, onDeselect }: SceneSize & { children: React.ReactNode; freezePreviewWhileEditing?: boolean; onDeselect?: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<SceneSize>({ width: 1, height: 1 });
   useLayoutEffect(() => {
@@ -23,9 +23,12 @@ export function CanvasStage({ width, height, children }: SceneSize & { children:
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const scale = Math.min(1, Math.max(1, size.width - 32) / width, Math.max(1, size.height - 32) / height);
+  const calculated = Math.min(1, Math.max(1, size.width - 32) / width, Math.max(1, size.height - 32) / height);
+  const frozen = useRef({ width: size.width, scale: calculated, editing: false });
+  if (!freezePreviewWhileEditing || !frozen.current.editing || !close(frozen.current.width, size.width)) frozen.current = { width: size.width, scale: calculated, editing: freezePreviewWhileEditing };
+  const scale = freezePreviewWhileEditing ? frozen.current.scale : calculated;
   return (
-    <div ref={ref} data-canvas-stage className="relative flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
+    <div ref={ref} data-canvas-stage onClick={event => { if (!(event.target as HTMLElement).closest('[data-text-editor-ui]')) onDeselect?.(); }} className="relative flex-1 min-h-0 w-full flex items-center justify-center overflow-auto" style={{ minHeight: freezePreviewWhileEditing ? Math.min(height * scale + 32, 500) : undefined }}>
       <div className="relative shrink-0" style={{ width: width * scale, height: height * scale, '--canvas-preview-scale': scale } as React.CSSProperties}>
         {children}
       </div>
