@@ -3,6 +3,20 @@ import type { CanvasTextDocument, CanvasTextLayer, TextCanvasSize, TextFont } fr
 // R3 candidate guardrails; performance provenance is recorded with the review evidence.
 export const TEXT_LIMITS = { layers: 20, codepoints: 1000 } as const;
 export const emptyTextDocument = (): CanvasTextDocument => ({ version: 1, layers: [] });
+/** Choose once on creation; later user colors are retained verbatim. */
+export function initialTextColor(backgroundType: string, solidColor: string): '#111827' | '#FFFFFF' {
+  if (backgroundType !== 'solid') return '#FFFFFF';
+  const luminance = (hex: string) => {
+    const rgb = [1, 3, 5].map(offset => {
+      const s = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+      return s <= .04045 ? s / 12.92 : ((s + .055) / 1.055) ** 2.4;
+    });
+    return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
+  };
+  const bg = luminance(solidColor), dark = luminance('#111827');
+  const darkContrast = (Math.max(bg, dark) + .05) / (Math.min(bg, dark) + .05);
+  return darkContrast >= 1.05 / (bg + .05) ? '#111827' : '#FFFFFF';
+}
 export function validateText(layer: CanvasTextLayer) {
   if (!layer.id || typeof layer.content !== 'string') throw new Error('Text needs a stable id and plain content.');
   if (Array.from(layer.content).length > TEXT_LIMITS.codepoints) throw new Error('Maximum 1000 Unicode characters per text box. Draft not applied.');

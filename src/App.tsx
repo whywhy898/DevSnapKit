@@ -10,7 +10,6 @@ import {
   Globe, AppWindow, Square, FileText, Mail, Receipt,
   Undo2, Redo2, Keyboard, EyeOff
 } from 'lucide-react';
-import { toCanvas } from 'html-to-image';
 
 import { MOCKUP_PRESETS } from './templates';
 import { GRADIENTS, PresetGradient } from './themes';
@@ -28,9 +27,10 @@ import { WindowTheme } from './MockupUnit';
 import { DuoThumbnail, DuoLayoutType } from './DuoThumbnail';
 import { useEditorHistory, EditorSnapshot } from './useHistory';
 import { CanvasStage, SceneSize } from './CanvasLayout';
-import { MockupArtwork } from './MockupArtwork';
+import { MockupArtwork, type MockupArtworkProps } from './MockupArtwork';
+import { exportMockup, freezeArtworkProps } from './export/exportMockup';
 import { PosterEditor } from './poster/PosterEditor';
-import { emptyTextDocument } from './text/document';
+import { addText, emptyTextDocument, initialTextColor, updateText } from './text/document';
 
 // Helper to get true outer rendered DOM dimensions of canvas node (including padding/border)
 function getCanvasRenderedDimensions(el: HTMLElement | null): { width: number; height: number } {
@@ -723,6 +723,11 @@ export default function App() {
 
   // Snapshot for History (Undo / Redo - F1)
   const [textDocument, setTextDocument] = useState(emptyTextDocument);
+  const [activeTextId, setActiveTextId] = useState<string | null>(null);
+  const [textError, setTextError] = useState('');
+  const cancelledTextBlur = useRef(false);
+  const exportLock = useRef(false);
+  const frozenArtwork = useRef<MockupArtworkProps | null>(null);
   const currentSnapshot: EditorSnapshot = useMemo(() => ({
     textDocument,
     gradientId: gradient.id,
@@ -844,7 +849,7 @@ export default function App() {
     setImageOffsetY(0);
   }, []);
 
-  const { canUndo, canRedo, undo, redo } = useEditorHistory(currentSnapshot, handleRestoreSnapshot);
+  const { canUndo, canRedo, undo, redo, flush, beginTransaction, commitTransaction, cancelTransaction } = useEditorHistory(currentSnapshot, handleRestoreSnapshot);
 
   useEffect(() => {
     const el = canvasRef.current;
@@ -1209,6 +1214,7 @@ export default function App() {
   // Global Clipboard Paste Support (Shots.so style: press Ctrl+V anywhere)
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
+      if (exportLock.current) { e.preventDefault(); return; }
       if (studioMode !== 'mockup') return;
       const items = e.clipboardData?.items;
       if (!items) return;
@@ -1400,85 +1406,30 @@ export default function App() {
   };
 
   // Core single canvas export helper that returns an authentic image Blob
+  const artworkProps = (): MockupArtworkProps => ({
+    ...currentSnapshot, canvasRef, gradient, canvasLogicalSize, effectivePaddingX, effectivePaddingY,
+    isPhoneTheme, zoomStyle, handleNaturalSceneSize,
+    onReplace: () => fileInputRef.current?.click(), onReplaceSecondary: () => secondaryFileInputRef.current?.click(),
+    emptySlot: renderEmptySlot2(), isProUnlocked, qrDataUrl,
+  });
+  const beginExport = () => {
+    if (exportLock.current) return false;
+    flush(currentSnapshot);
+    frozenArtwork.current = freezeArtworkProps(artworkProps());
+    exportLock.current = true; setIsExporting(true); setTextError('');
+    return true;
+  };
+  const finishExport = () => { exportLock.current = false; frozenArtwork.current = null; setIsExporting(false); };
   const exportSingleCanvasBlob = async (
     targetAspect: AspectOption,
     scale: number,
     format: 'png' | 'webp' | 'jpeg'
   ): Promise<Blob | null> => {
-    if (!canvasRef.current) return null;
-    const canvasEl = canvasRef.current;
-    canvasEl.setAttribute('data-exporting', 'true');
-
-    try {
-      const { width: domWidth, height: domHeight } = getCanvasRenderedDimensions(canvasEl);
-
-      const { width: targetWidth, height: targetHeight } = getCanonicalDimensions(
-        targetAspect.id,
-        scale,
-        domWidth,
-        domHeight,
-        canonicalAutoW,
-        canonicalAutoH,
-        customCanvasSize.width,
-        customCanvasSize.height
-      );
-
-      const computedRatio = targetWidth / domWidth;
-      const isTransparent = bgType === 'transparent';
-      const rawCanvas = await toCanvas(canvasEl, {
-        width: domWidth,
-        height: domHeight,
-        style: { transform: 'none', transformOrigin: 'top left' },
-        pixelRatio: computedRatio,
-        skipFonts: true,
-        cacheBust: false,
-        backgroundColor: isTransparent ? 'rgba(0,0,0,0)' : undefined,
-        filter: (node: HTMLElement) => {
-          if (node instanceof HTMLElement) {
-            if (
-              node.getAttribute('data-export-ignore') === 'true' ||
-              node.classList?.contains('media-hover-overlay') ||
-              node.closest?.('[data-export-ignore="true"]')
-            ) {
-              return false;
-            }
-          }
-          return true;
-        },
-      });
-
-      const outCanvas = document.createElement('canvas');
-      outCanvas.width = targetWidth;
-      outCanvas.height = targetHeight;
-      const ctx = outCanvas.getContext('2d');
-      if (!ctx) throw new Error('Could not initialize 2D canvas context');
-
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-
-      if (format === 'jpeg' && isTransparent) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, targetWidth, targetHeight);
-      }
-
-      ctx.drawImage(rawCanvas, 0, 0, targetWidth, targetHeight);
-
-      let mimeType = 'image/png';
-      let quality = 0.98;
-      if (format === 'webp') {
-        mimeType = 'image/webp';
-        quality = 0.92;
-      } else if (format === 'jpeg') {
-        mimeType = 'image/jpeg';
-        quality = 0.92;
-      }
-
-      return new Promise<Blob | null>((resolve) => {
-        outCanvas.toBlob((blob) => resolve(blob), mimeType, quality);
-      });
-    } finally {
-      canvasEl.removeAttribute('data-exporting');
-    }
+    if (!canvasRef.current?.parentElement || !frozenArtwork.current) return null;
+    const frozen = frozenArtwork.current;
+    const base = getCanonicalDimensions(targetAspect.id, 1, 0, 0, canonicalAutoW, canonicalAutoH, customCanvasSize.width, customCanvasSize.height);
+    const out = getCanonicalDimensions(targetAspect.id, scale, 0, 0, canonicalAutoW, canonicalAutoH, customCanvasSize.width, customCanvasSize.height);
+    return exportMockup(frozen, { ...base, outputWidth: out.width, outputHeight: out.height, format }, canvasRef.current.parentElement);
   };
 
   // Download High-Resolution Image (Supports Canonical 1x, 2x, 4K and Genuine PNG, WebP, JPEG)
@@ -1495,7 +1446,7 @@ export default function App() {
     }
     if (showProModal) setShowProModal(false);
 
-    setIsExporting(true);
+    if (!beginExport()) return;
 
     try {
       const filename = `devsnap-${Date.now()}.${exportFormat}`;
@@ -1513,9 +1464,9 @@ export default function App() {
       }
     } catch (err) {
       console.error('Export failed:', err);
-      alert('Failed to generate image. Please try again.');
+      setTextError(err instanceof Error ? err.message : 'Failed to generate image. Please try again.');
     } finally {
-      setIsExporting(false);
+      finishExport();
     }
   };
 
@@ -1530,19 +1481,14 @@ export default function App() {
       return;
     }
 
-    setIsExporting(true);
-    const originalAspect = aspectRatio;
+    if (!beginExport()) return;
     const total = selectedBatchAspects.length;
 
     try {
       for (let i = 0; i < total; i++) {
         const aspectId = selectedBatchAspects[i];
         const targetOption = aspectOptions.find((a) => a.id === aspectId) || ASPECT_RATIOS[0];
-        setAspectRatio(targetOption);
         setBatchProgress({ current: i + 1, total });
-
-        // Wait 2 animation frames + 80ms buffer for layout to settle
-        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 80))));
 
         const filename = `devsnap-${aspectId}-${Date.now()}.${exportFormat}`;
         const blob = await exportSingleCanvasBlob(targetOption, exportScale, exportFormat);
@@ -1560,10 +1506,9 @@ export default function App() {
       }
     } catch (err) {
       console.error('Batch export failed:', err);
-      alert('Batch export encountered an issue.');
+      setTextError(err instanceof Error ? err.message : 'Batch export encountered an issue.');
     } finally {
-      setAspectRatio(originalAspect);
-      setIsExporting(false);
+      finishExport();
       setBatchProgress(null);
     }
   };
@@ -1574,7 +1519,7 @@ export default function App() {
     if (showClaimModal) setShowClaimModal(false);
     if (showSuccessModal) setShowSuccessModal(false);
     if (showProModal) setShowProModal(false);
-    setIsExporting(true);
+    if (!beginExport()) return;
 
     try {
       const blob = await exportSingleCanvasBlob(aspectRatio, 2, 'png');
@@ -1590,9 +1535,9 @@ export default function App() {
       }
     } catch (err) {
       console.error('Clipboard copy error:', err);
-      alert('Could not copy image to clipboard.');
+      setTextError(err instanceof Error ? err.message : 'Could not copy image to clipboard.');
     } finally {
-      setIsExporting(false);
+      finishExport();
     }
   };
 
@@ -1703,6 +1648,7 @@ export default function App() {
       el instanceof HTMLElement && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || (el as HTMLElement)?.isContentEditable);
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (exportLock.current) { e.preventDefault(); return; }
       if (studioMode !== 'mockup') return;
       if (isEditable(e.target)) return;
 
@@ -1840,8 +1786,19 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
     </div>
   );
 
+  const activeText = textDocument.layers.find(layer => layer.id === activeTextId) ?? textDocument.layers.at(-1);
+  const handleAddText = () => {
+    if (exportLock.current) return;
+    try {
+      const next = addText(textDocument, canvasLogicalSize, initialTextColor(bgType, solidColor));
+      beginTransaction(currentSnapshot); setTextDocument(next);
+      commitTransaction({ ...currentSnapshot, textDocument: next });
+      setActiveTextId(next.layers[next.layers.length - 1].id); setTextError('');
+    } catch (error) { setTextError((error as Error).message); }
+  };
+
   return (
-    <div className={`min-h-screen ${themeMode === 'light' ? 'theme-light bg-slate-50 text-slate-900' : 'theme-dark bg-slate-950 text-slate-100'} flex flex-col font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-200`}>
+    <div {...(isExporting ? { inert: '' } : {})} aria-busy={isExporting} className={`min-h-screen ${themeMode === 'light' ? 'theme-light bg-slate-50 text-slate-900' : 'theme-dark bg-slate-950 text-slate-100'} flex flex-col font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-200`}>
       
       {/* Top Navbar (Edge-to-Edge Desktop Studio Header) */}
       <header className="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40">
@@ -2173,17 +2130,24 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           </div>
 
           {/* Canvas Node Captured by html-to-image */}
+          <div className="flex items-center gap-3 py-2 px-4 flex-wrap" data-canvas-text-controls>
+            <button type="button" aria-label="Add text" onClick={handleAddText} disabled={isExporting || textDocument.layers.length >= 20}
+              className="px-3 py-1.5 rounded-lg border border-white/20 text-sm bg-slate-800 text-white disabled:opacity-50">Add text</button>
+            {activeText && <label className="flex items-center gap-2 text-xs text-slate-400">Content
+              <textarea aria-label="Text content" rows={1} value={activeText.content} disabled={isExporting}
+                className="bg-slate-800 text-white border border-slate-600 rounded px-2 py-1 w-64"
+                onFocus={() => { cancelledTextBlur.current = false; beginTransaction(currentSnapshot); }}
+                onBlur={() => { if (!cancelledTextBlur.current) commitTransaction(currentSnapshot); cancelledTextBlur.current = false; }}
+                onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); cancelledTextBlur.current = true; cancelTransaction(); event.currentTarget.blur(); } }}
+                onChange={event => {
+                  try { setTextDocument(updateText(textDocument, activeText.id, { content: event.target.value })); setTextError(''); }
+                  catch (error) { setTextError((error as Error).message); }
+                }} />
+            </label>}
+            {textError && <p role="alert" className="text-sm text-red-400 whitespace-pre-wrap">{textError}</p>}
+          </div>
           <CanvasStage width={canvasLogicalSize.width} height={canvasLogicalSize.height}>
-          <MockupArtwork
-            {...currentSnapshot}
-            canvasRef={canvasRef} gradient={gradient} canvasLogicalSize={canvasLogicalSize}
-            effectivePaddingX={effectivePaddingX} effectivePaddingY={effectivePaddingY}
-            isPhoneTheme={isPhoneTheme} zoomStyle={zoomStyle}
-            handleNaturalSceneSize={handleNaturalSceneSize}
-            onReplace={() => fileInputRef.current?.click()}
-            onReplaceSecondary={() => secondaryFileInputRef.current?.click()}
-            emptySlot={renderEmptySlot2()} isProUnlocked={isProUnlocked} qrDataUrl={qrDataUrl}
-          />
+          <MockupArtwork {...artworkProps()} />
 
           {/* Floating Bottom Studio Dock */}
           </CanvasStage>
@@ -2358,6 +2322,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           </div>  
             <input 
               ref={fileInputRef}
+              aria-label="Main screenshot file"
               type="file" 
               accept="image/*" 
               onChange={handleFileUpload} 
@@ -2365,6 +2330,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             />
             <input 
               ref={secondaryFileInputRef}
+              aria-label="Second screenshot file"
               type="file" 
               accept="image/*" 
               onChange={handleSecondaryFileUpload} 

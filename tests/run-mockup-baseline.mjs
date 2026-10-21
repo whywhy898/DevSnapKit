@@ -74,7 +74,7 @@ try {
     await clickButton(page, 'Export');
     await clickButton(page, '1x Web');
     const downloaded = await downloadPng(page, directory, `${fixture.id}.download.png`, async () => {
-      const handle = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(button => /^Download 1x/.test(button.innerText.trim())));
+      const handle = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(button => button.offsetParent !== null && /^Download 1x/.test(button.innerText.trim())));
       assert.ok(await handle.evaluate(button => Boolean(button)));
       await handle.evaluate(button => button.click()); await handle.dispose();
     });

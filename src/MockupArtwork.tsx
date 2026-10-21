@@ -2,8 +2,10 @@ import React from 'react';
 import { DeviceComposition, FittedScene, SceneSize } from './CanvasLayout';
 import type { EditorSnapshot } from './useHistory';
 import type { PresetGradient } from './themes';
+import { CanvasTextLayerRenderer } from './text/CanvasTextLayerRenderer';
 
 export interface MockupArtworkProps extends Pick<EditorSnapshot,
+  | 'textDocument'
   | 'bgType'
   | 'isCustomGradient'
   | 'selectedPattern'
@@ -59,10 +61,13 @@ export interface MockupArtworkProps extends Pick<EditorSnapshot,
   emptySlot: React.ReactNode;
   isProUnlocked: boolean;
   qrDataUrl: string | null;
+  preview?: boolean;
 }
 
 /** Original artwork tree; App retains the stage, state, history and export ownership. */
 export function MockupArtwork({
+  textDocument,
+  preview = true,
   bgType,
   isCustomGradient,
   selectedPattern,
@@ -121,7 +126,7 @@ export function MockupArtwork({
   return (
     <div 
       ref={canvasRef}
-      id="studio-canvas"
+      id={preview ? 'studio-canvas' : undefined}
       data-canvas-root="true"
       className={`absolute left-0 top-0 rounded-2xl flex flex-col items-center justify-center overflow-hidden shadow-2xl ${
         bgType === 'gradient' && !isCustomGradient
@@ -141,7 +146,7 @@ export function MockupArtwork({
       style={{ 
         width: canvasLogicalSize.width,
         height: canvasLogicalSize.height,
-        transform: 'scale(var(--canvas-preview-scale, 1))',
+        transform: preview ? 'scale(var(--canvas-preview-scale, 1))' : 'none',
         transformOrigin: 'top left',
         padding: `${effectivePaddingY}px ${effectivePaddingX}px`,
         backgroundColor: bgType === 'solid' ? solidColor : undefined,
@@ -151,7 +156,7 @@ export function MockupArtwork({
       }}
     >
       {/* Transparent checkerboard hint (only in transparent mode for preview) */}
-      {bgType === 'transparent' && (
+      {preview && bgType === 'transparent' && (
         <div 
           data-export-ignore="true"
           className="absolute inset-0 z-0 pointer-events-none opacity-30 bg-[radial-gradient(#475569_1.5px,transparent_1.5px)] [background-size:16px_16px]" 
@@ -274,6 +279,7 @@ export function MockupArtwork({
         </div>
       )}
 
+      <CanvasTextLayerRenderer document={textDocument} size={canvasLogicalSize} />
     </div>
   );
 }

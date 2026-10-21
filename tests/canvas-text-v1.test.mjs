@@ -10,6 +10,16 @@ async function load(name) {
   return import(`data:text/javascript;base64,${Buffer.from(output).toString('base64')}`);
 }
 
+test('initial text color chooses the greater WCAG contrast only for solid backgrounds', async () => {
+  const d = await load('text/document');
+  assert.equal(typeof d.initialTextColor, 'function', 'Initial color must use a testable contrast calculation');
+  assert.equal(d.initialTextColor('solid', '#999999'), '#111827');
+  assert.equal(d.initialTextColor('solid', '#FFFFFF'), '#111827');
+  assert.equal(d.initialTextColor('solid', '#000000'), '#FFFFFF');
+  assert.equal(d.initialTextColor('solid', '#6366F1'), '#FFFFFF');
+  for (const type of ['gradient', 'transparent', 'pattern', 'image']) assert.equal(d.initialTextColor(type, '#FFFFFF'), '#FFFFFF');
+});
+
 test('text document validates codepoints, fonts, finite geometry and object limits without truncating', async () => {
   const d = await load('text/document');
   let doc = d.emptyTextDocument();

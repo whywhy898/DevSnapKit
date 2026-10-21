@@ -1,30 +1,8 @@
-import { getFontEmbedCSS, toPng } from 'html-to-image';
-
-let fontCSS: Promise<string> | undefined;
-const imageData = new WeakMap<Blob, Promise<string>>();
-
-function inlineLocalImage(blob: Blob): Promise<string> {
-  let cached = imageData.get(blob);
-  if (!cached) {
-    cached = new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Local image could not be prepared.'));
-      reader.onerror = () => reject(new Error('Local image could not be prepared.'));
-      reader.readAsDataURL(blob);
-    });
-    imageData.set(blob, cached);
-    cached.catch(() => imageData.delete(blob));
-  }
-  return cached;
-}
+import { toPng } from 'html-to-image';
+import { artworkFontCSS, ensureArtworkFonts, prepareArtworkImages } from '../export/prepareArtworkExport';
 
 export async function preparePoster(root: HTMLElement) {
-  await Promise.all([
-    document.fonts.load('800 73px "Poster Manrope"'),
-    document.fonts.load('italic 400 78px "Poster Gelasio"'),
-  ]);
-  await document.fonts.ready;
-  if (!document.fonts.check('800 73px "Poster Manrope"') || !document.fonts.check('italic 400 78px "Poster Gelasio"')) throw new Error('Poster fonts could not be loaded. Please try again.');
+  await ensureArtworkFonts(['normal 800 73px "Poster Manrope"', 'italic 400 78px "Poster Gelasio"']);
   await Promise.all(Array.from(root.querySelectorAll('img')).map(async image => {
     try { await image.decode(); } catch { throw new Error(`${image.alt || 'Poster image'} could not be loaded. Replace the image and try again.`); }
     if (!image.naturalWidth) throw new Error(`${image.alt || 'Poster image'} is missing.`);
@@ -45,18 +23,12 @@ export async function exportPoster(root: HTMLElement, pixelRatio: 1 | 2, resolve
   const issues = posterTextIssues(root);
   if (issues.length) throw new Error(issues.join('\n'));
   if (!root.querySelector('[data-poster-role="main"] img')) throw new Error('Main screenshot is required.');
-  fontCSS ??= getFontEmbedCSS(root).catch(error => { fontCSS = undefined; throw error; });
-  const fontEmbedCSS = await fontCSS;
+  const fontEmbedCSS = await artworkFontCSS(root);
   if (!fontEmbedCSS.includes('data:')) throw new Error('Poster font embedding failed. Please try again.');
   // The production CSP intentionally disallows fetch(blob:). Read original local
   // Blobs directly instead of relaxing connect-src or changing the user's preview.
   const artwork = root.cloneNode(true) as HTMLElement;
-  for (const image of artwork.querySelectorAll('img')) {
-    if (!image.src.startsWith('blob:')) continue;
-    const blob = resolveBlob?.(image.src);
-    if (!blob) throw new Error(`${image.alt || 'Poster image'} is no longer available. Replace it and try again.`);
-    image.src = await inlineLocalImage(blob);
-  }
+  await prepareArtworkImages(artwork, resolveBlob);
   const host = document.createElement('div');
   Object.assign(host.style, { position: 'absolute', left: '-100000px', top: '0', width: '1600px', height: '1200px', pointerEvents: 'none' });
   host.setAttribute('aria-hidden', 'true');

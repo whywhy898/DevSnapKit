@@ -6,9 +6,9 @@ import ts from 'typescript';
 
 // Executes the real hook with deterministic effect and timer scheduling, including
 // App's memoized same-value restores. Browser tests exercise the same user paths.
-function harness() {
+function harness({ delayedRestore = false } = {}) {
   const slots = [], effects = [], layouts = [], timers = new Map();
-  let cursor = 0, nextTimer = 0, snapshot = { v: 0 }, output, restores = 0;
+  let cursor = 0, nextTimer = 0, snapshot = { v: 0 }, output, restores = 0, awaitingRestore;
   const sameDeps = (a, b) => a && b && a.length === b.length && a.every((x, i) => Object.is(x, b[i]));
   function effect(queue, fn, deps) {
     const i = cursor++, prev = slots[i];
@@ -32,11 +32,12 @@ function harness() {
     setTimeout: fn => { const id = ++nextTimer; timers.set(id, fn); return id; },
     clearTimeout: id => timers.delete(id),
   });
-  const restore = next => { restores++; if (JSON.stringify(snapshot) !== JSON.stringify(next)) snapshot = next; };
+  const restore = next => { restores++; if (delayedRestore) awaitingRestore = next; else if (JSON.stringify(snapshot) !== JSON.stringify(next)) snapshot = next; };
   const render = () => { cursor = 0; output = module.exports.useEditorHistory(snapshot, restore); while (layouts.length) layouts.shift()(); while (effects.length) effects.shift()(); return output; };
   render();
   return { get api() { return output; }, get snapshot() { return snapshot; }, get restores() { return restores; }, render,
     edit(v) { snapshot = { v }; render(); },
+    acknowledgeRestore() { assert.ok(awaitingRestore); snapshot = awaitingRestore; awaitingRestore = undefined; render(); },
     tick() { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); render(); },
   };
 }
@@ -49,6 +50,22 @@ test('same-value cancel and empty undo do not stall subsequent effect recording'
     assert.equal(h.api.historyCount, 2, action);
     h.api.undo(); h.render(); assert.equal(h.snapshot.v, 0);
   }
+});
+
+test('delayed restore acknowledgement suppresses recording until the restored render actually arrives', () => {
+  const h = harness({ delayedRestore: true });
+  h.edit(1); h.tick(); h.edit(2); h.tick();
+  h.api.undo(); h.render();
+  assert.equal(h.snapshot.v, 2, 'React has not delivered the restored render yet');
+  h.tick(); h.tick();
+  assert.equal(h.api.historyCount, 3, 'No timer can append the stale render during restoration');
+  assert.equal(h.api.historyIndex, 1);
+  h.acknowledgeRestore(); h.tick();
+  assert.equal(h.snapshot.v, 1); assert.equal(h.api.canRedo, true);
+  h.edit(3); h.tick();
+  assert.equal(h.api.historyCount, 3); assert.equal(h.api.canRedo, false);
+  h.api.undo(); h.render(); h.acknowledgeRestore();
+  assert.equal(h.snapshot.v, 1, 'A subsequent ordinary edit is recorded after acknowledgement');
 });
 test('redo cannot restore over pending changes, or cause a no-future restore', () => {
   const h = harness();

@@ -9,6 +9,10 @@ test('M1 has a shared DOM renderer and export entry', () => {
   assert.match(renderer, /MockupUnit/);
   assert.match(renderer, /<mark/);
   const exporter = fs.readFileSync(new URL('exportPoster.ts', dir), 'utf8');
-  assert.match(exporter, /getFontEmbedCSS/);
+  assert.match(exporter, /artworkFontCSS\(root\)/);
+  const preparation = fs.readFileSync(new URL('../export/prepareArtworkExport.ts', dir), 'utf8');
+  assert.match(preparation, /getFontEmbedCSS\(fontProbe\)/);
+  assert.match(preparation, /reader\.readAsDataURL\(blob\)/);
+  assert.match(exporter, /prepareArtworkImages\(artwork, resolveBlob\)/);
   assert.doesNotMatch(exporter, /skipFonts:\s*true/);
 });

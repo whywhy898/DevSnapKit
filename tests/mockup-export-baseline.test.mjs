@@ -17,7 +17,7 @@ async function exportCurrent(page, filename) {
   await clickButton(page, '1x Web');
   await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => /^Download 1x/.test(b.innerText.trim())));
   return downloadPng(page, output, filename, async () => {
-    const handle = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(b => /^Download 1x/.test(b.innerText.trim())));
+    const handle = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(b => b.offsetParent !== null && /^Download 1x/.test(b.innerText.trim())));
     assert.ok(await handle.evaluate(button => Boolean(button)), '1x export control exists');
     await handle.evaluate(button => button.click());
     await handle.dispose();
@@ -29,12 +29,15 @@ test('old Mockup downloads: single, duo, browser, phone and transparent PNG alph
   const results = [];
   try {
     const page = await preparePage(browser, url);
-    const uploads = await page.$$('input[type=file]');
-    await uploads[0].uploadFile(path.join(root, 'output/devsnapkit/honeywerank-original.png'));
+    const primary = await page.$('input[aria-label="Main screenshot file"]');
+    const secondary = await page.$('input[aria-label="Second screenshot file"]');
+    await primary.uploadFile(path.join(root, 'output/devsnapkit/honeywerank-original.png'));
+    await page.waitForFunction(() => document.querySelector('#studio-canvas img')?.src.startsWith('data:'));
     for (const scenario of ['single', 'duo', 'browser', 'phone']) {
       if (scenario === 'duo') {
         await page.click('button[title="Dual shots (2 images)"]');
-        await uploads[1].uploadFile(path.join(root, 'output/devsnapkit/honeywerank-platforms.png'));
+        await secondary.uploadFile(path.join(root, 'output/devsnapkit/honeywerank-platforms.png'));
+        await page.waitForFunction(() => document.querySelector('#studio-canvas [data-scene-slot="2"] img')?.src.startsWith('data:'));
       } else if (scenario === 'browser' || scenario === 'phone') {
         await page.click('button[title="Single shot (1 image)"]');
         await clickButton(page, 'Frame');

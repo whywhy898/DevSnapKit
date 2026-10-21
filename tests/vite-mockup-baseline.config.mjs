@@ -8,7 +8,7 @@ export default mergeConfig(base, {
     enforce: 'pre',
     transform(source, id) {
       if (!id.replaceAll('\\', '/').endsWith('/src/App.tsx')) return;
-      const anchor = '  const { canUndo, canRedo, undo, redo } = useEditorHistory(currentSnapshot, handleRestoreSnapshot);';
+      const anchor = '  const { canUndo, canRedo, undo, redo, flush, beginTransaction, commitTransaction, cancelTransaction } = useEditorHistory(currentSnapshot, handleRestoreSnapshot);';
       if (!source.includes(anchor)) throw new Error('Baseline state driver anchor missing');
       return source.replace(anchor, `${anchor}
   useEffect(() => {
