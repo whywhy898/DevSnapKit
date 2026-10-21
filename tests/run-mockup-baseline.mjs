@@ -20,7 +20,7 @@ const rasterArgs = ['--disable-gpu', '--force-color-profile=srgb', '--disable-lc
 const vite = path.join(path.dirname(require.resolve('vite/package.json')), 'bin/vite.js');
 async function hashSources() {
   const hashes = {};
-  for (const file of ['src/App.tsx', 'src/useHistory.ts', 'src/CanvasLayout.tsx', 'src/MockupArtwork.tsx']) {
+  for (const file of ['src/App.tsx', 'src/useHistory.ts', 'src/CanvasLayout.tsx', 'src/MockupArtwork.tsx', 'src/export/exportMockup.ts', 'src/export/prepareArtworkExport.ts', 'src/text/CanvasTextLayerRenderer.tsx']) {
     try { hashes[file] = createHash('sha256').update(await fs.readFile(path.join(root, file))).digest('hex'); }
     catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
@@ -89,7 +89,9 @@ try {
     console.log(`${fixture.id}${reference ? ` preview=${row.previewDiff.differentPixels} download=${row.downloadDiff.differentPixels}` : ' captured'}`);
   }
   assert.deepEqual(await hashSources(), sourceHashes, 'Artwork source must stay frozen during capture');
-  await fs.writeFile(path.join(output, `${phase}-metadata.json`), JSON.stringify({ sha: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), sourceHashes, dirty: execFileSync('git', ['status', '--short'], { cwd: root, encoding: 'utf8' }), browser: await browser.version(), rasterArgs, viewport: { width: 1440, height: 1100, deviceScaleFactor: 1 }, seed: 123456789, fixedDateNow: 1700000000000, fontReady: true, imageDecode: true, animations: 'disabled in test only', fixtures: baselineCases }, null, 2));
+  const sceneReferenceCommit = process.env.CANVAS_TEXT_SCENE_REFERENCE_COMMIT || null;
+  const effectiveSceneHash = sceneReferenceCommit ? createHash('sha256').update(execFileSync('git', ['show', `${sceneReferenceCommit}:src/CanvasLayout.tsx`], { cwd: root })).digest('hex') : sourceHashes['src/CanvasLayout.tsx'];
+  await fs.writeFile(path.join(output, `${phase}-metadata.json`), JSON.stringify({ sha: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), sourceHashes, sceneReferenceCommit, effectiveSceneHash, dirty: execFileSync('git', ['status', '--short'], { cwd: root, encoding: 'utf8' }), browser: await browser.version(), rasterArgs, viewport: { width: 1440, height: 1100, deviceScaleFactor: 1 }, seed: 123456789, fixedDateNow: 1700000000000, fontReady: true, imageDecode: true, animations: 'disabled in test only', fixtures: baselineCases }, null, 2));
   assert.deepEqual(errors, [], 'No browser runtime errors');
   if (reference) for (const row of results) for (const type of ['previewDiff', 'downloadDiff']) {
     assert.equal(row[type].dimensionsEqual, true, `${row.id} ${type} dimensions`);

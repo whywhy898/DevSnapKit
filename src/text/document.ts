@@ -1,6 +1,9 @@
 import type { CanvasTextDocument, CanvasTextLayer, TextCanvasSize, TextFont } from './types';
 
-// R3 candidate guardrails; performance provenance is recorded with the review evidence.
+// Interactive guardrails are measured by tests/canvas-text-geometry-perf.test.mjs:
+// 1/5/10/20 boxes, 20/1000 codepoints, three actual handle/input runs, real upload,
+// frame p95 <=33.4ms and event-to-paint-opportunity p95 <=100ms. Keep the raw
+// before/after evidence in canvas-text-v1/geometry when changing these limits.
 export const TEXT_LIMITS = { layers: 20, codepoints: 1000 } as const;
 export const emptyTextDocument = (): CanvasTextDocument => ({ version: 1, layers: [] });
 /** Choose once on creation; later user colors are retained verbatim. */

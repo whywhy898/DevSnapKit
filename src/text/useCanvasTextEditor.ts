@@ -2,19 +2,25 @@ import { useEffect, useRef, useState } from 'react';
 import type { EditorSnapshot } from '../useHistory';
 import type { CanvasTextDocument, CanvasTextLayer, TextCanvasSize, TextFont } from './types';
 import { addText, changeTextFont, deleteText, initialTextColor, updateText } from './document';
+import { geometryPatch, moveTextByScreenDelta, resizeTextByScreenDelta, type GeometryField } from './geometry';
 
 type History = {
   beginTransaction: (snapshot?: EditorSnapshot) => void;
   commitTransaction: (snapshot?: EditorSnapshot) => void;
   cancelTransaction: () => void;
 };
-type Session = { id: string; kind: 'content' | 'fontSize' | 'color'; value: string; composing: boolean; error: string };
+type Field = 'fontSize' | 'color' | GeometryField;
+type Session = { id: string; kind: 'content' | Field; value: string; composing: boolean; error: string };
+type Gesture = { token: number; id: string; kind: 'move' | 'left' | 'right' | 'keyboard'; layer: CanvasTextLayer; size: TextCanvasSize; scale: number };
 
 /** Ephemeral editor state never enters the document or history. */
 export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc: CanvasTextDocument) => void, size: TextCanvasSize, history: History) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [message, setMessage] = useState('');
+  const gesture = useRef<Gesture | null>(null);
+  const nextGestureToken = useRef(0);
+  const [gesturing, setGesturing] = useState(false);
   const latest = useRef(snapshot); latest.current = snapshot;
   const liveSession = useRef(session);
   const saveSession = (next: Session | null) => { liveSession.current = next; setSession(next); };
@@ -24,12 +30,13 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
   }, [snapshot.textDocument, activeId]);
   const applyDocument = (doc: CanvasTextDocument) => { latest.current = { ...latest.current, textDocument: doc }; setDocument(doc); };
   const finish = () => {
+    if (gesture.current) { gesture.current = null; setGesturing(false); history.commitTransaction(latest.current); }
     const current = liveSession.current;
     if (!current) return true;
     if (current.composing || current.error) { setMessage(current.composing ? 'Finish composing text before continuing.' : current.error); return false; }
     history.commitTransaction(latest.current); saveSession(null); setMessage(''); return true;
   };
-  const cancel = () => { if (!liveSession.current) return; saveSession(null); history.cancelTransaction(); setMessage(''); };
+  const cancel = () => { if (!liveSession.current && !gesture.current) return; gesture.current = null; setGesturing(false); saveSession(null); history.cancelTransaction(); setMessage(''); };
   const edit = (id: string) => {
     if (liveSession.current?.id === id && liveSession.current.kind === 'content') return;
     if (!finish()) return;
@@ -43,8 +50,8 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
     try {
       if (current.kind === 'content') {
         if (!composing) applyDocument(updateText(latest.current.textDocument, current.id, { content: value }));
-      } else {
-        const patch = current.kind === 'fontSize' ? { fontSize: value.trim() === '' ? NaN : Number(value) } : { color: value };
+      } else if (!composing) {
+        const patch = current.kind === 'fontSize' ? { fontSize: value.trim() === '' ? NaN : Number(value) } : current.kind === 'color' ? { color: value } : geometryPatch(current.kind, value, size);
         applyDocument(updateText(latest.current.textDocument, current.id, patch));
       }
     } catch (e) { error = (e as Error).message; }
@@ -64,19 +71,48 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
     history.beginTransaction(latest.current); applyDocument(deleteText(latest.current.textDocument, activeId));
     history.commitTransaction(latest.current); setActiveId(null); setMessage('');
   };
-  const styleStart = (kind: 'fontSize' | 'color') => {
+  const styleStart = (kind: Field) => {
     if (liveSession.current?.kind === kind) return true;
     if (!finish() || !activeId) return false;
     const layer = latest.current.textDocument.layers.find(layer => layer.id === activeId); if (!layer) return false;
     history.beginTransaction(latest.current);
-    saveSession({ id: activeId, kind, value: String(layer[kind]), composing: false, error: '' });
+    const value = kind === 'x' ? layer.centerX * size.width : kind === 'y' ? layer.centerY * size.height : kind === 'width' ? layer.widthRatio * size.width : layer[kind];
+    saveSession({ id: activeId, kind, value: String(value), composing: false, error: '' });
     return true;
   };
-  const changeStyle = (kind: 'fontSize' | 'color', value: string) => {
+  const changeStyle = (kind: Field, value: string) => {
     if (!styleStart(kind) || liveSession.current?.kind !== kind || liveSession.current.id !== activeId) return;
     change(value);
   };
-  const finishStyle = (kind: 'fontSize' | 'color') => liveSession.current?.kind === kind ? finish() : true;
+  const finishStyle = (kind: Field) => liveSession.current?.kind === kind ? finish() : true;
+  const beginGesture = (id: string, kind: Gesture['kind'], scale = 1) => {
+    if (!finish()) return false;
+    const layer = latest.current.textDocument.layers.find(item => item.id === id); if (!layer) return false;
+    setActiveId(id); history.beginTransaction(latest.current);
+    const token = ++nextGestureToken.current;
+    gesture.current = { token, id, kind, layer, scale, size }; setGesturing(true); setMessage(''); return token;
+  };
+  const moveGesture = (x: number, y: number) => {
+    const current = gesture.current; if (!current) return;
+    try {
+      const patch = current.kind === 'left' || current.kind === 'right'
+        ? resizeTextByScreenDelta(current.layer, x, current.kind, current.scale, current.size)
+        : moveTextByScreenDelta(current.layer, { x, y }, { previewScale: current.scale, canvasWidth: current.size.width, canvasHeight: current.size.height });
+      applyDocument(updateText(latest.current.textDocument, current.id, patch)); setMessage('');
+    } catch (error) { setMessage((error as Error).message); }
+  };
+  const nudge = (key: string, shift: boolean) => {
+    if (!activeId) return false;
+    if (gesture.current?.kind !== 'keyboard' && !beginGesture(activeId, 'keyboard')) return true;
+    const layer = latest.current.textDocument.layers.find(item => item.id === activeId); if (!layer) return true;
+    const step = shift ? 10 : 1;
+    try { applyDocument(updateText(latest.current.textDocument, activeId, moveTextByScreenDelta(layer,
+      { x: key === 'ArrowLeft' ? -step : key === 'ArrowRight' ? step : 0, y: key === 'ArrowUp' ? -step : key === 'ArrowDown' ? step : 0 },
+      { previewScale: 1, canvasWidth: size.width, canvasHeight: size.height }))); }
+    catch (error) { setMessage((error as Error).message); }
+    return true;
+  };
+  const endKeyboard = () => { if (gesture.current?.kind === 'keyboard') finish(); };
   const style = (patch: Partial<CanvasTextLayer> | TextFont) => {
     if (!finish() || !activeId) return;
     const layer = latest.current.textDocument.layers.find(layer => layer.id === activeId); if (!layer) return;
@@ -86,6 +122,7 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
   };
   const guard = (event: React.SyntheticEvent) => {
     const target = event.target as HTMLElement;
+    if (gesture.current && !target.closest('[data-text-gesture]')) finish();
     if (target.closest('[data-text-editor-ui]')) return;
     if (!finish()) { event.preventDefault(); event.stopPropagation(); }
   };
@@ -94,6 +131,7 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
     window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);
   }, [snapshot.textDocument]);
-  return { activeId, active, session, message, setMessage, editingId: session?.kind === 'content' ? session.id : null,
+  return { activeId, active, session, message, setMessage, size, gesturing, editingId: session?.kind === 'content' ? session.id : null,
+    beginGesture, moveGesture, nudge, endKeyboard, hasGesture: (token?: number) => token === undefined ? !!gesture.current : gesture.current?.token === token,
     edit, add, remove, select, finish, cancel, change, styleStart, changeStyle, finishStyle, style, guard };
 }

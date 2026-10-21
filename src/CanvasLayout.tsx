@@ -82,6 +82,7 @@ export function DeviceComposition({ mode, duoLayout, secondarySrc, secondaryName
 }
 
 interface FittedSceneProps extends SceneSize {
+  measurementKey?: unknown;
   paddingX: number;
   paddingY: number;
   basisWidth: number;
@@ -94,7 +95,7 @@ interface FittedSceneProps extends SceneSize {
 }
 
 /** Measures the complete composition, including hardware, rotated slots and backplates. */
-export function FittedScene({ width, height, paddingX, paddingY, basisWidth, zoom, offsetX, offsetY, projection, onNaturalSize, children }: FittedSceneProps) {
+export function FittedScene({ width, height, paddingX, paddingY, basisWidth, zoom, offsetX, offsetY, projection, onNaturalSize, children, measurementKey = children }: FittedSceneProps) {
   const origin = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState<Bounds>({ x: 0, y: 0, width: basisWidth, height: 600 });
   useLayoutEffect(() => {
@@ -136,9 +137,10 @@ export function FittedScene({ width, height, paddingX, paddingY, basisWidth, zoo
     observer.observe(el);
     el.querySelectorAll('[data-scene-slot]').forEach(node => observer.observe(node));
     el.addEventListener('load', schedule, true);
+    document.fonts.addEventListener('loadingdone', schedule);
     schedule();
-    return () => { cancelAnimationFrame(raf); observer.disconnect(); el.removeEventListener('load', schedule, true); };
-  }, [children, basisWidth, projection, onNaturalSize]);
+    return () => { cancelAnimationFrame(raf); observer.disconnect(); el.removeEventListener('load', schedule, true); document.fonts.removeEventListener('loadingdone', schedule); };
+  }, [measurementKey, basisWidth, projection, onNaturalSize]);
   const innerW = Math.max(1, width - 2 * paddingX), innerH = Math.max(1, height - 2 * paddingY);
   // The measurement basis is fixed, not the canvas width; fit may therefore grow
   // as well as shrink. The composition keeps its own proportions in either case.

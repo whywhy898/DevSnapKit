@@ -34,6 +34,8 @@ import { emptyTextDocument } from './text/document';
 import { useCanvasTextEditor } from './text/useCanvasTextEditor';
 import { CanvasTextOverlay } from './text/CanvasTextOverlay';
 import { TextControls } from './text/TextControls';
+import { getCanonicalDimensions } from './canvasDimensions';
+import { useTextLayoutValidation, type CanvasSizingAction } from './text/useTextLayoutValidation';
 
 // Helper to get true outer rendered DOM dimensions of canvas node (including padding/border)
 function getCanvasRenderedDimensions(el: HTMLElement | null): { width: number; height: number } {
@@ -44,97 +46,7 @@ function getCanvasRenderedDimensions(el: HTMLElement | null): { width: number; h
   return { width: Math.max(1, w), height: Math.max(1, h) };
 }
 
-// Helper to compute exact nominal target resolution (independent of browser window CSS width)
-function getCanonicalDimensions(
-  aspectId: string,
-  scale: number,
-  _domWidth: number,
-  _domHeight: number,
-  autoW?: number,
-  autoH?: number,
-  customW = 1500,
-  customH = 900
-): { width: number; height: number } {
-  if (aspectId === 'auto' || aspectId === 'custom') {
-    const baseW = aspectId === 'custom' ? customW : autoW && autoW > 0 ? autoW : 1200;
-    const baseH = aspectId === 'custom' ? customH : autoH && autoH > 0 ? autoH : 776;
-    if (scale === 1) {
-      return { width: baseW, height: baseH };
-    } else if (scale === 2) {
-      return { width: baseW * 2, height: baseH * 2 };
-    } else {
-      // 4K Ultra HD: target standard 3840px longest edge (preserving exact aspect ratio)
-      if (baseW >= baseH) {
-        const targetW = 3840;
-        const targetH = Math.round(targetW * (baseH / baseW));
-        return { width: targetW, height: targetH };
-      } else {
-        const targetH = 3840;
-        const targetW = Math.round(targetH * (baseW / baseH));
-        return { width: targetW, height: targetH };
-      }
-    }
-  }
-
-  let baseWidth = 1200;
-  let baseHeight = 630;
-
-  switch (aspectId) {
-    case 'og':
-      baseWidth = 1200;
-      baseHeight = 630;
-      break;
-    case '16-9':
-      baseWidth = 1920;
-      baseHeight = 1080;
-      break;
-    case '4-3':
-      baseWidth = 1200;
-      baseHeight = 900;
-      break;
-    case '1-1':
-      baseWidth = 1080;
-      baseHeight = 1080;
-      break;
-    case 'ig-post':
-      baseWidth = 1080;
-      baseHeight = 1350;
-      break;
-    case 'ig-story':
-      baseWidth = 1080;
-      baseHeight = 1920;
-      break;
-    case 'linkedin':
-      baseWidth = 1200;
-      baseHeight = 627;
-      break;
-    case 'youtube':
-      baseWidth = 1280;
-      baseHeight = 720;
-      break;
-    default:
-      baseWidth = 1200;
-      baseHeight = 630;
-      break;
-  }
-
-  if (scale === 1) {
-    return { width: baseWidth, height: baseHeight };
-  } else if (scale === 2) {
-    if (aspectId === '16-9' || aspectId === 'youtube') return { width: 2560, height: 1440 }; // 2K QHD
-    return { width: baseWidth * 2, height: baseHeight * 2 };
-  } else {
-    // 4K Ultra HD resolution
-    if (aspectId === 'og') return { width: 3840, height: 2016 };
-    if (aspectId === '16-9' || aspectId === 'youtube') return { width: 3840, height: 2160 };
-    if (aspectId === '4-3') return { width: 3200, height: 2400 };
-    if (aspectId === '1-1') return { width: 3840, height: 3840 };
-    if (aspectId === 'ig-post') return { width: 3072, height: 3840 };
-    if (aspectId === 'ig-story') return { width: 2160, height: 3840 };
-    if (aspectId === 'linkedin') return { width: 3840, height: 2006 };
-    return { width: baseWidth * 3, height: baseHeight * 3 };
-  }
-}
+// Nominal canvas dimensions live in the shared pure canvasDimensions helper.
 
 // Aspect Ratios
 interface AspectOption {
@@ -850,7 +762,8 @@ export default function App() {
     setImageOffsetY(0);
   }, []);
 
-  const { canUndo, canRedo, undo, redo, flush, beginTransaction, commitTransaction, cancelTransaction } = useEditorHistory(currentSnapshot, handleRestoreSnapshot);
+  const editorHistory = useEditorHistory(currentSnapshot, handleRestoreSnapshot);
+  const { canUndo, canRedo, undo, redo, flush, beginTransaction, commitTransaction, cancelTransaction } = editorHistory;
 
   useEffect(() => {
     const el = canvasRef.current;
@@ -894,6 +807,24 @@ export default function App() {
   const effectivePaddingX = Math.min(padding, Math.max(0, (canvasLogicalSize.width - 120) / 2));
   const effectivePaddingY = Math.min(padding, Math.max(0, (canvasLogicalSize.height - 120) / 2));
   const textEditor = useCanvasTextEditor(currentSnapshot, setTextDocument, canvasLogicalSize, { beginTransaction, commitTransaction, cancelTransaction });
+  const sizingAction = useRef<CanvasSizingAction | null>(null);
+  const textLayout = useTextLayoutValidation(canvasRef, currentSnapshot, canvasLogicalSize, editorHistory, { width: canonicalAutoW, height: canonicalAutoH }, (id, custom) => {
+    setCustomCanvasSize(custom); setAspectRatio(id === 'custom' ? customAspect(custom) : ASPECT_RATIOS.find(option => option.id === id) || ASPECT_RATIOS[0]);
+  }, textEditor.finish, sizingAction);
+  const startSizing = () => {
+    if (sizingAction.current?.active || !textEditor.finish()) return;
+    beginTransaction(currentSnapshot);
+    sizingAction.current = { active: true, valid: !Object.keys(textLayout.issues).length, size: canvasLogicalSize, aspectRatioId: currentSnapshot.aspectRatioId, customCanvasSize, commitId: -1, action: 'size change' };
+  };
+  const finishSizing = () => {
+    if (!sizingAction.current?.active) return;
+    sizingAction.current.active = false; commitTransaction(currentSnapshot); sizingAction.current.commitId = editorHistory.getCommitId();
+  };
+  const guardEditorAction = (event: React.SyntheticEvent) => {
+    const sizingControl = (event.target as HTMLElement).closest('[data-canvas-sizing]');
+    if (!sizingControl) finishSizing();
+    textEditor.guard(event);
+  };
   const dynamicExportDimensions = getCanonicalDimensions(
     aspectRatio.id, exportScale, canvasDomSize.width, canvasDomSize.height,
     canonicalAutoW, canonicalAutoH, customCanvasSize.width, customCanvasSize.height
@@ -1658,7 +1589,7 @@ export default function App() {
       if (isEditable(e.target) || e.isComposing) return;
 
       if (e.key === 'Escape') {
-        if (textEditor.session) textEditor.cancel();
+        if (textEditor.session || textEditor.hasGesture()) textEditor.cancel();
         else textEditor.select(null);
         setShowShortcutsModal(false);
         setShowExportMenu(false);
@@ -1667,6 +1598,7 @@ export default function App() {
       }
 
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (!isCmdOrCtrl && e.key.startsWith('Arrow') && textEditor.activeId) { e.preventDefault(); textEditor.nudge(e.key, e.shiftKey); return; }
       const changesTool = isCmdOrCtrl ? ['z', 'y', 's'].includes(e.key.toLowerCase())
         : ['1', '2', 'Delete', 'Backspace', '?'].includes(e.key) || (e.key === '/' && e.shiftKey);
       if (changesTool && !textEditor.finish()) { e.preventDefault(); return; }
@@ -1721,9 +1653,11 @@ export default function App() {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, handleDownload, layoutMode, secondarySrc, showExportMenu, showDemoTemplatesMenu, studioMode]);
+    const keyup = (event: KeyboardEvent) => { if (event.key.startsWith('Arrow')) textEditor.endKeyboard(); };
+    const blur = () => { if (textEditor.hasGesture()) textEditor.cancel(); };
+    window.addEventListener('keydown', handleKeyDown); window.addEventListener('keyup', keyup); window.addEventListener('blur', blur);
+    return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', keyup); window.removeEventListener('blur', blur); };
+  }, [undo, redo, handleDownload, layoutMode, secondarySrc, showExportMenu, showDemoTemplatesMenu, studioMode, textEditor]);
 
   // Handle Starter Preset Template Application
   const handleApplyPreset = (preset: typeof MOCKUP_PRESETS[0]) => {
@@ -1798,7 +1732,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
   );
 
   return (
-    <div onPointerDownCapture={textEditor.guard} onClickCapture={textEditor.guard} onChangeCapture={textEditor.guard} onDropCapture={textEditor.guard} {...(isExporting ? { inert: '' } : {})} aria-busy={isExporting} className={`min-h-screen ${themeMode === 'light' ? 'theme-light bg-slate-50 text-slate-900' : 'theme-dark bg-slate-950 text-slate-100'} flex flex-col font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-200`}>
+    <div onPointerDownCapture={guardEditorAction} onClickCapture={guardEditorAction} onChangeCapture={guardEditorAction} onDropCapture={guardEditorAction} {...(isExporting ? { inert: '' } : {})} aria-busy={isExporting} className={`min-h-screen ${themeMode === 'light' ? 'theme-light bg-slate-50 text-slate-900' : 'theme-dark bg-slate-950 text-slate-100'} flex flex-col font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-200`}>
       
       {/* Top Navbar (Edge-to-Edge Desktop Studio Header) */}
       <header className="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40">
@@ -2131,9 +2065,16 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
           {/* Canvas Node Captured by html-to-image */}
           <TextControls document={textDocument} editor={textEditor} disabled={isExporting} exportError={textError} />
-          <CanvasStage width={canvasLogicalSize.width} height={canvasLogicalSize.height} freezePreviewWhileEditing={!!textEditor.editingId} onDeselect={() => textEditor.select(null)}>
+          {!!Object.keys(textLayout.issues).length && <div data-text-layout-errors data-text-editor-ui data-export-ignore="true" role="alert" className="w-full rounded-lg border border-red-400 bg-slate-900 p-2 text-xs text-red-200">
+            <p>Current canvas: {Object.keys(textLayout.issues).length} text boxes outside the canvas or too narrow. Move the marked text, widen its box, or reduce its font size.</p>
+            {Object.entries(textLayout.issues).map(([id, issue]) => <button type="button" key={id} className="block underline py-1" onClick={() => textEditor.select(id)}>Locate text {textDocument.layers.findIndex(layer => layer.id === id) + 1}: {issue}</button>)}
+            {textLayout.recovery && <button type="button" data-text-size-recovery className="rounded bg-indigo-600 text-white px-3 py-2" onClick={textLayout.recovery.restore}>{textLayout.recovery.label}</button>}
+          </div>}
+          <CanvasStage width={canvasLogicalSize.width} height={canvasLogicalSize.height} freezePreviewWhileEditing={!!textEditor.editingId || textEditor.gesturing} onDeselect={() => textEditor.select(null)}>
           <MockupArtwork {...artworkProps()} editingTextId={textEditor.editingId} />
           <CanvasTextOverlay document={textDocument} size={canvasLogicalSize} activeId={textEditor.activeId} editingId={textEditor.editingId}
+            issues={textLayout.issues} onGestureStart={textEditor.beginGesture} onGestureMove={textEditor.moveGesture}
+            onGestureActive={textEditor.hasGesture}
             draft={textEditor.session?.kind === 'content' ? textEditor.session.value : ''} light={themeMode === 'light'}
             onEdit={textEditor.edit} onChange={textEditor.change} onDone={textEditor.finish} onCancel={textEditor.cancel} onDeselect={() => textEditor.select(null)} />
 
@@ -2375,12 +2316,13 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             <button
               onClick={handleReset}
               className="text-[11px] text-white/50 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
-              title="Reset default styling"
+              title="Reset default styling; canvas text is preserved"
             >
               <RefreshCw className="w-3 h-3" />
               <span>Reset</span>
             </button>
           </div>
+          <p data-reset-preserves-text className="text-[11px] text-white/50">Reset changes mockup styling. Your canvas text is preserved.</p>
 
           {/* 4-Tab Segmented Control (Style, Background, Brand, Export) */}
           <div className="grid grid-cols-4 gap-1 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl">
@@ -3104,6 +3046,8 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                         min="0"
                         max="200"
                         aria-label="Canvas padding"
+                        data-canvas-sizing onFocus={startSizing} onBlur={finishSizing}
+                        onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { finishSizing(); event.currentTarget.blur(); } }}
                         value={padding}
                         onChange={(e) => {
                           const val = parseInt(e.target.value);
@@ -3119,6 +3063,9 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                     min="0"
                     max="200"
                     step="4"
+                    aria-label="Canvas padding slider" data-canvas-sizing onPointerDown={startSizing} onPointerUp={finishSizing} onPointerCancel={finishSizing} onLostPointerCapture={finishSizing} onBlur={finishSizing}
+                    onKeyDown={event => { if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key)) startSizing(); }}
+                    onKeyUp={finishSizing}
                     value={padding}
                     onChange={(e) => setPadding(parseInt(e.target.value))}
                     className="w-full accent-indigo-400 cursor-pointer"

@@ -77,3 +77,13 @@ test('redo cannot restore over pending changes, or cause a no-future restore', (
   h.api.undo(); h.render(); h.edit(2); h.api.redo(); h.render();
   assert.equal(h.snapshot.v, 2, 'pending change after Undo is a new branch');
 });
+test('conditional undo checks the live snapshot and cancel does not masquerade as navigation', () => {
+  const h = harness(); h.edit(1); h.tick();
+  const id = h.api.getCommitId(), revision = h.api.navigationRevision;
+  h.api.beginTransaction(); h.render(); h.api.cancelTransaction(); h.render();
+  assert.equal(h.api.navigationRevision, revision);
+  h.edit(2); assert.equal(h.api.undoCommit(id), false); assert.equal(h.snapshot.v, 2);
+  h.tick(); const nextId = h.api.getCommitId(); assert.notEqual(id, nextId);
+  assert.equal(h.api.undoCommit(nextId), true); h.render();
+  assert.equal(h.snapshot.v, 1); assert.equal(h.api.navigationRevision, revision + 1);
+});

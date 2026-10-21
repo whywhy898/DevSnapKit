@@ -5,12 +5,14 @@ const field = 'min-w-0 rounded-lg border border-slate-600 bg-slate-800 text-whit
 const button = field + ' disabled:opacity-40';
 export function TextControls({ document, editor, disabled, exportError }: { document: CanvasTextDocument; editor: Editor; disabled: boolean; exportError?: string }) {
   const { active, session } = editor;
-  const numericOrColor = (kind: 'fontSize' | 'color', label: string) => <label className="flex items-center gap-1 text-xs text-slate-400">{label}
-    <input aria-label={kind === 'fontSize' ? 'Text size' : 'Text color'} type="text" inputMode={kind === 'fontSize' ? 'decimal' : 'text'}
-      className={field + (kind === 'fontSize' ? ' w-16' : ' w-24')} value={session?.kind === kind ? session.value : active?.[kind] ?? ''}
+  const numericOrColor = (kind: 'fontSize' | 'color' | 'x' | 'y' | 'width', label: string) => <label className="flex items-center gap-1 text-xs text-slate-400">{label}
+    <input aria-label={kind === 'fontSize' ? 'Text size' : kind === 'color' ? 'Text color' : `Text ${kind}`} type="text" inputMode={kind === 'color' ? 'text' : 'decimal'}
+      className={field + (kind === 'color' ? ' w-24' : ' w-16')} value={session?.kind === kind ? session.value : active ? kind === 'x' ? Math.round(active.centerX * editor.size.width * 100) / 100 : kind === 'y' ? Math.round(active.centerY * editor.size.height * 100) / 100 : kind === 'width' ? Math.round(active.widthRatio * editor.size.width * 100) / 100 : active[kind] : ''}
       aria-invalid={session?.kind === kind && !!session.error} onFocus={() => editor.styleStart(kind)}
       onChange={event => editor.changeStyle(kind, event.target.value)} onBlur={event => { if (!(event.relatedTarget as HTMLElement | null)?.closest('[data-text-cancel]')) editor.finishStyle(kind); }}
-      onKeyDown={event => { if (event.key === 'Enter') { if (editor.finish()) event.currentTarget.blur(); } if (event.key === 'Escape') { editor.cancel(); event.currentTarget.blur(); } }} />
+      onCompositionStart={event => { if (editor.styleStart(kind)) editor.change(event.currentTarget.value, true); }}
+      onCompositionEnd={event => { if (editor.styleStart(kind)) editor.change(event.currentTarget.value, false); }}
+      onKeyDown={event => { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') { if (editor.finish()) event.currentTarget.blur(); } if (event.key === 'Escape') { editor.cancel(); event.currentTarget.blur(); } }} />
   </label>;
   return <div data-canvas-text-controls data-text-editor-ui data-export-ignore="true" className="w-full min-w-0 px-3 py-2 flex flex-wrap items-center gap-2" aria-label="Canvas text controls">
     <button type="button" aria-label="Add text" disabled={disabled || document.layers.length >= 20} onClick={editor.add} className={button}>Add text</button>
@@ -28,6 +30,8 @@ export function TextControls({ document, editor, disabled, exportError }: { docu
       </select>
       <button type="button" aria-label="Text italic" aria-pressed={active.italic} disabled={active.font === 'manrope'} className={button + ' italic'} onClick={() => editor.style({ italic: !active.italic })}>Italic</button>
       {numericOrColor('fontSize', 'Size')}{numericOrColor('color', 'Color')}
+      {numericOrColor('x', 'Center X')}{numericOrColor('y', 'Center Y')}{numericOrColor('width', 'Width')}
+      <span className="text-xs text-slate-400">Logical px · Move handle: arrows 1 px, Shift + arrows 10 px. Width reflows text.</span>
       <input aria-label="Text color picker" type="color" className="w-8 h-8 bg-transparent" value={active.color} onFocus={() => editor.styleStart('color')} onChange={event => editor.changeStyle('color', event.target.value)} onBlur={event => { if (!(event.relatedTarget as HTMLElement | null)?.closest('[data-text-cancel]')) editor.finishStyle('color'); }} />
       <button type="button" className={button} onClick={() => editor.style({ color: '#111827' })}>Dark text</button>
       <button type="button" className={button} onClick={() => editor.style({ color: '#FFFFFF' })}>Light text</button>

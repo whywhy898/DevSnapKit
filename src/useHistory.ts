@@ -75,12 +75,14 @@ export function useEditorHistory(
   const awaiting = useRef<EditorSnapshot | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
   const [, refresh] = useState(0);
+  const [navigationRevision, setNavigationRevision] = useState(0);
   const notify = useCallback(() => refresh(n => n + 1), []);
   const stopTimer = useCallback(() => { clearTimeout(timer.current); }, []);
-  const apply = useCallback((snapshot: EditorSnapshot) => {
+  const apply = useCallback((snapshot: EditorSnapshot, navigation = false) => {
     awaiting.current = history.current!.equal(snapshot, latest.current) ? null : snapshot;
     latest.current = snapshot;
     restore.current(snapshot);
+    if (navigation) setNavigationRevision(n => n + 1);
     notify();
   }, [notify]);
   // Acknowledge the actual restored render, never a guessed timeout window.
@@ -97,15 +99,25 @@ export function useEditorHistory(
   const beginTransaction = useCallback((snapshot = latest.current) => { stopTimer(); history.current!.beginTransaction(snapshot); notify(); }, [stopTimer, notify]);
   const commitTransaction = useCallback((snapshot = latest.current) => { stopTimer(); history.current!.commitTransaction(snapshot); notify(); }, [stopTimer, notify]);
   const cancelTransaction = useCallback(() => { stopTimer(); apply(history.current!.cancelTransaction()); }, [stopTimer, apply]);
-  const undo = useCallback(() => { stopTimer(); apply(history.current!.undo(latest.current)); }, [stopTimer, apply]);
+  const undo = useCallback(() => { stopTimer(); apply(history.current!.undo(latest.current), true); }, [stopTimer, apply]);
   const redo = useCallback(() => {
     const h = history.current!;
     if (h.inTransaction || !h.canRedo || !h.equal(h.current, latest.current)) return;
-    stopTimer(); apply(h.redo());
+    stopTimer(); apply(h.redo(), true);
+  }, [stopTimer, apply]);
+  const undoCommit = useCallback((id: number) => {
+    const target = history.current!.undoCommit(id, latest.current);
+    if (!target) return false;
+    stopTimer(); apply(target, true); return true;
   }, [stopTimer, apply]);
   const pending = !history.current.equal(history.current.current, currentSnapshot);
   return { canUndo: history.current.canUndo || pending, canRedo: history.current.canRedo && !pending,
     historyCount: history.current.count, historyIndex: history.current.index,
     undo, redo, flush, beginTransaction, commitTransaction, cancelTransaction,
+    undoCommit, getCommitId: () => history.current!.currentCommitId,
+    navigationRevision,
+    isCurrentCommit: (id: number) => !history.current!.inTransaction && history.current!.currentCommitId === id && history.current!.equal(history.current!.current, latest.current),
+    getCommittedSnapshot: () => history.current!.current,
+    getPreviousSnapshot: () => history.current!.previous,
     isInTransaction: () => history.current!.inTransaction };
 }

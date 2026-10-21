@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const port = 5197;
+const port = Number(process.env.TEST_UI_PORT || 5197);
 const origin = `http://127.0.0.1:${port}`;
 const vite = path.join(path.dirname(require.resolve('vite/package.json')), 'bin/vite.js');
 const server = spawn(process.execPath, [vite, '--config', 'tests/vite-poster.config.mjs', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });

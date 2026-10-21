@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { DeviceComposition, FittedScene, SceneSize } from './CanvasLayout';
 import type { EditorSnapshot } from './useHistory';
 import type { PresetGradient } from './themes';
@@ -125,6 +125,12 @@ export function MockupArtwork({
   isProUnlocked,
   qrDataUrl,
 }: MockupArtworkProps) {
+  // Actual interaction A/B (geometry/interaction-performance-*.json) showed that
+  // remeasuring the image scene for each text move invalidated the entire canvas.
+  // Keep every image/frame/composition geometry input, but exclude text changes.
+  const imageStyleKey = JSON.stringify(zoomStyle);
+  const sceneMeasurementKey = useMemo(() => ({}), [layoutMode, duoLayout, windowTheme, imageSrc, imageName, shadowLevel, shadowOpacity,
+    cornerStyle, roundedCorners, windowTitle, hideMockup, secondarySrc, secondaryName, isPhoneTheme, imageStyleKey]);
   return (
     <div 
       ref={canvasRef}
@@ -213,6 +219,7 @@ export function MockupArtwork({
       )}
 
       <FittedScene
+        measurementKey={sceneMeasurementKey}
         width={canvasLogicalSize.width} height={canvasLogicalSize.height}
         paddingX={effectivePaddingX} paddingY={effectivePaddingY}
         basisWidth={layoutMode === 'single' && isPhoneTheme ? 375 : 1024}

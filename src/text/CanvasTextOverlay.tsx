@@ -6,6 +6,10 @@ interface Props {
   document: CanvasTextDocument; size: TextCanvasSize; activeId: string | null; editingId: string | null;
   draft: string; light: boolean; onEdit: (id: string) => void; onChange: (value: string, composing?: boolean) => void;
   onDone: () => boolean; onCancel: () => void; onDeselect: () => void;
+  issues: Record<string, string>;
+  onGestureStart: (id: string, kind: 'move' | 'left' | 'right', scale: number) => number | false;
+  onGestureMove: (x: number, y: number) => void;
+  onGestureActive: (token: number) => boolean;
 }
 export function textLayoutStyle(layer: CanvasTextLayer): React.CSSProperties {
   return { fontFamily: `"${textFontFamily(layer.font)}"`, fontSize: layer.fontSize, fontWeight: layer.weight,
@@ -25,15 +29,18 @@ export function CanvasTextOverlay(props: Props) {
     return () => { viewport.removeEventListener('resize', place); viewport.removeEventListener('scroll', place); };
   }, [editingId]);
   return <div data-export-ignore="true" data-text-editor-ui style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 50 }}>
-    <div style={{ position: 'absolute', width: size.width, height: size.height, transform: 'scale(var(--canvas-preview-scale, 1))', transformOrigin: 'top left', pointerEvents: 'none' }}>
-      {document.layers.map(layer => editingId === layer.id ? <InlineText key={layer.id} {...props} layer={layer} /> : <button key={layer.id} type="button" aria-label={`Edit text ${document.layers.indexOf(layer) + 1}`}
+    <div data-text-logical-overlay style={{ position: 'absolute', width: size.width, height: size.height, transform: 'scale(var(--canvas-preview-scale, 1))', transformOrigin: 'top left', pointerEvents: 'none' }}>
+      {document.layers.map(layer => <div key={layer.id}>{editingId === layer.id ? <InlineText {...props} layer={layer} /> : <button type="button" aria-label={`Edit text ${document.layers.indexOf(layer) + 1}`}
         data-text-hit={layer.id} onClick={() => props.onEdit(layer.id)}
+        aria-invalid={!!props.issues[layer.id]} title={props.issues[layer.id]}
         style={{ ...textLayoutStyle(layer), position: 'absolute', left: layer.centerX * size.width, top: layer.centerY * size.height,
           width: layer.widthRatio * size.width, transform: 'translate(-50%, -50%)', minHeight: layer.fontSize * 1.25,
           background: 'transparent', color: 'transparent', cursor: 'text', pointerEvents: 'auto',
-          outline: activeId === layer.id ? '2px solid #FFFFFF' : 'none', boxShadow: activeId === layer.id ? '0 0 0 4px #111827' : undefined, textDecoration: 'none' }}>
+          outline: props.issues[layer.id] ? '3px solid #F87171' : activeId === layer.id ? '2px solid #FFFFFF' : 'none', boxShadow: activeId === layer.id ? '0 0 0 4px #111827' : undefined, textDecoration: 'none' }}>
         {layer.content.trim() ? layer.content + (layer.content.endsWith('\n') ? '\u200b' : '') : '\u200b'}
-      </button>)}
+      </button>}
+      {activeId === layer.id && !editingId && <TextHandles {...props} layer={layer} />}
+      </div>)}
     </div>
     {editingId && <div data-text-edit-dock aria-label="Finish text editing" className="flex items-center gap-2 rounded-xl border border-slate-500 bg-slate-900 px-3 py-2 text-white shadow-lg"
       style={{ position: 'fixed', top: dockTop, bottom: dockTop === undefined ? 12 : undefined, left: '50%', transform: 'translateX(-50%)', zIndex: 80, pointerEvents: 'auto', maxWidth: 'calc(100vw - 24px)' }}>
@@ -41,6 +48,35 @@ export function CanvasTextOverlay(props: Props) {
       <button type="button" onPointerDown={event => event.preventDefault()} onClick={props.onDone} className="rounded-lg bg-indigo-600 px-3 py-1 text-sm">Done</button>
       <button type="button" data-text-cancel onPointerDown={event => event.preventDefault()} onClick={props.onCancel} className="rounded-lg border border-slate-500 px-3 py-1 text-sm">Cancel</button>
     </div>}
+  </div>;
+}
+function TextHandles(props: Props & { layer: CanvasTextLayer }) {
+  const start = useRef<{ x: number; y: number; pointerId: number; token: number } | null>(null);
+  const { layer, size } = props;
+  const handle = (kind: 'move' | 'left' | 'right', label: string, left: number, top: string) => <button type="button" data-text-gesture={kind}
+    aria-label={label} title={kind === 'move' ? 'Drag to move. Arrow keys move 1 logical px; Shift moves 10 px.' : 'Drag to reflow text. Use Text width and Text x inputs for keyboard control.'}
+    style={{ position: 'absolute', left, top, transform: 'translate(-50%, -50%)', minWidth: 36, minHeight: 36, padding: '4px 8px', border: '2px solid white', borderRadius: 6, background: '#312E81', color: 'white', font: '16px sans-serif', cursor: kind === 'move' ? 'move' : 'ew-resize', touchAction: 'none', pointerEvents: 'auto' }}
+    onPointerDown={event => {
+      if (event.button !== 0 || start.current) return;
+      event.preventDefault(); event.stopPropagation();
+      const logical = event.currentTarget.closest('[data-text-logical-overlay]') as HTMLElement;
+      const scale = logical.getBoundingClientRect().width / size.width;
+      const token = props.onGestureStart(layer.id, kind, scale); if (token === false) return;
+      event.currentTarget.focus({ preventScroll: true }); start.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId, token };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }}
+    onPointerMove={event => { if (start.current?.pointerId === event.pointerId && props.onGestureActive(start.current.token)) { event.stopPropagation(); props.onGestureMove(event.clientX - start.current.x, event.clientY - start.current.y); } }}
+    onPointerUp={event => { if (start.current?.pointerId === event.pointerId) { const token = start.current.token; start.current = null; if (props.onGestureActive(token)) props.onDone(); event.currentTarget.releasePointerCapture(event.pointerId); } }}
+    onPointerCancel={event => { if (start.current?.pointerId === event.pointerId) { const token = start.current.token; start.current = null; if (props.onGestureActive(token)) props.onCancel(); } }}
+    onLostPointerCapture={event => { if (start.current?.pointerId === event.pointerId) { const token = start.current.token; start.current = null; if (props.onGestureActive(token)) props.onCancel(); } }}
+    onClick={event => event.stopPropagation()}>{kind === 'move' ? '↔ Move' : '↔'}</button>;
+  useEffect(() => {
+    const cancel = () => { if (start.current) { const token = start.current.token; start.current = null; if (props.onGestureActive(token)) props.onCancel(); } };
+    window.addEventListener('scroll', cancel, true); window.addEventListener('blur', cancel);
+    return () => { window.removeEventListener('scroll', cancel, true); window.removeEventListener('blur', cancel); };
+  });
+  return <div style={{ position: 'absolute', left: layer.centerX * size.width, top: layer.centerY * size.height, width: layer.widthRatio * size.width, height: 0, pointerEvents: 'none', zIndex: 60 }}>
+    {handle('move', 'Move text', 0, '-42px')}{handle('left', 'Text left width handle', -layer.widthRatio * size.width / 2, '0px')}{handle('right', 'Text right width handle', layer.widthRatio * size.width / 2, '0px')}
   </div>;
 }
 function InlineText({ layer, size, draft, light, onChange, onDone, onCancel }: Props & { layer: CanvasTextLayer }) {
