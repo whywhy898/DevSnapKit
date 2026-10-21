@@ -1,9 +1,13 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react';
+import { EditorHistory } from './editorHistory';
+import type { CanvasTextDocument } from './text/types';
 import { WindowTheme } from './MockupUnit';
 import { CornerStyle, LayoutPreset } from './stylePresets';
 import { DuoLayoutType } from './DuoThumbnail';
 
 export interface EditorSnapshot {
+  textDocument: CanvasTextDocument;
+  gradientId: string;
   selectedPreset: string;
   imageSrc: string;
   imageName: string;
@@ -64,116 +68,44 @@ export function useEditorHistory(
   onRestore: (snapshot: EditorSnapshot) => void,
   maxHistory: number = 50
 ) {
-  const historyRef = useRef<EditorSnapshot[]>([]);
-  const historyIndexRef = useRef<number>(-1);
-  const isRestoringRef = useRef<boolean>(false);
-  const timerRef = useRef<any>(null);
-
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
-  const [historyCount, setHistoryCount] = useState(0);
-
-  // Initialize history with initial snapshot
+  const history = useRef<EditorHistory<EditorSnapshot>>();
+  history.current ??= new EditorHistory(currentSnapshot, maxHistory);
+  const latest = useRef(currentSnapshot); latest.current = currentSnapshot;
+  const restore = useRef(onRestore); restore.current = onRestore;
+  const awaiting = useRef<EditorSnapshot | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const [, refresh] = useState(0);
+  const notify = useCallback(() => refresh(n => n + 1), []);
+  const stopTimer = useCallback(() => { clearTimeout(timer.current); }, []);
+  const apply = useCallback((snapshot: EditorSnapshot) => {
+    awaiting.current = history.current!.equal(snapshot, latest.current) ? null : snapshot;
+    latest.current = snapshot;
+    restore.current(snapshot);
+    notify();
+  }, [notify]);
+  // Acknowledge the actual restored render, never a guessed timeout window.
+  useLayoutEffect(() => {
+    if (awaiting.current && history.current!.equal(awaiting.current, currentSnapshot)) awaiting.current = null;
+  }, [currentSnapshot]);
   useEffect(() => {
-    if (historyRef.current.length === 0) {
-      historyRef.current = [currentSnapshot];
-      historyIndexRef.current = 0;
-      setHistoryCount(1);
-    }
-  }, []);
-
-  // Debounced snapshot capture (400ms)
-  useEffect(() => {
-    if (isRestoringRef.current) return;
-    if (historyRef.current.length === 0) return;
-
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-
-    timerRef.current = setTimeout(() => {
-      if (isRestoringRef.current) return;
-
-      const currentIndex = historyIndexRef.current;
-      const topSnapshot = historyRef.current[currentIndex];
-
-      // Deep compare top of stack with current
-      if (topSnapshot && JSON.stringify(topSnapshot) === JSON.stringify(currentSnapshot)) {
-        return;
-      }
-
-      // Truncate redo branch
-      const nextHistory = historyRef.current.slice(0, currentIndex + 1);
-      nextHistory.push(currentSnapshot);
-
-      // Limit max history
-      if (nextHistory.length > maxHistory) {
-        nextHistory.shift();
-      }
-
-      historyRef.current = nextHistory;
-      historyIndexRef.current = nextHistory.length - 1;
-
-      setCanUndo(historyIndexRef.current > 0);
-      setCanRedo(false);
-      setHistoryCount(nextHistory.length);
-    }, 400);
-
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, [currentSnapshot, maxHistory]);
-
-  const undo = useCallback(() => {
-    if (historyIndexRef.current <= 0) return;
-
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-
-    isRestoringRef.current = true;
-    historyIndexRef.current -= 1;
-    const target = historyRef.current[historyIndexRef.current];
-
-    onRestore(target);
-
-    setCanUndo(historyIndexRef.current > 0);
-    setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
-
-    setTimeout(() => {
-      isRestoringRef.current = false;
-    }, 100);
-  }, [onRestore]);
-
+    stopTimer();
+    if (awaiting.current || history.current!.inTransaction) return;
+    timer.current = setTimeout(() => { history.current!.flush(latest.current); notify(); }, 400);
+    return stopTimer;
+  }, [currentSnapshot, stopTimer, notify]);
+  const flush = useCallback((snapshot = latest.current) => { stopTimer(); history.current!.flush(snapshot); notify(); }, [stopTimer, notify]);
+  const beginTransaction = useCallback((snapshot = latest.current) => { stopTimer(); history.current!.beginTransaction(snapshot); notify(); }, [stopTimer, notify]);
+  const commitTransaction = useCallback((snapshot = latest.current) => { stopTimer(); history.current!.commitTransaction(snapshot); notify(); }, [stopTimer, notify]);
+  const cancelTransaction = useCallback(() => { stopTimer(); apply(history.current!.cancelTransaction()); }, [stopTimer, apply]);
+  const undo = useCallback(() => { stopTimer(); apply(history.current!.undo(latest.current)); }, [stopTimer, apply]);
   const redo = useCallback(() => {
-    if (historyIndexRef.current >= historyRef.current.length - 1) return;
-
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-
-    isRestoringRef.current = true;
-    historyIndexRef.current += 1;
-    const target = historyRef.current[historyIndexRef.current];
-
-    onRestore(target);
-
-    setCanUndo(historyIndexRef.current > 0);
-    setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
-
-    setTimeout(() => {
-      isRestoringRef.current = false;
-    }, 100);
-  }, [onRestore]);
-
-  return {
-    canUndo,
-    canRedo,
-    historyCount,
-    undo,
-    redo,
-    historyIndex: historyIndexRef.current,
-  };
+    const h = history.current!;
+    if (h.inTransaction || !h.canRedo || !h.equal(h.current, latest.current)) return;
+    stopTimer(); apply(h.redo());
+  }, [stopTimer, apply]);
+  const pending = !history.current.equal(history.current.current, currentSnapshot);
+  return { canUndo: history.current.canUndo || pending, canRedo: history.current.canRedo && !pending,
+    historyCount: history.current.count, historyIndex: history.current.index,
+    undo, redo, flush, beginTransaction, commitTransaction, cancelTransaction,
+    isInTransaction: () => history.current!.inTransaction };
 }

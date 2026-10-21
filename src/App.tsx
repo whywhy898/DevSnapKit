@@ -29,6 +29,7 @@ import { DuoThumbnail, DuoLayoutType } from './DuoThumbnail';
 import { useEditorHistory, EditorSnapshot } from './useHistory';
 import { CanvasStage, DeviceComposition, FittedScene, SceneSize } from './CanvasLayout';
 import { PosterEditor } from './poster/PosterEditor';
+import { emptyTextDocument } from './text/document';
 
 // Helper to get true outer rendered DOM dimensions of canvas node (including padding/border)
 function getCanvasRenderedDimensions(el: HTMLElement | null): { width: number; height: number } {
@@ -720,7 +721,10 @@ export default function App() {
   const [canvasDomSize, setCanvasDomSize] = useState<{ width: number; height: number }>({ width: 960, height: 600 });
 
   // Snapshot for History (Undo / Redo - F1)
+  const [textDocument, setTextDocument] = useState(emptyTextDocument);
   const currentSnapshot: EditorSnapshot = useMemo(() => ({
+    textDocument,
+    gradientId: gradient.id,
     selectedPreset,
     imageSrc,
     imageName,
@@ -771,7 +775,7 @@ export default function App() {
     imageOffsetX,
     imageOffsetY,
   }), [
-    selectedPreset, imageSrc, imageName, windowTheme, windowTitle,
+    textDocument, gradient.id, selectedPreset, imageSrc, imageName, windowTheme, windowTitle,
     padding, roundedCorners, shadowLevel, shadowOpacity, activeCuratedLayout,
     cornerStyle, layoutPreset, aspectRatio.id, customCanvasSize, secondarySrc, secondaryName,
     layoutMode, duoLayout, bgType, solidColor, isCustomGradient,
@@ -783,6 +787,8 @@ export default function App() {
   ]);
 
   const handleRestoreSnapshot = useCallback((snap: EditorSnapshot) => {
+    setTextDocument(snap.textDocument ?? emptyTextDocument());
+    if (snap.gradientId) setGradient(GRADIENTS.find(g => g.id === snap.gradientId) ?? GRADIENTS[0]);
     setSelectedPreset(snap.selectedPreset);
     setImageSrc(snap.imageSrc);
     setImageName(snap.imageName);
