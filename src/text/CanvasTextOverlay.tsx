@@ -39,7 +39,7 @@ export function CanvasTextOverlay(props: Props) {
           outline: props.issues[layer.id] ? '3px solid #F87171' : activeId === layer.id ? '2px solid #FFFFFF' : 'none', boxShadow: activeId === layer.id ? '0 0 0 4px #111827' : undefined, textDecoration: 'none' }}>
         {layer.content.trim() ? layer.content + (layer.content.endsWith('\n') ? '\u200b' : '') : '\u200b'}
       </button>}
-      {activeId === layer.id && !editingId && <TextHandles {...props} layer={layer} />}
+      {activeId === layer.id && <TextHandles {...props} layer={layer} />}
       </div>)}
     </div>
     {editingId && <div data-text-edit-dock aria-label="Finish text editing" className="flex items-center gap-2 rounded-xl border border-slate-500 bg-slate-900 px-3 py-2 text-white shadow-lg"
@@ -52,7 +52,15 @@ export function CanvasTextOverlay(props: Props) {
 }
 function TextHandles(props: Props & { layer: CanvasTextLayer }) {
   const start = useRef<{ x: number; y: number; pointerId: number; token: number } | null>(null);
+  const container = useRef<HTMLDivElement>(null);
   const { layer, size } = props;
+  const [boxHeight, setBoxHeight] = useState(layer.fontSize * 1.25);
+  useLayoutEffect(() => {
+    const box = container.current?.parentElement?.querySelector<HTMLElement>('[data-text-edit-layout], [data-text-hit]');
+    if (!box) return;
+    const update = () => setBoxHeight(box.offsetHeight);
+    update(); const observer = new ResizeObserver(update); observer.observe(box); return () => observer.disconnect();
+  }, [layer.content, layer.fontSize, layer.widthRatio, layer.font, layer.weight, layer.italic, props.editingId]);
   const handle = (kind: 'move' | 'left' | 'right', label: string, left: number, top: string) => <button type="button" data-text-gesture={kind}
     aria-label={label} title={kind === 'move' ? 'Drag to move. Arrow keys move 1 logical px; Shift moves 10 px.' : 'Drag to reflow text. Use Text width and Text x inputs for keyboard control.'}
     style={{ position: 'absolute', left, top, transform: 'translate(-50%, -50%)', minWidth: 36, minHeight: 36, padding: '4px 8px', border: '2px solid white', borderRadius: 6, background: '#312E81', color: 'white', font: '16px sans-serif', cursor: kind === 'move' ? 'move' : 'ew-resize', touchAction: 'none', pointerEvents: 'auto' }}
@@ -75,8 +83,8 @@ function TextHandles(props: Props & { layer: CanvasTextLayer }) {
     window.addEventListener('scroll', cancel, true); window.addEventListener('blur', cancel);
     return () => { window.removeEventListener('scroll', cancel, true); window.removeEventListener('blur', cancel); };
   });
-  return <div style={{ position: 'absolute', left: layer.centerX * size.width, top: layer.centerY * size.height, width: layer.widthRatio * size.width, height: 0, pointerEvents: 'none', zIndex: 60 }}>
-    {handle('move', 'Move text', 0, '-42px')}{handle('left', 'Text left width handle', -layer.widthRatio * size.width / 2, '0px')}{handle('right', 'Text right width handle', layer.widthRatio * size.width / 2, '0px')}
+  return <div ref={container} style={{ position: 'absolute', left: layer.centerX * size.width, top: layer.centerY * size.height, width: layer.widthRatio * size.width, height: 0, pointerEvents: 'none', zIndex: 60 }}>
+    {handle('move', 'Move text', 0, `${-boxHeight / 2 - 24}px`)}{handle('left', 'Text left width handle', -layer.widthRatio * size.width / 2, '0px')}{handle('right', 'Text right width handle', layer.widthRatio * size.width / 2, '0px')}
   </div>;
 }
 function InlineText({ layer, size, draft, light, onChange, onDone, onCancel }: Props & { layer: CanvasTextLayer }) {

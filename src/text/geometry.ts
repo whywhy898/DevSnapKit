@@ -22,6 +22,27 @@ export function resizeTextByScreenDelta(layer: Pick<CanvasTextLayer, 'centerX' |
   return { centerX, widthRatio: width / size.width };
 }
 export type TextHorizontalExtent = { left: number; right: number };
+export type TextMovementLayout = { height: number; positionedHeight: number; horizontal: TextHorizontalExtent };
+/** Clamp translation using the same logical extents as preview/export validation.
+ * An already oversized axis has no feasible translation; preserve it rather than
+ * silently shrinking text or jumping between contradictory limits. */
+export function clampTextPosition(layer: Pick<CanvasTextLayer, 'centerX' | 'centerY' | 'widthRatio'>, position: { centerX: number; centerY: number }, size: TextCanvasSize, layout: TextMovementLayout) {
+  const halfWidth = layer.widthRatio * size.width / 2;
+  const minX = halfWidth - layout.horizontal.left, maxX = size.width + halfWidth - layout.horizontal.right;
+  const minY = layout.positionedHeight / 2, maxY = size.height - layout.height + layout.positionedHeight / 2;
+  const clamp = (value: number, min: number, max: number, original: number) => {
+    // CSS positions/transforms quantize to layout subpixels. A two-subpixel
+    // inset keeps fractional boxes inside after that rounding, at every zoom.
+    const inset = Math.min(1 / 32, Math.max(0, (max - min) / 2));
+    min += inset; max -= inset;
+    const target = min <= max ? Math.max(min, Math.min(max, value)) : original;
+    // Transformed DOM rects vary by tiny floating-point fractions between paints.
+    // Repeated pushes against an edge must remain a no-op in document/history.
+    return Math.abs(target - original) < .001 ? original : target;
+  };
+  return { centerX: clamp(position.centerX * size.width, minX, maxX, layer.centerX * size.width) / size.width,
+    centerY: clamp(position.centerY * size.height, minY, maxY, layer.centerY * size.height) / size.height };
+}
 /** Native line fragments include indivisible graphemes overflowing either edge.
  * Coordinates remain relative to the positioned CSS box, in logical pixels. */
 export function textHorizontalExtent(node: HTMLElement, previewScale: number): TextHorizontalExtent {

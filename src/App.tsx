@@ -830,7 +830,7 @@ export default function App() {
   );
   const effectivePaddingX = Math.min(padding, Math.max(0, (canvasLogicalSize.width - 120) / 2));
   const effectivePaddingY = Math.min(padding, Math.max(0, (canvasLogicalSize.height - 120) / 2));
-  const textEditor = useCanvasTextEditor(currentSnapshot, setTextDocument, canvasLogicalSize, { beginTransaction, commitTransaction, cancelTransaction });
+  const textEditor = useCanvasTextEditor(currentSnapshot, setTextDocument, canvasLogicalSize, { beginTransaction, commitTransaction, cancelTransaction }, canvasRef);
   const switchInspectorTab = (tab: typeof sidebarTab) => {
     if (sidebarTab === 'text' && tab !== 'text' && !textEditor.finish()) return;
     setSidebarTab(tab);

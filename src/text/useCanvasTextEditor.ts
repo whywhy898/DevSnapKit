@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { EditorSnapshot } from '../useHistory';
 import type { CanvasTextDocument, CanvasTextLayer, TextCanvasSize, TextFont } from './types';
 import { addText, changeTextFont, deleteText, initialTextColor, updateText } from './document';
-import { geometryPatch, moveTextByScreenDelta, resizeTextByScreenDelta, type GeometryField } from './geometry';
+import { clampTextPosition, geometryPatch, moveTextByScreenDelta, resizeTextByScreenDelta, textHorizontalExtent, type GeometryField, type TextMovementLayout } from './geometry';
 
 type History = {
   beginTransaction: (snapshot?: EditorSnapshot) => void;
@@ -11,10 +11,10 @@ type History = {
 };
 type Field = 'fontSize' | 'color' | GeometryField;
 type Session = { id: string; kind: 'content' | Field; value: string; composing: boolean; error: string };
-type Gesture = { token: number; id: string; kind: 'move' | 'left' | 'right' | 'keyboard'; layer: CanvasTextLayer; size: TextCanvasSize; scale: number };
+type Gesture = { token: number; id: string; kind: 'move' | 'left' | 'right' | 'keyboard'; layer: CanvasTextLayer; size: TextCanvasSize; scale: number; layout: TextMovementLayout };
 
 /** Ephemeral editor state never enters the document or history. */
-export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc: CanvasTextDocument) => void, size: TextCanvasSize, history: History) {
+export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc: CanvasTextDocument) => void, size: TextCanvasSize, history: History, root: React.RefObject<HTMLDivElement>) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [message, setMessage] = useState('');
@@ -88,16 +88,23 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
   const beginGesture = (id: string, kind: Gesture['kind'], scale = 1) => {
     if (!finish()) return false;
     const layer = latest.current.textDocument.layers.find(item => item.id === id); if (!layer) return false;
+    const node = Array.from(root.current?.querySelectorAll<HTMLElement>('[data-canvas-text]') ?? []).find(item => item.dataset.canvasText === id);
+    if (layer.content.trim() && (!node || !node.offsetWidth)) { setMessage('Text layout is not ready. Try moving it again.'); return false; }
+    const canvas = root.current;
+    const previewScale = canvas && canvas.offsetWidth ? canvas.getBoundingClientRect().width / canvas.offsetWidth : scale;
+    const positionedHeight = node ? node.getBoundingClientRect().height / previewScale : layer.fontSize * 1.25;
+    const layout = node ? { height: Math.max(positionedHeight, node.offsetHeight, node.scrollHeight), positionedHeight, horizontal: textHorizontalExtent(node, previewScale) }
+      : { height: layer.fontSize * 1.25, positionedHeight: layer.fontSize * 1.25, horizontal: { left: 0, right: layer.widthRatio * size.width } };
     setActiveId(id); history.beginTransaction(latest.current);
     const token = ++nextGestureToken.current;
-    gesture.current = { token, id, kind, layer, scale, size }; setGesturing(true); setMessage(''); return token;
+    gesture.current = { token, id, kind, layer, scale, size, layout }; setGesturing(true); setMessage(''); return token;
   };
   const moveGesture = (x: number, y: number) => {
     const current = gesture.current; if (!current) return;
     try {
       const patch = current.kind === 'left' || current.kind === 'right'
         ? resizeTextByScreenDelta(current.layer, x, current.kind, current.scale, current.size)
-        : moveTextByScreenDelta(current.layer, { x, y }, { previewScale: current.scale, canvasWidth: current.size.width, canvasHeight: current.size.height });
+        : clampTextPosition(current.layer, moveTextByScreenDelta(current.layer, { x, y }, { previewScale: current.scale, canvasWidth: current.size.width, canvasHeight: current.size.height }), current.size, current.layout);
       applyDocument(updateText(latest.current.textDocument, current.id, patch)); setMessage('');
     } catch (error) { setMessage((error as Error).message); }
   };
@@ -106,9 +113,9 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
     if (gesture.current?.kind !== 'keyboard' && !beginGesture(activeId, 'keyboard')) return true;
     const layer = latest.current.textDocument.layers.find(item => item.id === activeId); if (!layer) return true;
     const step = shift ? 10 : 1;
-    try { applyDocument(updateText(latest.current.textDocument, activeId, moveTextByScreenDelta(layer,
+    try { applyDocument(updateText(latest.current.textDocument, activeId, clampTextPosition(layer, moveTextByScreenDelta(layer,
       { x: key === 'ArrowLeft' ? -step : key === 'ArrowRight' ? step : 0, y: key === 'ArrowUp' ? -step : key === 'ArrowDown' ? step : 0 },
-      { previewScale: 1, canvasWidth: size.width, canvasHeight: size.height }))); }
+      { previewScale: 1, canvasWidth: size.width, canvasHeight: size.height }), size, gesture.current!.layout))); }
     catch (error) { setMessage((error as Error).message); }
     return true;
   };

@@ -501,8 +501,14 @@ test('T5 font160 inline editing keeps the renderer origin while covering its com
     assert.equal(measurements.layout.offsetHeight, measurements.normal.offsetHeight);
     assert.equal(measurements.textarea.offsetHeight, Math.max(measurements.normal.offsetHeight, measurements.normal.scrollHeight));
     assert.equal(measurements.textarea.scrollTop, 0);
-    // Remove only the editing caret/selection from this glyph comparison. The
-    // actual textarea font, origin, size and rendering stay untouched.
+    const move = await (await page.$('[aria-label="Move text"]')).boundingBox();
+    const inputBox = await (await page.$('[aria-label="Text content"]')).boundingBox();
+    assert.ok(move.y + move.height <= inputBox.y + .1, JSON.stringify({ move, inputBox }));
+    // Exclude editor chrome from this glyph-only comparison: the Move handle is
+    // intentionally visible while typing, and its antialiasing shares the test
+    // glyph's color mask. Its actual non-overlap is asserted above. Textarea
+    // font, origin, size and rendering stay untouched.
+    await page.$$eval('[data-text-gesture]', nodes => nodes.forEach(node => { node.style.visibility = 'hidden'; }));
     await page.$eval('[aria-label="Text content"]', textarea => { textarea.setSelectionRange(0, 0); textarea.style.caretColor = 'transparent'; });
     const beforeFile = path.join(output, 'inline-font160.png'), afterFile = path.join(output, 'inline-font160-committed.png');
     await page.screenshot({ path: beforeFile, clip: await (await page.$('#studio-canvas')).boundingBox() });

@@ -21,7 +21,7 @@ export function TextControls({ document, editor, disabled, exportError }: { docu
     </div>
     <label className="flex flex-col gap-1.5 text-xs text-white/60">Selected text
     <select aria-label="Current text" className={field + ' w-full'} value={editor.activeId ?? ''} onChange={event => editor.select(event.target.value || null)}>
-      <option value="">No text selected</option>{document.layers.map((layer, i) => <option value={layer.id} key={layer.id}>{i + 1}. {layer.content.trim().slice(0, 24) || '(empty)'} · {layer.id.slice(0, 6)}</option>)}
+      <option value="">No text selected</option>{document.layers.map((layer, i) => <option value={layer.id} key={layer.id}>{i + 1}. {layer.content.trim().slice(0, 24) || '(empty)'}</option>)}
     </select></label>
     {active && <>
       <div className="flex flex-wrap gap-2">

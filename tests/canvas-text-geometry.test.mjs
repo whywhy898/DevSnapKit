@@ -33,6 +33,19 @@ test('logical numeric geometry rejects drafts without clamping and width resize 
   assert.deepEqual(g.resizeTextByScreenDelta(layer, 40, 'right', .5, size), { centerX: .525, widthRatio: .35 });
   assert.deepEqual(g.resizeTextByScreenDelta(layer, -40, 'left', .5, size), { centerX: .475, widthRatio: .35 });
 });
+test('movement clamps complete text extents on four edges and preserves an impossible axis without shrinking', async () => {
+  const { clampTextPosition } = await load('text/geometry');
+  const layer = { centerX: .5, centerY: .5, widthRatio: .4 }, size = { width: 1600, height: 1200 };
+  const layout = { height: 122, positionedHeight: 120, horizontal: { left: 0, right: 640 } };
+  const inset = 1 / 32;
+  assert.deepEqual(clampTextPosition(layer, { centerX: 9, centerY: 9 }, size, layout), { centerX: (1280 - inset) / 1600, centerY: (1138 - inset) / 1200 });
+  assert.deepEqual(clampTextPosition(layer, { centerX: -9, centerY: -9 }, size, layout), { centerX: (320 + inset) / 1600, centerY: (60 + inset) / 1200 });
+  assert.deepEqual(clampTextPosition(layer, { centerX: .55, centerY: .4 }, size, layout), { centerX: .55, centerY: .4 });
+  assert.deepEqual(clampTextPosition(layer, { centerX: -9, centerY: 9 }, size, { ...layout, horizontal: { left: -40, right: 700 } }), { centerX: (360 + inset) / 1600, centerY: (1138 - inset) / 1200 });
+  assert.deepEqual(clampTextPosition(layer, { centerX: 9, centerY: 9 }, size, { height: 1300, positionedHeight: 1300, horizontal: { left: -1000, right: 1700 } }), { centerX: .5, centerY: .5 });
+  const atEdge = { ...layer, centerX: (1280 - inset) / 1600 };
+  assert.deepEqual(clampTextPosition(atEdge, { centerX: 9, centerY: .5 }, size, { ...layout, horizontal: { left: 0, right: 640.0001 } }), { centerX: atEdge.centerX, centerY: .5 }, 'DOM subpixel noise at the edge cannot add a history transaction');
+});
 test('scroll overflow extends from the centered offset origin rather than a symmetric maximum height', async () => {
   const { textBoxIssue } = await load('text/geometry');
   const layer = { content: 'I', centerX: .5, centerY: .5, widthRatio: .8 };
