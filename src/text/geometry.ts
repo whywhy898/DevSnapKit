@@ -21,11 +21,30 @@ export function resizeTextByScreenDelta(layer: Pick<CanvasTextLayer, 'centerX' |
   geometryPatch('width', String(width), size); geometryPatch('x', String(centerX * size.width), size);
   return { centerX, widthRatio: width / size.width };
 }
-export function textBoxIssue(layer: Pick<CanvasTextLayer, 'centerX' | 'centerY' | 'widthRatio' | 'content'>, size: TextCanvasSize, height: number): string | null {
+export type TextHorizontalExtent = { left: number; right: number };
+/** Native line fragments include indivisible graphemes overflowing either edge.
+ * Coordinates remain relative to the positioned CSS box, in logical pixels. */
+export function textHorizontalExtent(node: HTMLElement, previewScale: number): TextHorizontalExtent {
+  if (!Number.isFinite(previewScale) || previewScale <= 0) return { left: NaN, right: NaN };
+  const box = node.getBoundingClientRect();
+  const extent = { left: 0, right: box.width / previewScale };
+  const range = node.ownerDocument.createRange();
+  range.selectNodeContents(node);
+  for (const fragment of range.getClientRects()) {
+    extent.left = Math.min(extent.left, (fragment.left - box.left) / previewScale);
+    extent.right = Math.max(extent.right, (fragment.right - box.left) / previewScale);
+  }
+  return extent;
+}
+export function textBoxIssue(layer: Pick<CanvasTextLayer, 'centerX' | 'centerY' | 'widthRatio' | 'content'>, size: TextCanvasSize, height: number, positionedHeight = height, horizontal?: TextHorizontalExtent): string | null {
   if (!layer.content.trim()) return null;
   const width = layer.widthRatio * size.width, x = layer.centerX * size.width, y = layer.centerY * size.height;
-  if (![width, height, x, y].every(Number.isFinite)) return 'Invalid text layout.';
+  const left = horizontal?.left ?? 0, right = horizontal?.right ?? width;
+  if (![width, height, positionedHeight, x, y, left, right].every(Number.isFinite)) return 'Invalid text layout.';
   if (width < Math.min(64, size.width) - 1) return 'Text width is too narrow. Widen the box or restore the previous size.';
-  if (x - width / 2 < -1 || x + width / 2 > size.width + 1 || y - height / 2 < -1 || y + height / 2 > size.height + 1) return 'Text is outside the canvas. Move it, reduce its size, or restore the previous canvas size.';
+  // translateY(-50%) uses the CSS offset box, not its larger scroll extent.
+  // Extra font overflow extends below that origin; it is not symmetric padding.
+  const top = y - positionedHeight / 2;
+  if (x - width / 2 + left < -1 || x - width / 2 + right > size.width + 1 || top < -1 || top + height > size.height + 1) return 'Text is outside the canvas. Move it, reduce its size, or restore the previous canvas size.';
   return null;
 }

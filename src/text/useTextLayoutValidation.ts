@@ -2,7 +2,7 @@ import { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import type { EditorSnapshot } from '../useHistory';
 import type { useEditorHistory } from '../useHistory';
 import type { TextCanvasSize } from './types';
-import { textBoxIssue } from './geometry';
+import { textBoxIssue, textHorizontalExtent } from './geometry';
 import { getCanonicalDimensions } from '../canvasDimensions';
 
 type History = ReturnType<typeof useEditorHistory>;
@@ -25,10 +25,12 @@ export function useTextLayoutValidation(root: React.RefObject<HTMLDivElement>, s
     // A hidden Mockup session keeps its last reliable layout and recovery anchor.
     if (!root.current || !root.current.getClientRects().length || root.current.offsetWidth <= 0 || root.current.offsetHeight <= 0) return;
     const nodes = new Map(Array.from(root.current?.querySelectorAll<HTMLElement>('[data-canvas-text]') ?? []).map(node => [node.dataset.canvasText!, node]));
+    const previewScale = root.current.getBoundingClientRect().width / root.current.offsetWidth;
     const next: { [id: string]: string } = {};
     for (const layer of snapshot.textDocument.layers) {
       const node = nodes.get(layer.id);
-      const issue = textBoxIssue(layer, size, node ? Math.max(node.offsetHeight, node.scrollHeight) : 0);
+      const issue = textBoxIssue(layer, size, node ? Math.max(node.offsetHeight, node.scrollHeight) : 0, node?.offsetHeight ?? 0,
+        node && layer.content.trim() ? textHorizontalExtent(node, previewScale) : undefined);
       if (issue) next[layer.id] = issue;
     }
     setIssues(old => JSON.stringify(old) === JSON.stringify(next) ? old : next);

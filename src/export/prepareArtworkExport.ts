@@ -14,12 +14,18 @@ const ownedFaces = [
   { family: 'Poster Gelasio', style: 'normal', weights: '400 700', url: '/poster/fonts/Gelasio.ttf', format: 'truetype' },
   { family: 'Poster Gelasio', style: 'italic', weights: '400 700', url: '/poster/fonts/Gelasio-Italic.ttf', format: 'truetype' },
 ];
+export function createArtworkPreparationStats() {
+  return { fontPreparationCalls: 0, fontCSSCacheHits: 0, fontCSSCacheMisses: 0, fontResourceFetches: 0, fontResourceCacheHits: 0,
+    imagePreparationCalls: 0, imageAssetDecodeCalls: 0, imageAssetCacheHits: 0, imageDOMReadinessCalls: 0, blobConversions: 0, blobCacheHits: 0 };
+}
+export type ArtworkPreparationStats = ReturnType<typeof createArtworkPreparationStats>;
 type OwnedFace = typeof ownedFaces[number];
 const ownedFaceIdentity = (face: OwnedFace) => `${face.family}|${face.style}|${face.weights}|${face.url}`;
 
-function ownedFontURL(face: OwnedFace): Promise<string> {
+function ownedFontURL(face: OwnedFace, stats?: ArtworkPreparationStats): Promise<string> {
   let data = ownedFontData.get(face.url);
   if (!data) {
+    if (stats) stats.fontResourceFetches++;
     data = (async () => {
       const response = await fetch(face.url);
       if (!response.ok) throw new Error('Font response failed');
@@ -27,7 +33,7 @@ function ownedFontURL(face: OwnedFace): Promise<string> {
     })();
     ownedFontData.set(face.url, data);
     data.catch(() => ownedFontData.delete(face.url));
-  }
+  } else if (stats) stats.fontResourceCacheHits++;
   return data;
 }
 
@@ -48,11 +54,11 @@ async function recoverOwnedFace(face: OwnedFace): Promise<void> {
   await recovery;
 }
 
-async function embedOwnedFaces(used: string[]): Promise<string> {
+async function embedOwnedFaces(used: string[], stats?: ArtworkPreparationStats): Promise<string> {
   const faces = ownedFaces.filter(face => used.some(font => font.includes(face.family) && font.startsWith(`${face.style} `)));
   return (await Promise.all(faces.map(async face => {
     try {
-      return `@font-face{font-family:"${face.family}";font-style:${face.style};font-weight:${face.weights};src:url("${await ownedFontURL(face)}") format("${face.format}");}`;
+      return `@font-face{font-family:"${face.family}";font-style:${face.style};font-weight:${face.weights};src:url("${await ownedFontURL(face, stats)}") format("${face.format}");}`;
     } catch {
       const identities = used.filter(font => font.includes(face.family) && font.startsWith(`${face.style} `));
       throw new Error(`Font ${identities.join(', ')} could not be embedded. Check your connection and try again.`);
@@ -60,9 +66,10 @@ async function embedOwnedFaces(used: string[]): Promise<string> {
   }))).join('\n');
 }
 
-export function inlineLocalImage(blob: Blob): Promise<string> {
+export function inlineLocalImage(blob: Blob, stats?: ArtworkPreparationStats): Promise<string> {
   let cached = imageData.get(blob);
   if (!cached) {
+    if (stats) stats.blobConversions++;
     cached = new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Local image could not be prepared.'));
@@ -71,28 +78,44 @@ export function inlineLocalImage(blob: Blob): Promise<string> {
     });
     imageData.set(blob, cached);
     cached.catch(() => imageData.delete(blob));
-  }
+  } else if (stats) stats.blobCacheHits++;
   return cached;
 }
 
-export async function prepareArtworkImages(root: HTMLElement, resolveBlob?: (url: string) => Blob | undefined) {
+function imageDOMReady(image: HTMLImageElement): Promise<void> {
+  if (image.complete) return image.naturalWidth > 0 ? Promise.resolve() : Promise.reject(new Error('Empty image'));
+  return new Promise((resolve, reject) => {
+    const cleanup = () => { image.removeEventListener('load', loaded); image.removeEventListener('error', failed); };
+    const loaded = () => { cleanup(); image.naturalWidth > 0 ? resolve() : reject(new Error('Empty image')); };
+    const failed = () => { cleanup(); reject(new Error('Image load failed')); };
+    image.addEventListener('load', loaded, { once: true }); image.addEventListener('error', failed, { once: true });
+    // A cache hit can complete between the initial check and listener setup.
+    if (image.complete) loaded();
+  });
+}
+
+export async function prepareArtworkImages(root: HTMLElement, resolveBlob?: (url: string) => Blob | undefined, stats?: ArtworkPreparationStats) {
+  if (stats) stats.imagePreparationCalls++;
   await Promise.all([...root.querySelectorAll('img')].map(async image => {
     const original = image.src;
     if (original.startsWith('blob:')) {
       const blob = resolveBlob?.(original);
       if (!blob) throw new Error(`${image.alt || 'Image'} is no longer available. Replace it and try again.`);
-      image.src = await inlineLocalImage(blob);
+      image.src = await inlineLocalImage(blob, stats);
     }
     let ready = decodedImages.get(image.src);
     if (!ready) {
+      if (stats) stats.imageAssetDecodeCalls++;
       const probe = new Image(); probe.src = image.src;
       ready = probe.decode().then(() => { if (!probe.naturalWidth) throw new Error('Empty image'); });
       decodedImages.set(image.src, ready);
       const key = image.src; ready.catch(() => decodedImages.delete(key));
       // Keep the process cache bounded; a frozen batch shares its identities.
       if (decodedImages.size > 100) decodedImages.delete(decodedImages.keys().next().value!);
-    }
-    try { await ready; await image.decode(); }
+    } else if (stats) stats.imageAssetCacheHits++;
+    // Decode the source once. Each target still needs loaded intrinsic geometry,
+    // which complete/load+naturalWidth provides without another decode() call.
+    try { await ready; if (stats) stats.imageDOMReadinessCalls++; await imageDOMReady(image); }
     catch { throw new Error(`${image.alt || 'Image'} could not be loaded. Replace it and try again.`); }
   }));
 }
@@ -120,7 +143,8 @@ export async function ensureArtworkFonts(used: string[]): Promise<void> {
   if (missing.length) throw new Error(`Font ${missing.join(', ')} could not be loaded. Check your connection and try again.`);
 }
 
-export async function artworkFontCSS(root: HTMLElement, identities?: string[]): Promise<string> {
+export async function artworkFontCSS(root: HTMLElement, identities?: string[], stats?: ArtworkPreparationStats): Promise<string> {
+  if (stats) stats.fontPreparationCalls++;
   const used = identities ?? [...root.querySelectorAll<HTMLElement>('*')].map(node => {
     const css = getComputedStyle(node); return `${css.fontStyle} ${css.fontWeight} 16px ${css.fontFamily}`;
   });
@@ -128,8 +152,9 @@ export async function artworkFontCSS(root: HTMLElement, identities?: string[]): 
   await ensureArtworkFonts(used);
   let promise = fontCSS.get(key);
   if (!promise) {
+    if (stats) stats.fontCSSCacheMisses++;
     promise = (async () => {
-      const ownedCSS = await embedOwnedFaces(used);
+      const ownedCSS = await embedOwnedFaces(used, stats);
       // Probe only the other used families, keeping compatibility with the app's
       // body fonts without routing our recoverable faces through library caches.
       const fontProbe = root.ownerDocument?.createElement('div') ?? document.createElement('div');
@@ -144,7 +169,7 @@ export async function artworkFontCSS(root: HTMLElement, identities?: string[]): 
     });
     fontCSS.set(key, promise);
     if (fontCSS.size > 30) fontCSS.delete(fontCSS.keys().next().value!);
-  }
+  } else if (stats) stats.fontCSSCacheHits++;
   const css = await promise;
   const faces = [...css.matchAll(/@font-face\s*\{[^}]+\}/gi)].map(match => match[0]);
   const incomplete = used.filter(font => {

@@ -12,6 +12,7 @@ export default mergeConfig(base, {
     enforce: 'pre',
     transform(source, id) {
       const normalized = id.replaceAll('\\', '/');
+      if (normalized.endsWith('/src/export/exportMockup.tsx')) return source.replace('return { targets, metrics, dispose,', '(window as any).__lastExportMetrics = metrics; return { targets, metrics, dispose,');
       if (normalized.endsWith('/src/CanvasLayout.tsx') && sceneReference) source = sceneReference;
       if (normalized.endsWith('/src/editorHistory.ts')) return source.replace('equal(a: T, b: T) { return equalValues(a, b); }', `equal(a: T, b: T) {
         const start = performance.now(); const result = equalValues(a, b);
@@ -31,6 +32,7 @@ export default mergeConfig(base, {
   useEffect(() => {
     (window as any).__mockupBaseline = {
       snapshot: currentSnapshot,
+      artwork: () => artworkProps(),
       history: { count: editorHistory.historyCount, index: editorHistory.historyIndex, commitId: editorHistory.getCommitId(), inTransaction: editorHistory.isInTransaction(), canRedo: editorHistory.canRedo },
       holdNaturalSize: (hold: boolean) => {
         (window as any).__holdNaturalSize = hold;

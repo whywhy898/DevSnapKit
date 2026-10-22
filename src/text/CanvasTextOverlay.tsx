@@ -82,15 +82,19 @@ function TextHandles(props: Props & { layer: CanvasTextLayer }) {
 function InlineText({ layer, size, draft, light, onChange, onDone, onCancel }: Props & { layer: CanvasTextLayer }) {
   const input = useRef<HTMLTextAreaElement>(null), measure = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(layer.fontSize * 1.25);
+  const [layoutHeight, setLayoutHeight] = useState(layer.fontSize * 1.25);
   useLayoutEffect(() => { input.current?.focus({ preventScroll: true }); input.current?.select(); }, [layer.id]);
   useLayoutEffect(() => {
     const node = measure.current; if (!node) return;
-    const update = () => setHeight(Math.max(layer.fontSize * 1.25, node.offsetHeight, node.scrollHeight));
+    const update = () => {
+      setLayoutHeight(Math.max(layer.fontSize * 1.25, node.offsetHeight));
+      setHeight(Math.max(layer.fontSize * 1.25, node.offsetHeight, node.scrollHeight));
+    };
     update(); const observer = new ResizeObserver(update); observer.observe(node); return () => observer.disconnect();
   }, [draft, layer]);
   const style = textLayoutStyle(layer);
-  return <div style={{ position: 'absolute', left: layer.centerX * size.width, top: layer.centerY * size.height, width: layer.widthRatio * size.width,
-    height, transform: 'translate(-50%, -50%)', pointerEvents: 'auto' }}>
+  return <div data-text-edit-layout style={{ position: 'absolute', left: layer.centerX * size.width, top: layer.centerY * size.height, width: layer.widthRatio * size.width,
+    height: layoutHeight, transform: 'translate(-50%, -50%)', pointerEvents: 'auto' }}>
     <div ref={measure} aria-hidden style={{ ...style, visibility: 'hidden', width: '100%', position: 'absolute', pointerEvents: 'none' }}>{draft + (draft.endsWith('\n') || !draft ? '\u200b' : '')}</div>
     <textarea ref={input} aria-label="Text content" value={draft} rows={1} spellCheck={false}
       style={{ ...style, display: 'block', width: '100%', height, resize: 'none', overflow: 'hidden', borderRadius: 0,

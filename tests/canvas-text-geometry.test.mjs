@@ -33,6 +33,29 @@ test('logical numeric geometry rejects drafts without clamping and width resize 
   assert.deepEqual(g.resizeTextByScreenDelta(layer, 40, 'right', .5, size), { centerX: .525, widthRatio: .35 });
   assert.deepEqual(g.resizeTextByScreenDelta(layer, -40, 'left', .5, size), { centerX: .475, widthRatio: .35 });
 });
+test('scroll overflow extends from the centered offset origin rather than a symmetric maximum height', async () => {
+  const { textBoxIssue } = await load('text/geometry');
+  const layer = { content: 'I', centerX: .5, centerY: .5, widthRatio: .8 };
+  assert.match(textBoxIssue(layer, { width: 200, height: 210 }, 209, 200), /outside/);
+  assert.equal(textBoxIssue({ ...layer, centerY: 100 / 210 }, { width: 200, height: 210 }, 209, 200), null);
+  assert.equal(textBoxIssue(layer, { width: 200, height: 210 }, 200), null, 'Legacy three-argument callers retain symmetric box semantics');
+});
+test('native horizontal fragments extend beyond either side of the nominal text box', async () => {
+  const { textBoxIssue, textHorizontalExtent } = await load('text/geometry');
+  const size = { width: 200, height: 400 }, layer = { content: 'W', centerX: .75, centerY: .5, widthRatio: .32 };
+  assert.equal(textBoxIssue(layer, size, 200), null);
+  assert.match(textBoxIssue(layer, size, 200, 200, { left: 0, right: 156 }), /outside/);
+  assert.match(textBoxIssue({ ...layer, centerX: .25 }, size, 200, 200, { left: -92, right: 64 }), /outside/);
+  assert.equal(textBoxIssue({ ...layer, centerX: .5 }, size, 200, 200, { left: -46, right: 110 }), null);
+  // Contract coverage for browser-provided negative fragments, not a claim that
+  // the production Chromium fixture generates negative overflow for its W.
+  let selected;
+  const node = { getBoundingClientRect: () => ({ left: 100, width: 32 }), ownerDocument: { createRange: () => ({
+    selectNodeContents: value => { selected = value; }, getClientRects: () => [{ left: 77, right: 155 }],
+  }) } };
+  assert.deepEqual(textHorizontalExtent(node, .5), { left: -46, right: 110 });
+  assert.equal(selected, node);
+});
 test('canonical dimensions preserve prior Auto, preset, custom and 2K/4K semantics', async () => {
   const { getCanonicalDimensions: size } = await load('canvasDimensions');
   assert.deepEqual(size('auto', 1, 999, 111, 1600, 1200), { width: 1600, height: 1200 });

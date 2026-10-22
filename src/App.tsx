@@ -28,7 +28,9 @@ import { DuoThumbnail, DuoLayoutType } from './DuoThumbnail';
 import { useEditorHistory, EditorSnapshot } from './useHistory';
 import { CanvasStage, SceneSize } from './CanvasLayout';
 import { MockupArtwork, type MockupArtworkProps } from './MockupArtwork';
-import { exportMockup, freezeArtworkProps } from './export/exportMockup';
+import { exportMockup, freezeArtworkProps, prepareMockupExport, exportTargetLabel } from './export/exportMockup';
+import { ArtworkTasks, readArtworkFile, decodeArtworkImage } from './export/artworkTasks';
+import { stableArtworkLayout } from './export/prepareArtworkExport';
 import { PosterEditor } from './poster/PosterEditor';
 import { emptyTextDocument } from './text/document';
 import { useCanvasTextEditor } from './text/useCanvasTextEditor';
@@ -55,6 +57,16 @@ interface AspectOption {
   shortLabel?: string;
   desc: string;
   styleClass: string;
+}
+interface FrozenMockupExport {
+  artwork: MockupArtworkProps;
+  auto: SceneSize;
+  custom: SceneSize;
+  aspect: AspectOption;
+  batch: AspectOption[];
+  scale: number;
+  format: 'png' | 'webp' | 'jpeg';
+  parent: HTMLElement;
 }
 
 const ASPECT_RATIOS: AspectOption[] = [
@@ -480,6 +492,7 @@ export default function App() {
   const aspectOptions = useMemo(() => [...ASPECT_RATIOS, customAspect(customCanvasSize)], [customCanvasSize]);
   const [naturalSceneSize, setNaturalSceneSize] = useState<SceneSize>({ width: 1024, height: 600 });
   const handleNaturalSceneSize = useCallback((size: SceneSize) => {
+    if (frozenArtwork.current) return;
     setNaturalSceneSize(prev => prev.width === size.width && prev.height === size.height ? prev : size);
   }, []);
   const [windowTheme, setWindowTheme] = useState<WindowTheme>('none');
@@ -640,7 +653,17 @@ export default function App() {
   const [textDocument, setTextDocument] = useState(emptyTextDocument);
   const [textError, setTextError] = useState('');
   const exportLock = useRef(false);
+  const exportAdmissionError = useRef('');
+  const capturedPointers = useRef(new Map<number, HTMLElement>());
   const frozenArtwork = useRef<MockupArtworkProps | null>(null);
+  const artworkTasks = useRef<ArtworkTasks>();
+  artworkTasks.current ??= new ArtworkTasks(message => setTextError(message));
+  const latestExportInputs = useRef<{ artwork: MockupArtworkProps; snapshot: EditorSnapshot; auto: SceneSize; custom: SceneSize } | null>(null);
+  useEffect(() => {
+    // Changing away from image background is newer intent than an unfinished
+    // file read/decode, which must not switch the canvas back to Image later.
+    if (bgType !== 'image') artworkTasks.current!.clear('background');
+  }, [bgType]);
   const currentSnapshot: EditorSnapshot = useMemo(() => ({
     textDocument,
     gradientId: gradient.id,
@@ -706,6 +729,7 @@ export default function App() {
   ]);
 
   const handleRestoreSnapshot = useCallback((snap: EditorSnapshot) => {
+    for (const key of ['main', 'secondary', 'background', 'logo', 'qr']) artworkTasks.current!.clear(key);
     setTextDocument(snap.textDocument ?? emptyTextDocument());
     if (snap.gradientId) setGradient(GRADIENTS.find(g => g.id === snap.gradientId) ?? GRADIENTS[0]);
     setSelectedPreset(snap.selectedPreset);
@@ -821,9 +845,23 @@ export default function App() {
     sizingAction.current.active = false; commitTransaction(currentSnapshot); sizingAction.current.commitId = editorHistory.getCommitId();
   };
   const guardEditorAction = (event: React.SyntheticEvent) => {
+    if (exportLock.current) { event.preventDefault(); event.stopPropagation(); return; }
+    if (event.type === 'pointerdown') {
+      const pointer = event as React.PointerEvent;
+      capturedPointers.current.set(pointer.pointerId, event.target as HTMLElement);
+    }
     const sizingControl = (event.target as HTMLElement).closest('[data-canvas-sizing]');
     if (!sizingControl) finishSizing();
     textEditor.guard(event);
+  };
+  const guardExportMutation = (event: React.SyntheticEvent) => {
+    if (exportLock.current) { event.preventDefault(); event.stopPropagation(); }
+  };
+  const releaseExportPointers = () => {
+    for (const [id, element] of capturedPointers.current) {
+      try { if (element.hasPointerCapture(id)) element.releasePointerCapture(id); } catch { /* Already released by the browser. */ }
+    }
+    capturedPointers.current.clear();
   };
   const dynamicExportDimensions = getCanonicalDimensions(
     aspectRatio.id, exportScale, canvasDomSize.width, canvasDomSize.height,
@@ -915,19 +953,23 @@ export default function App() {
   // Debounced QR code generation using qrcode library
   useEffect(() => {
     if (!qrUrl.trim()) {
+      artworkTasks.current!.clear('qr');
       setQrDataUrl(null);
       return;
     }
-
-    const timer = setTimeout(async () => {
+    let timer: ReturnType<typeof setTimeout>;
+    let wake: (() => void) | undefined;
+    let cancelled = false;
+    void artworkTasks.current!.run('qr', 'QR code', async () => {
+      await new Promise<void>(resolve => { wake = resolve; timer = setTimeout(resolve, 300); });
+      if (cancelled) return null;
       let targetUrl = qrUrl.trim();
       if (!/^https?:\/\//i.test(targetUrl)) {
         targetUrl = 'https://' + targetUrl;
       }
 
-      try {
-        const QRCode = (await import('qrcode')).default;
-        const dataUrl = await QRCode.toDataURL(targetUrl, {
+      const QRCode = (await import('qrcode')).default;
+      return QRCode.toDataURL(targetUrl, {
           margin: 1,
           width: 512,
           errorCorrectionLevel: 'M',
@@ -935,15 +977,9 @@ export default function App() {
             dark: '#000000',
             light: '#ffffff',
           },
-        });
-        setQrDataUrl(dataUrl);
-      } catch (err) {
-        console.error('QR code generation error:', err);
-        setQrDataUrl(null);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
+      });
+    }, setQrDataUrl);
+    return () => { cancelled = true; clearTimeout(timer); wake?.(); artworkTasks.current!.clear('qr'); };
   }, [qrUrl]);
 
   // Dynamically load PayPal JavaScript SDK using client ID from server config
@@ -1043,38 +1079,39 @@ export default function App() {
   const filteredGradients = GRADIENTS;
 
   // Helper to load image data URL and auto-detect portrait mobile screenshot
-  const applyLoadedImage = (dataUrl: string, fileName: string) => {
-    setImageSrc(dataUrl);
-    setImageName(fileName);
-    const img = new Image();
-    img.onload = () => {
-      setImageNaturalSize({ width: img.naturalWidth || 820, height: img.naturalHeight || 480 });
+  const loadMainImage = (file: File, fileName = file.name) => {
+    if (exportLock.current) return;
+    setTextError('');
+    void artworkTasks.current!.run('main', 'Main screenshot', async () => {
+      const dataUrl = await readArtworkFile(file);
+      const img = await decodeArtworkImage(dataUrl);
+      return { dataUrl, width: img.naturalWidth, height: img.naturalHeight };
+    }, ({ dataUrl, width, height }) => {
+      setImageSrc(dataUrl); setImageName(fileName);
+      setImageNaturalSize({ width, height });
       // Auto-detect mobile screenshot: if height exceeds width by 15%, auto-select iPhone 17 frame
-      if (img.naturalHeight > img.naturalWidth * 1.15) {
+      if (height > width * 1.15) {
         setWindowTheme('iphone-17');
       }
-    };
-    img.src = dataUrl;
+    });
+  };
+  const loadSecondaryImage = (file: File, fileName = file.name) => {
+    if (exportLock.current) return;
+    setTextError('');
+    const initial = !secondarySrc;
+    void artworkTasks.current!.run('secondary', 'Second screenshot', async () => {
+      const source = await readArtworkFile(file); await decodeArtworkImage(source); return source;
+    }, source => {
+      setSecondarySrc(source); setSecondaryName(fileName);
+      trackEvent(initial ? 'media_slot_add' : 'media_slot_replace', { slot: 2, size: file.size, type: file.type });
+    });
   };
 
   // Handle Image Upload
   const handleSecondaryFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      const isInitialAdd = !secondarySrc;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setSecondarySrc(event.target.result as string);
-          setSecondaryName(file.name);
-          trackEvent(isInitialAdd ? 'media_slot_add' : 'media_slot_replace', {
-            slot: 2,
-            size: file.size,
-            type: file.type,
-          });
-        }
-      };
-      reader.readAsDataURL(file);
+      loadSecondaryImage(file);
     }
     if (e.target) e.target.value = '';
   };
@@ -1082,20 +1119,7 @@ export default function App() {
   const handleSecondaryDrop = (e: React.DragEvent) => {
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      const isInitialAdd = !secondarySrc;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setSecondarySrc(event.target.result as string);
-          setSecondaryName(file.name);
-          trackEvent(isInitialAdd ? 'media_slot_add' : 'media_slot_replace', {
-            slot: 2,
-            size: file.size,
-            type: file.type,
-          });
-        }
-      };
-      reader.readAsDataURL(file);
+      loadSecondaryImage(file);
     }
   };
 
@@ -1114,13 +1138,7 @@ export default function App() {
       if (layoutMode === 'duo') {
         trackEvent('media_slot_replace', { slot: 1, size: file.size, type: file.type });
       }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          applyLoadedImage(event.target.result as string, file.name);
-        }
-      };
-      reader.readAsDataURL(file);
+      loadMainImage(file);
     }
   };
 
@@ -1134,13 +1152,7 @@ export default function App() {
       if (layoutMode === 'duo') {
         trackEvent('media_slot_replace', { slot: 1, size: file.size, type: file.type });
       }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          applyLoadedImage(event.target.result as string, file.name);
-        }
-      };
-      reader.readAsDataURL(file);
+      loadMainImage(file);
     }
   };
 
@@ -1158,22 +1170,11 @@ export default function App() {
           const file = items[i].getAsFile();
           if (file) {
             trackEvent('upload_image', { name: 'clipboard', size: file.size, method: 'paste' });
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              if (event.target?.result) {
-                if (layoutMode === 'duo' && !secondarySrc) {
-                  setSecondarySrc(event.target.result as string);
-                  setSecondaryName('pasted-screenshot-2.png');
-                  trackEvent('media_slot_add', { slot: 2, size: file.size, type: file.type });
-                } else {
-                  applyLoadedImage(event.target.result as string, 'pasted-screenshot.png');
-                  if (layoutMode === 'duo') {
-                    trackEvent('media_slot_replace', { slot: 1, size: file.size, type: file.type });
-                  }
-                }
-              }
-            };
-            reader.readAsDataURL(file);
+            if (layoutMode === 'duo' && !secondarySrc) loadSecondaryImage(file, 'pasted-screenshot-2.png');
+            else {
+              loadMainImage(file, 'pasted-screenshot.png');
+              if (layoutMode === 'duo') trackEvent('media_slot_replace', { slot: 1, size: file.size, type: file.type });
+            }
             break;
           }
         }
@@ -1187,54 +1188,23 @@ export default function App() {
   // Handle Custom Background Image Upload (F3)
   const handleBgImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const rawDataUrl = event.target?.result as string;
-      const img = new Image();
-      img.onload = () => {
-        const maxDimension = 2560;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
-          }
-          const offscreenCanvas = document.createElement('canvas');
-          offscreenCanvas.width = width;
-          offscreenCanvas.height = height;
-          const ctx = offscreenCanvas.getContext('2d');
-          if (ctx) {
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(img, 0, 0, width, height);
-            const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-            const compressed = offscreenCanvas.toDataURL(mime, 0.92);
-            setBgImageSrc(compressed);
-            setBgType('image');
-            trackEvent('bg_image_upload', { size: compressed.length });
-            return;
-          }
-        }
-        setBgImageSrc(rawDataUrl);
-        setBgType('image');
-        trackEvent('bg_image_upload', { size: rawDataUrl.length });
-      };
-      img.src = rawDataUrl;
-    };
-    reader.readAsDataURL(file);
+    if (!file || !file.type.startsWith('image/') || exportLock.current) return;
+    setTextError('');
+    void artworkTasks.current!.run('background', 'Canvas background', async () => {
+      const source = await readArtworkFile(file), image = await decodeArtworkImage(source);
+      if (Math.max(image.width, image.height) <= 2560) return source;
+      const ratio = 2560 / Math.max(image.width, image.height), canvas = document.createElement('canvas');
+      canvas.width = Math.round(image.width * ratio); canvas.height = Math.round(image.height * ratio);
+      const context = canvas.getContext('2d'); if (!context) throw new Error('background could not be resized');
+      context.imageSmoothingEnabled = true; context.imageSmoothingQuality = 'high'; context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', .92);
+    }, source => { setBgImageSrc(source); setBgType('image'); trackEvent('bg_image_upload', { size: source.length }); });
     if (e.target) e.target.value = '';
   };
 
   // Handle Custom Brand Logo Upload with Client-Side Smart Compression (Canvas)
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (exportLock.current) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -1245,6 +1215,7 @@ export default function App() {
     }
 
     setLogoError('');
+    setTextError('');
 
     // Check MIME type or file extension
     const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|svg|webp)$/i.test(file.name);
@@ -1263,80 +1234,15 @@ export default function App() {
 
     setIsProcessingLogo(true);
     trackEvent('upload_logo', { name: file.name, size: file.size });
-
-    // If SVG, read directly as data URL
-    if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setLogoDataUrl(event.target.result as string);
-        }
-        setIsProcessingLogo(false);
-      };
-      reader.onerror = () => {
-        setLogoError('Failed to read SVG file.');
-        setIsProcessingLogo(false);
-      };
-      reader.readAsDataURL(file);
-      if (e.target) e.target.value = '';
-      return;
-    }
-
-    // For raster images (PNG, JPEG, WebP): auto-compress onto offscreen canvas if large
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const rawDataUrl = event.target?.result as string;
-      if (!rawDataUrl) {
-        setIsProcessingLogo(false);
-        return;
-      }
-
-      const img = new Image();
-      img.onload = () => {
-        const maxDimension = 600;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
-          }
-        }
-
-        const offscreenCanvas = document.createElement('canvas');
-        offscreenCanvas.width = width;
-        offscreenCanvas.height = height;
-        const ctx = offscreenCanvas.getContext('2d');
-        if (ctx) {
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = offscreenCanvas.toDataURL('image/png', 0.95);
-          setLogoDataUrl(compressedDataUrl);
-        } else {
-          setLogoDataUrl(rawDataUrl);
-        }
-        setIsProcessingLogo(false);
-      };
-
-      img.onerror = () => {
-        setLogoError('Could not process this image format. Try a transparent PNG.');
-        setIsProcessingLogo(false);
-      };
-
-      img.src = rawDataUrl;
-    };
-
-    reader.onerror = () => {
-      setLogoError('Failed to read image file.');
-      setIsProcessingLogo(false);
-    };
-
-    reader.readAsDataURL(file);
+    void artworkTasks.current!.run('logo', 'Brand logo', async () => {
+      const source = await readArtworkFile(file), image = await decodeArtworkImage(source);
+      if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) return source;
+      const ratio = Math.min(1, 600 / Math.max(image.width, image.height)), canvas = document.createElement('canvas');
+      canvas.width = Math.round(image.width * ratio); canvas.height = Math.round(image.height * ratio);
+      const context = canvas.getContext('2d'); if (!context) throw new Error('logo could not be resized');
+      context.imageSmoothingEnabled = true; context.imageSmoothingQuality = 'high'; context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/png', .95);
+    }, setLogoDataUrl).finally(() => setIsProcessingLogo(false));
     if (e.target) e.target.value = '';
   };
 
@@ -1347,25 +1253,54 @@ export default function App() {
     onReplace: () => fileInputRef.current?.click(), onReplaceSecondary: () => secondaryFileInputRef.current?.click(),
     emptySlot: renderEmptySlot2(), isProUnlocked, qrDataUrl,
   });
-  const beginExport = () => {
-    if (exportLock.current) return false;
-    if (!textEditor.finish()) return false;
+  const beginExport = async (): Promise<FrozenMockupExport | null> => {
+    exportAdmissionError.current = '';
+    if (exportLock.current || !canvasRef.current?.parentElement) return null;
+    if (!textEditor.finish()) return null;
+    finishSizing();
     flush(currentSnapshot);
-    frozenArtwork.current = freezeArtworkProps(artworkProps());
+    const request = { aspect: { ...aspectRatio }, batch: selectedBatchAspects.map(id => ({ ...(aspectOptions.find(option => option.id === id) || ASPECT_RATIOS[0]) })), scale: exportScale, format: exportFormat, parent: canvasRef.current.parentElement };
     exportLock.current = true; setIsExporting(true); setTextError('');
-    return true;
+    releaseExportPointers();
+    try {
+      // Previously admitted uploads/QR work may finish while input is locked.
+      // Capture only after those operations, fonts and actual Auto layout settle.
+      let settled = false;
+      const requiredAssets = () => {
+        const live = latestExportInputs.current!.artwork;
+        return ['main', ...(live.layoutMode === 'duo' ? ['secondary'] : []), ...(live.bgType === 'image' ? ['background'] : []),
+          ...(live.isProUnlocked && live.logoDataUrl ? ['logo'] : []), ...(live.isProUnlocked && qrUrl.trim() ? ['qr'] : [])];
+      };
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const revision = artworkTasks.current!.revision;
+        await artworkTasks.current!.settle(requiredAssets());
+        await document.fonts.ready;
+        if (!canvasRef.current) throw new Error('Canvas is unavailable. Please try again.');
+        await stableArtworkLayout(canvasRef.current);
+        await artworkTasks.current!.settle(requiredAssets());
+        if (revision === artworkTasks.current!.revision) { settled = true; break; }
+      }
+      if (!settled || !latestExportInputs.current) throw new Error('Artwork is still preparing. Please try again.');
+      const latest = latestExportInputs.current;
+      flush(latest.snapshot);
+      frozenArtwork.current = freezeArtworkProps(latest.artwork);
+      return { ...request, artwork: frozenArtwork.current, auto: { ...latest.auto }, custom: { ...latest.custom } };
+    } catch (error) {
+      exportAdmissionError.current = error instanceof Error ? error.message : 'Artwork could not be prepared. Please try again.';
+      setTextError(exportAdmissionError.current);
+      finishExport(); return null;
+    }
   };
   const finishExport = () => { exportLock.current = false; frozenArtwork.current = null; setIsExporting(false); };
   const exportSingleCanvasBlob = async (
+    context: FrozenMockupExport,
     targetAspect: AspectOption,
     scale: number,
     format: 'png' | 'webp' | 'jpeg'
   ): Promise<Blob | null> => {
-    if (!canvasRef.current?.parentElement || !frozenArtwork.current) return null;
-    const frozen = frozenArtwork.current;
-    const base = getCanonicalDimensions(targetAspect.id, 1, 0, 0, canonicalAutoW, canonicalAutoH, customCanvasSize.width, customCanvasSize.height);
-    const out = getCanonicalDimensions(targetAspect.id, scale, 0, 0, canonicalAutoW, canonicalAutoH, customCanvasSize.width, customCanvasSize.height);
-    return exportMockup(frozen, { ...base, outputWidth: out.width, outputHeight: out.height, format }, canvasRef.current.parentElement);
+    const base = getCanonicalDimensions(targetAspect.id, 1, 0, 0, context.auto.width, context.auto.height, context.custom.width, context.custom.height);
+    const out = getCanonicalDimensions(targetAspect.id, scale, 0, 0, context.auto.width, context.auto.height, context.custom.width, context.custom.height);
+    return exportMockup(context.artwork, { ...base, outputWidth: out.width, outputHeight: out.height, format, id: targetAspect.id, label: targetAspect.label }, context.parent);
   };
 
   // Download High-Resolution Image (Supports Canonical 1x, 2x, 4K and Genuine PNG, WebP, JPEG)
@@ -1382,13 +1317,13 @@ export default function App() {
     }
     if (showProModal) setShowProModal(false);
 
-    if (!beginExport()) return;
+    const context = await beginExport(); if (!context) return;
 
     try {
-      const filename = `devsnap-${Date.now()}.${exportFormat}`;
-      const blob = await exportSingleCanvasBlob(aspectRatio, exportScale, exportFormat);
+      const filename = `devsnap-${Date.now()}.${context.format}`;
+      const blob = await exportSingleCanvasBlob(context, context.aspect, context.scale, context.format);
       if (blob) {
-        trackEvent('export_image', { format: exportFormat, scale: exportScale, aspect: aspectRatio.id });
+        trackEvent('export_image', { format: context.format, scale: context.scale, aspect: context.aspect.id });
         const downloadUrl = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.download = filename;
@@ -1417,23 +1352,32 @@ export default function App() {
       return;
     }
 
-    if (!beginExport()) return;
-    const total = selectedBatchAspects.length;
+    const context = await beginExport(); if (!context) return;
+    const format = context.format;
+    const targets = context.batch.map(aspect => {
+      const base = getCanonicalDimensions(aspect.id, 1, 0, 0, context.auto.width, context.auto.height, context.custom.width, context.custom.height);
+      const out = getCanonicalDimensions(aspect.id, context.scale, 0, 0, context.auto.width, context.auto.height, context.custom.width, context.custom.height);
+      return { ...base, outputWidth: out.width, outputHeight: out.height, format, id: aspect.id, label: aspect.label };
+    });
+    const total = targets.length;
+    let session: Awaited<ReturnType<typeof prepareMockupExport>> | undefined;
+    let completed = 0;
 
     try {
+      session = await prepareMockupExport(context.artwork, targets, context.parent);
       for (let i = 0; i < total; i++) {
-        const aspectId = selectedBatchAspects[i];
-        const targetOption = aspectOptions.find((a) => a.id === aspectId) || ASPECT_RATIOS[0];
+        const target = targets[i];
         setBatchProgress({ current: i + 1, total });
 
-        const filename = `devsnap-${aspectId}-${Date.now()}.${exportFormat}`;
-        const blob = await exportSingleCanvasBlob(targetOption, exportScale, exportFormat);
+        const filename = `devsnap-${target.id}-${Date.now()}.${format}`;
+        const blob = await session.rasterize(i);
         if (blob) {
           const downloadUrl = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.download = filename;
           link.href = downloadUrl;
           link.click();
+          completed++;
           setTimeout(() => URL.revokeObjectURL(downloadUrl), 8000);
         }
 
@@ -1442,8 +1386,10 @@ export default function App() {
       }
     } catch (err) {
       console.error('Batch export failed:', err);
-      setTextError(err instanceof Error ? err.message : 'Batch export encountered an issue.');
+      const detail = err instanceof Error ? err.message : 'Batch export encountered an issue.';
+      setTextError(session ? `${completed} downloads started. Failed at ${exportTargetLabel(targets[completed])}: ${detail} Retry after fixing the problem; files already sent to the browser cannot be withdrawn.` : detail);
     } finally {
+      session?.dispose();
       finishExport();
       setBatchProgress(null);
     }
@@ -1451,27 +1397,37 @@ export default function App() {
 
   // Copy 2x HD Image to Clipboard
   const handleCopyClipboard = async () => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || exportLock.current) return;
+    if (!navigator.clipboard?.write || !(window as any).ClipboardItem) {
+      setTextError('Clipboard image copying is not supported in this browser. Use Download instead.'); return;
+    }
+    if (!textEditor.finish()) return;
     if (showClaimModal) setShowClaimModal(false);
     if (showSuccessModal) setShowSuccessModal(false);
     if (showProModal) setShowProModal(false);
-    if (!beginExport()) return;
-
+    // Start write in the click's activation window. The item resolves to the
+    // real, validated PNG only after locked admission and resource preparation.
+    const blob = beginExport().then(async context => {
+      if (!context) throw new Error(exportAdmissionError.current || 'Finish the current edit and try again.');
+      const image = await exportSingleCanvasBlob(context, context.aspect, 2, 'png');
+      if (!image) throw new Error('The image could not be generated.');
+      return image;
+    });
     try {
-      const blob = await exportSingleCanvasBlob(aspectRatio, 2, 'png');
-      if (blob && navigator.clipboard && (window as any).ClipboardItem) {
-        await navigator.clipboard.write([
-          new (window as any).ClipboardItem({ 'image/png': blob })
-        ]);
-        trackEvent('copy_image');
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2500);
-      } else {
-        alert('Direct clipboard copying is not supported in this browser. Please use Export.');
-      }
+      const write = navigator.clipboard.write([new (window as any).ClipboardItem({ 'image/png': blob })]);
+      // A permission rejection can arrive before rendering ends. Keep the lock
+      // until both operations settle; never leave a late renderer running free.
+      const results = await Promise.allSettled([write, blob]);
+      // A rejected image promise can make clipboard.write reject generically.
+      // Preserve its named preparation error; successful rendering still reports
+      // a native permission/write failure with the Download recovery path.
+      const failure = [results[1], results[0]].find((result): result is PromiseRejectedResult => result.status === 'rejected');
+      if (failure) throw failure.reason;
+      trackEvent('copy_image'); setCopied(true); setTimeout(() => setCopied(false), 2500);
     } catch (err) {
+      await Promise.allSettled([blob]);
       console.error('Clipboard copy error:', err);
-      setTextError(err instanceof Error ? err.message : 'Could not copy image to clipboard.');
+      setTextError(`Could not copy image to clipboard: ${err instanceof Error ? err.message : 'permission or image preparation failed'}. Use Download instead.`);
     } finally {
       finishExport();
     }
@@ -1539,6 +1495,7 @@ export default function App() {
 
   // Handle Reset to Default Studio Styling
   const handleReset = () => {
+    for (const key of ['main', 'secondary', 'background', 'logo', 'qr']) artworkTasks.current!.clear(key);
     setPadding(88);
     setAspectRatio(ASPECT_RATIOS[0]);
     setCustomCanvasSize({ width: 1500, height: 900 });
@@ -1661,6 +1618,7 @@ export default function App() {
 
   // Handle Starter Preset Template Application
   const handleApplyPreset = (preset: typeof MOCKUP_PRESETS[0]) => {
+    artworkTasks.current!.clear('main');
     setSelectedPreset(preset.id);
     setImageSrc(preset.svgDataUri);
     setImageName(preset.id + '.svg');
@@ -1731,15 +1689,22 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
     </div>
   );
 
+  latestExportInputs.current = { artwork: artworkProps(), snapshot: currentSnapshot,
+    auto: { width: canonicalAutoW, height: canonicalAutoH }, custom: customCanvasSize };
+
   return (
-    <div onPointerDownCapture={guardEditorAction} onClickCapture={guardEditorAction} onChangeCapture={guardEditorAction} onDropCapture={guardEditorAction} {...(isExporting ? { inert: '' } : {})} aria-busy={isExporting} className={`min-h-screen ${themeMode === 'light' ? 'theme-light bg-slate-50 text-slate-900' : 'theme-dark bg-slate-950 text-slate-100'} flex flex-col font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-200`}>
+    <div onPointerDownCapture={guardEditorAction} onClickCapture={guardEditorAction} onChangeCapture={guardEditorAction} onDropCapture={guardEditorAction}
+      onInputCapture={guardExportMutation} onKeyDownCapture={guardExportMutation} onPasteCapture={guardExportMutation}
+      onPointerMoveCapture={guardExportMutation} onPointerUpCapture={event => { guardExportMutation(event); capturedPointers.current.delete(event.pointerId); }}
+      onPointerCancelCapture={event => { guardExportMutation(event); capturedPointers.current.delete(event.pointerId); }}
+      {...(isExporting ? { inert: '' } : {})} aria-busy={isExporting} className={`min-h-screen ${themeMode === 'light' ? 'theme-light bg-slate-50 text-slate-900' : 'theme-dark bg-slate-950 text-slate-100'} flex flex-col font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-200`}>
       
       {/* Top Navbar (Edge-to-Edge Desktop Studio Header) */}
       <header className="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40">
-        <div className="w-full px-4 sm:px-6 h-16 flex items-center justify-between gap-4 relative">
+        <div className="w-full px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 relative">
           
           {/* Left: Brand */}
-          <div className="flex items-center gap-3 shrink-0 z-10">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 z-10">
             <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 p-1.5 shadow-md flex items-center justify-center relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/20 to-cyan-500/20 opacity-80 group-hover:opacity-100 transition-opacity" />
               <svg className="w-full h-full relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -1755,7 +1720,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               <span className="font-extrabold text-base tracking-tight text-white whitespace-nowrap">
                 DevSnap<span className="text-cyan-400">Kit</span>
               </span>
-              <span className="text-[11px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-slate-800/90 text-slate-400 border border-slate-700/60 whitespace-nowrap">
+              <span className="hidden sm:inline-flex text-[11px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-slate-800/90 text-slate-400 border border-slate-700/60 whitespace-nowrap">
                 Studio
               </span>
             </div>
@@ -1875,7 +1840,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
           
           {/* Top Canvas Action Bar: History & Shortcuts (F1/F2) */}
-          <div className="shrink-0 mb-1 flex items-center gap-1 px-1.5 py-1 rounded-xl bg-[#0c0d14]/85 backdrop-blur-xl border border-white/10 shadow-lg z-20">
+          <div className="relative shrink-0 mb-1 flex items-center gap-1 px-1.5 py-1 rounded-xl bg-[#0c0d14]/85 backdrop-blur-xl border border-white/10 shadow-lg z-20">
             {/* Undo Button (F1) */}
             <button
               type="button"
@@ -1945,7 +1910,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             <div className="h-3.5 w-[1px] bg-white/10 mx-0.5" />
 
             {/* Download / Export Button with Popover */}
-            <div className="relative">
+            <div className="sm:relative">
               <button
                 type="button"
                 onClick={() => setShowExportMenu(!showExportMenu)}
@@ -1970,7 +1935,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                     onClick={() => setShowExportMenu(false)}
                   />
 
-                  <div className="export-popover absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 top-full mt-2 w-72 bg-slate-900 border border-slate-700/80 rounded-2xl p-4 shadow-2xl z-50 space-y-3.5">
+                  <div className="export-popover absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 top-full mt-2 w-72 max-w-[calc(100vw-32px)] bg-slate-900 border border-slate-700/80 rounded-2xl p-4 shadow-2xl z-50 space-y-3.5">
                     <div className="flex items-center justify-between pb-2.5 border-b border-slate-800">
                       <span className="text-xs font-bold text-white flex items-center gap-1.5">
                         <Sliders className="w-3.5 h-3.5 text-indigo-400" />
@@ -3615,7 +3580,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                             <span>Replace</span>
                           </button>
                           <button
-                            onClick={() => setBgImageSrc(null)}
+                            onClick={() => { artworkTasks.current!.clear('background'); setBgImageSrc(null); }}
                             className="py-1.5 px-2.5 rounded-lg text-xs font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 transition-all cursor-pointer flex items-center justify-center"
                             title="Remove background image"
                           >
@@ -3834,7 +3799,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                   </span>
                   {logoDataUrl && (
                     <button
-                      onClick={() => setLogoDataUrl(null)}
+                      onClick={() => { artworkTasks.current!.clear('logo'); setLogoDataUrl(null); }}
                       className="text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
                       title="Remove custom logo"
                     >
