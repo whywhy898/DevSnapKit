@@ -136,6 +136,7 @@ export function MockupArtwork({
       ref={canvasRef}
       id={preview ? 'studio-canvas' : undefined}
       data-canvas-root="true"
+      data-media-upload-enabled={preview && textDocument.layers.length === 0}
       className={`absolute left-0 top-0 rounded-2xl flex flex-col items-center justify-center overflow-hidden shadow-2xl ${
         bgType === 'gradient' && !isCustomGradient
           ? gradient.className
@@ -229,6 +230,7 @@ export function MockupArtwork({
         <DeviceComposition
           mode={layoutMode} duoLayout={duoLayout}
           theme={windowTheme} imageSrc={imageSrc} imageName={imageName}
+          interactive={preview && textDocument.layers.length === 0}
           onReplace={onReplace}
           shadowLevel={shadowLevel} shadowOpacity={shadowOpacity}
           cornerStyle={cornerStyle} roundedCorners={roundedCorners}

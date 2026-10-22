@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import { launchBrowser, preparePage, clickButton, downloadPng } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, clickButton, downloadPng, revealInspectorControl } from './helpers/browser.mjs';
 const url = process.env.TEST_UI_URL;
 const output = path.resolve('../../output/devsnapkit/canvas-text-v1/geometry');
 const snapshot = page => page.evaluate(() => window.__mockupBaseline.snapshot);
 const paint = page => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 async function withPage(fn) { const browser = await launchBrowser(); try { const page = await preparePage(browser, url); await fn(page); } finally { await browser.close(); } }
-async function field(page, name, value) { const el = await page.$(`[data-canvas-text-controls] [aria-label="${name}"]`); assert.ok(el, `${name} exists`); await el.focus(); await page.keyboard.down('Control'); await page.keyboard.press('a'); await page.keyboard.up('Control'); await page.keyboard.type(value); await page.keyboard.press('Enter'); }
+async function field(page, name, value) { const selector = `[data-canvas-text-controls] [aria-label="${name}"]`; await revealInspectorControl(page, selector); const el = await page.$(selector); assert.ok(el, `${name} exists`); await el.focus(); await page.keyboard.down('Control'); await page.keyboard.press('a'); await page.keyboard.up('Control'); await page.keyboard.type(value); await page.keyboard.press('Enter'); }
 async function undo(page) { await page.focus('[aria-label="Move text"]'); await page.keyboard.down('Control'); await page.keyboard.press('z'); await page.keyboard.up('Control'); await paint(page); }
 async function fixture(page, recovery = false) {
   await clickButton(page, 'Add text'); await clickButton(page, 'Done');
@@ -102,6 +102,7 @@ test('T4 recovered A to Twitter uses A; valid intermediate and history clear sta
 test('T4 initial invalid has no recovery promise and text editing remains accessible through overlap selector', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await page.evaluate(() => { const layer = { id:'initial-invalid', content:'Outside', centerX:.5, centerY:0, widthRatio:.6, font:'manrope', fontSize:100, weight:700, italic:false, color:'#123456', align:'center' }; window.__mockupBaseline.apply({textDocument:{version:1,layers:[layer,{...layer,id:'overlap'}]}}); }); await paint(page);
   assert.ok(await page.$('[data-text-layout-errors]')); assert.equal(await page.$('[data-text-size-recovery]'), null);
+  await clickButton(page, 'Text');
   await page.select('[aria-label="Current text"]', 'initial-invalid'); await clickButton(page,'Edit text');
   assert.equal(await page.$eval('[aria-label="Text content"]', el => el.value), 'Outside'); await clickButton(page,'Done');
   await page.select('[aria-label="Current text"]', 'overlap'); await field(page,'Text y','400');
@@ -143,6 +144,7 @@ test('T4 movement cannot run with other tools; Escape, scroll, mode and export e
 }));
 test('T4 camera, background, frame, duo, presets and reset retain independent text above artwork', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await fixture(page); const initial=(await snapshot(page)).textDocument;
+  await clickButton(page, 'Frame');
   for (const [label,value] of [['Mockup zoom','250'],['Mockup position X','20']]) {
     const el=await page.$(`[aria-label="${label}"]`);await el.focus();await page.keyboard.down('Control');await page.keyboard.press('a');await page.keyboard.up('Control');await page.keyboard.type(value);await page.keyboard.press('Tab');
     assert.deepEqual((await snapshot(page)).textDocument,initial);
@@ -176,6 +178,7 @@ test('T4 delayed actual Auto measurement retains upload commit identity after a 
 }));
 test('T4 one padding range gesture with 100 input updates creates one commit and restores valid baseline dimensions', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await clickButton(page,'Add text');await clickButton(page,'Done');await new Promise(r=>setTimeout(r,450));
+  await clickButton(page, 'Frame');
   const before=await snapshot(page), initialHistory=await page.evaluate(()=>window.__mockupBaseline.history.count);
   const slider=await page.$('[aria-label="Canvas padding slider"]');await slider.evaluate(el=>el.scrollIntoView({block:'center'}));const box=await slider.boundingBox();await page.mouse.move(box.x+box.width*.5,box.y+box.height/2);await page.mouse.down();
   // Exercise the actual native range control and React onChange 100 times while
@@ -186,6 +189,7 @@ test('T4 one padding range gesture with 100 input updates creates one commit and
 }));
 test('T4 invalid padding gesture recovery names and restores its full valid transaction baseline', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await clickButton(page,'Add text');await clickButton(page,'Done');
+  await clickButton(page, 'Frame');
   await page.evaluate(()=>{const layer=window.__mockupBaseline.snapshot.textDocument.layers[0];window.__mockupBaseline.apply({padding:200,textDocument:{version:1,layers:[{...layer,content:'A\nB\nC',fontSize:160,centerY:.35,widthRatio:.6}]}});});await page.evaluate(()=>document.fonts.ready);await new Promise(r=>setTimeout(r,200));await paint(page);
   const before=await page.$eval('#studio-canvas',el=>({width:el.offsetWidth,height:el.offsetHeight}));assert.equal(await page.$('[data-text-layout-errors]'),null);await new Promise(r=>setTimeout(r,450));const count=await page.evaluate(()=>window.__mockupBaseline.history.count);
   const slider=await page.$('[aria-label="Canvas padding slider"]');await slider.evaluate(el=>el.scrollIntoView({block:'center'}));const box=await slider.boundingBox();await page.mouse.move(box.x+box.width*.98,box.y+box.height/2);await page.mouse.down();
@@ -203,6 +207,7 @@ test('T4 numeric composition keeps native Enter and arrows local until compositi
 }));
 test('T4 physically clicked padding number keeps one focus transaction through typing and blur', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await clickButton(page,'Add text');await clickButton(page,'Done');await new Promise(r=>setTimeout(r,450));const before=await snapshot(page),count=await page.evaluate(()=>window.__mockupBaseline.history.count);
+  await clickButton(page, 'Frame');
   await page.click('[aria-label="Canvas padding"]');assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),true,'Initial pointer release must not end number focus session');
   await page.keyboard.down('Control');await page.keyboard.press('a');await page.keyboard.up('Control');await page.keyboard.type('160');assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),true);
   await page.keyboard.press('Tab');await paint(page);assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.count),count+1);assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),false);await undo(page);assert.equal((await snapshot(page)).padding,before.padding);

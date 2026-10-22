@@ -3,3 +3,8 @@
 @font-face{font-family:'Poster Gelasio';src:url('/poster/fonts/Gelasio.ttf') format('truetype');font-style:normal;font-weight:400 700;font-display:swap}
 @font-face{font-family:'Poster Gelasio';src:url('/poster/fonts/Gelasio-Italic.ttf') format('truetype');font-style:italic;font-weight:400 700;font-display:swap}
 [data-canvas-text][data-trailing-newline="true"]::after{content:'\200b'}
+[data-media-upload-enabled="false"] [data-scene-slot] .cursor-pointer{cursor:default}
+.theme-light aside.studio-inspector [data-canvas-text-controls] .canvas-text-field{background-color:#fff;border-color:#cbd5e1;color:#0f172a}
+.theme-light aside.studio-inspector [data-inspector-tabs]{background-color:#f1f5f9;border-color:#e2e8f0}
+.theme-light aside.studio-inspector [data-inspector-tabs] button.bg-white\/10{background-color:#fff;color:#4f46e5;border-color:#e2e8f0;box-shadow:0 1px 3px rgb(15 23 42 / .06)}
+.theme-light aside.studio-inspector [data-inspector-tabs] button.text-white\/50{color:#334155}

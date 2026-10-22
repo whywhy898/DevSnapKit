@@ -8,7 +8,7 @@ import {
   Smartphone, Laptop, Monitor, RotateCw, Plus, X,
   Wand2, Sun, Moon, Pipette, Flame, Grid,
   Globe, AppWindow, Square, FileText, Mail, Receipt,
-  Undo2, Redo2, Keyboard, EyeOff
+    Undo2, Redo2, Keyboard, EyeOff, Type
 } from 'lucide-react';
 
 import { MOCKUP_PRESETS } from './templates';
@@ -622,7 +622,7 @@ export default function App() {
   const [showDemoTemplatesMenu, setShowDemoTemplatesMenu] = useState<boolean>(false);
 
   // Interactive UI States
-  const [sidebarTab, setSidebarTab] = useState<'style' | 'background' | 'brand' | 'export'>('style');
+  const [sidebarTab, setSidebarTab] = useState<'style' | 'background' | 'text' | 'brand' | 'export'>('style');
   const [copied, setCopied] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [showProModal, setShowProModal] = useState<boolean>(false);
@@ -831,6 +831,10 @@ export default function App() {
   const effectivePaddingX = Math.min(padding, Math.max(0, (canvasLogicalSize.width - 120) / 2));
   const effectivePaddingY = Math.min(padding, Math.max(0, (canvasLogicalSize.height - 120) / 2));
   const textEditor = useCanvasTextEditor(currentSnapshot, setTextDocument, canvasLogicalSize, { beginTransaction, commitTransaction, cancelTransaction });
+  const switchInspectorTab = (tab: typeof sidebarTab) => {
+    if (sidebarTab === 'text' && tab !== 'text' && !textEditor.finish()) return;
+    setSidebarTab(tab);
+  };
   const sizingAction = useRef<CanvasSizingAction | null>(null);
   const textLayout = useTextLayoutValidation(canvasRef, currentSnapshot, canvasLogicalSize, editorHistory, { width: canonicalAutoW, height: canonicalAutoH }, (id, custom) => {
     setCustomCanvasSize(custom); setAspectRatio(id === 'custom' ? customAspect(custom) : ASPECT_RATIOS.find(option => option.id === id) || ASPECT_RATIOS[0]);
@@ -1841,6 +1845,11 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           
           {/* Top Canvas Action Bar: History & Shortcuts (F1/F2) */}
           <div className="relative shrink-0 mb-1 flex items-center gap-1 px-1.5 py-1 rounded-xl bg-[#0c0d14]/85 backdrop-blur-xl border border-white/10 shadow-lg z-20">
+            <button type="button" aria-label="Add text" disabled={isExporting || textDocument.layers.length >= 20}
+              onClick={() => { setSidebarTab('text'); textEditor.add(); }}
+              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1 text-xs disabled:opacity-40"
+              title="Add text to the canvas"><Type className="w-4 h-4" /><span className="text-[11px] font-medium">Add text</span></button>
+            <div className="h-3.5 w-px bg-white/10 mx-0.5" />
             {/* Undo Button (F1) */}
             <button
               type="button"
@@ -2029,7 +2038,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           </div>
 
           {/* Canvas Node Captured by html-to-image */}
-          <TextControls document={textDocument} editor={textEditor} disabled={isExporting} exportError={textError} />
+          {textError && <p data-text-export-error role="alert" className="w-full rounded-lg border border-red-400 bg-slate-900 p-2 text-xs text-red-200 whitespace-pre-wrap">{textError}</p>}
           {!!Object.keys(textLayout.issues).length && <div data-text-layout-errors data-text-editor-ui data-export-ignore="true" role="alert" className="w-full rounded-lg border border-red-400 bg-slate-900 p-2 text-xs text-red-200">
             <p>Current canvas: {Object.keys(textLayout.issues).length} text boxes outside the canvas or too narrow. Move the marked text, widen its box, or reduce its font size.</p>
             {Object.entries(textLayout.issues).map(([id, issue]) => <button type="button" key={id} className="block underline py-1" onClick={() => textEditor.select(id)}>Locate text {textDocument.layers.findIndex(layer => layer.id === id) + 1}: {issue}</button>)}
@@ -2041,7 +2050,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             issues={textLayout.issues} onGestureStart={textEditor.beginGesture} onGestureMove={textEditor.moveGesture}
             onGestureActive={textEditor.hasGesture}
             draft={textEditor.session?.kind === 'content' ? textEditor.session.value : ''} light={themeMode === 'light'}
-            onEdit={textEditor.edit} onChange={textEditor.change} onDone={textEditor.finish} onCancel={textEditor.cancel} onDeselect={() => textEditor.select(null)} />
+            onEdit={id => { setSidebarTab('text'); textEditor.edit(id); }} onChange={textEditor.change} onDone={textEditor.finish} onCancel={textEditor.cancel} onDeselect={() => textEditor.select(null)} />
 
           {/* Floating Bottom Studio Dock */}
           </CanvasStage>
@@ -2289,11 +2298,11 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           </div>
           <p data-reset-preserves-text className="text-[11px] text-white/50">Reset changes mockup styling. Your canvas text is preserved.</p>
 
-          {/* 4-Tab Segmented Control (Style, Background, Brand, Export) */}
-          <div className="grid grid-cols-4 gap-1 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl">
+          {/* Shared Inspector: keep canvas properties out of the artwork viewport. */}
+          <div data-inspector-tabs className="grid grid-cols-5 gap-1 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl">
             <button
-              onClick={() => setSidebarTab('style')}
-              className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] ${
+              onClick={() => switchInspectorTab('style')}
+              className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer active:scale-[0.98] ${
                 sidebarTab === 'style'
                   ? 'bg-white/10 text-white border border-white/15 shadow-sm'
                   : 'text-white/50 hover:text-white hover:bg-white/[0.04]'
@@ -2304,8 +2313,8 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             </button>
 
             <button
-              onClick={() => setSidebarTab('background')}
-              className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] ${
+              onClick={() => switchInspectorTab('background')}
+              className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer active:scale-[0.98] ${
                 sidebarTab === 'background'
                   ? 'bg-white/10 text-white border border-white/15 shadow-sm'
                   : 'text-white/50 hover:text-white hover:bg-white/[0.04]'
@@ -2315,9 +2324,13 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               <span>Canvas</span>
             </button>
 
+            <button type="button" onClick={() => switchInspectorTab('text')}
+              className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer active:scale-[0.98] ${sidebarTab === 'text' ? 'bg-white/10 text-white border border-white/15 shadow-sm' : 'text-white/50 hover:text-white hover:bg-white/[0.04]'}`}>
+              <Type className="w-3.5 h-3.5" /><span>Text</span>
+            </button>
             <button
-              onClick={() => setSidebarTab('brand')}
-              className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] relative ${
+              onClick={() => switchInspectorTab('brand')}
+              className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer active:scale-[0.98] relative ${
                 sidebarTab === 'brand'
                   ? 'bg-amber-500/15 text-amber-200 border border-amber-500/30 shadow-sm'
                   : 'text-white/50 hover:text-white hover:bg-white/[0.04]'
@@ -2326,15 +2339,15 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>Brand</span>
               {!isProUnlocked && (
-                <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 leading-none">
+                <span className="absolute -top-1 -right-1 text-[8px] font-extrabold px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 leading-none">
                   PRO
                 </span>
               )}
             </button>
 
             <button
-              onClick={() => setSidebarTab('export')}
-              className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] ${
+              onClick={() => switchInspectorTab('export')}
+              className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer active:scale-[0.98] ${
                 sidebarTab === 'export'
                   ? 'bg-white/10 text-white border border-white/15 shadow-sm'
                   : 'text-white/50 hover:text-white hover:bg-white/[0.04]'
@@ -2343,6 +2356,10 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               <Download className="w-3.5 h-3.5" />
               <span>Export</span>
             </button>
+          </div>
+
+          <div hidden={sidebarTab !== 'text'}>
+            <TextControls document={textDocument} editor={textEditor} disabled={isExporting} />
           </div>
 
           {/* TAB 1: FRAME & 3D LAYOUT */}

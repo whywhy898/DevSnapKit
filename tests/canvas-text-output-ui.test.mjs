@@ -3,16 +3,21 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import { launchBrowser, preparePage, clickButton } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, clickButton, revealInspectorControl } from './helpers/browser.mjs';
 
 const url = process.env.TEST_UI_URL;
 const output = path.resolve('../../output/devsnapkit/canvas-text-v1/outputs');
 const snapshot = page => page.evaluate(() => ({ snapshot: window.__mockupBaseline.snapshot, history: window.__mockupBaseline.history, selected: document.querySelector('[aria-label="Current text"]')?.value }));
 const paint = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 async function fill(page, selector, value, commit = true) {
+  await revealInspectorControl(page, selector);
   const element = await page.$(selector); assert.ok(element, selector); await element.focus();
   await page.keyboard.down('Control'); await page.keyboard.press('a'); await page.keyboard.up('Control');
   await page.keyboard.type(String(value)); if (commit) await page.keyboard.press('Enter');
+}
+async function exportButton(page, label) {
+  await clickButton(page, 'Export');
+  await clickButton(page, label);
 }
 async function fixture(page, { pro = true, narrow = false } = {}) {
   await clickButton(page, 'Add text'); await clickButton(page, 'Done');
@@ -23,7 +28,7 @@ async function fixture(page, { pro = true, narrow = false } = {}) {
   }, { pro, narrow });
   await page.waitForFunction(() => document.querySelector('#studio-canvas').offsetWidth === 1600);
   await page.evaluate(() => document.fonts.ready); await paint(page);
-  await clickButton(page, 'Export'); await clickButton(page, '1x Web');
+  await exportButton(page, '1x Web');
 }
 async function downloads(page, label) {
   await fs.mkdir(output, { recursive: true });
@@ -54,7 +59,7 @@ test('T5 batch preflights every target before any download and keeps the whole e
     const page = await preparePage(browser, url); await fixture(page, { narrow: true });
     await new Promise(resolve => setTimeout(resolve, 450));
     const before = await snapshot(page), stream = await downloads(page, 'preflight');
-    await clickButton(page, 'Export 4 Sizes (1x)');
+    await exportButton(page, 'Export 4 Sizes (1x)');
     await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]') && [...document.querySelectorAll('[role="alert"]')].some(node => /width|narrow|canvas/i.test(node.textContent)), { timeout: 60000 });
     assert.deepEqual(await stream.files(), [], 'A later invalid target must prevent even the earlier valid downloads');
     const message = await page.$$eval('[role="alert"]', nodes => nodes.map(node => node.textContent).join('\n'));
@@ -161,8 +166,8 @@ test('T5 PNG, WebP and JPEG downloads contain real text at 1x and 2x with correc
     const before = await snapshot(page), rows = [];
     const stream = await downloads(page, 'formats');
     for (const format of ['png', 'webp', 'jpeg']) for (const scale of [1, 2]) {
-      await clickButton(page, format.toUpperCase()); await clickButton(page, scale === 1 ? '1x Web' : '2x HD');
-      await clickButton(page, `Download ${scale}x (${1600 * scale}×${1200 * scale})`);
+      await exportButton(page, format.toUpperCase()); await exportButton(page, scale === 1 ? '1x Web' : '2x HD');
+      await exportButton(page, `Download ${scale}x (${1600 * scale}×${1200 * scale})`);
       const file = await takeDownload(stream, `format-${format}-${scale}x.${format}`);
       const metadata = await sharp(file).metadata();
       assert.equal(metadata.format, format); assert.equal(metadata.width, 1600 * scale); assert.equal(metadata.height, 1200 * scale);
@@ -190,7 +195,7 @@ test('T5 actual clipboard image reads back at 2x, native denial and unavailable 
     await context.overridePermissions(new URL(url).origin, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
     const page = await preparePage(browser, url); await fixture(page, { pro: false });
     await new Promise(resolve => setTimeout(resolve, 450)); const before = await snapshot(page);
-    await clickButton(page, 'Copy to Clipboard (2x HD)');
+    await exportButton(page, 'Copy to Clipboard (2x HD)');
     await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
     const copyState = await page.evaluate(async () => ({ focused: document.hasFocus(), readPermission: (await navigator.permissions.query({ name: 'clipboard-read' })).state, writePermission: (await navigator.permissions.query({ name: 'clipboard-write' })).state, alerts: [...document.querySelectorAll('[role="alert"]')].map(node => node.textContent), copied: [...document.querySelectorAll('button')].some(button => button.innerText.includes('Copied to Clipboard')) }));
     assert.equal(copyState.copied, true, JSON.stringify(copyState));
@@ -218,12 +223,12 @@ test('T5 actual clipboard image reads back at 2x, native denial and unavailable 
     assert.deepEqual(await snapshot(page), before);
     await context.overridePermissions(new URL(url).origin, []);
     await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.innerText.trim() === 'Copy to Clipboard (2x HD)'));
-    await clickButton(page, 'Copy to Clipboard (2x HD)');
+    await exportButton(page, 'Copy to Clipboard (2x HD)');
     await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]') && [...document.querySelectorAll('[role="alert"]')].some(node => /clipboard|permission|denied/i.test(node.textContent)));
     const denied = await page.$$eval('[role="alert"]', nodes => nodes.map(node => node.textContent).join('\n'));
     assert.match(denied, /download|export/i, 'Denial explains the working fallback'); assert.deepEqual(await snapshot(page), before);
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined }));
-    await clickButton(page, 'Copy to Clipboard (2x HD)');
+    await exportButton(page, 'Copy to Clipboard (2x HD)');
     await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]') && [...document.querySelectorAll('[role="alert"]')].some(node => /not supported|unavailable/i.test(node.textContent)));
     const unavailable = await page.$$eval('[role="alert"]', nodes => nodes.map(node => node.textContent).join('\n'));
     assert.match(unavailable, /download|export/i); assert.deepEqual(await snapshot(page), before);
@@ -243,13 +248,13 @@ test('T5 batch runtime failure reports downloads already started and the failing
         return original.call(this, callback, ...args);
       };
     });
-    await clickButton(page, 'Export 4 Sizes (1x)');
+    await exportButton(page, 'Export 4 Sizes (1x)');
     await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]') && [...document.querySelectorAll('[role="alert"]')].some(node => /downloads started/.test(node.textContent)), { timeout: 60000 });
     const message = await page.$$eval('[role="alert"]', nodes => nodes.map(node => node.textContent).join('\n'));
     assert.match(message, /1 downloads started/); assert.match(message, /16:9|1920×1080/); assert.match(message, /cannot be withdrawn/);
     assert.equal((await stream.files()).length, 1); assert.deepEqual(await snapshot(page), before);
     const partial = await takeDownload(stream, 'batch-partial-og.png');
-    await clickButton(page, 'Export 4 Sizes (1x)');
+    await exportButton(page, 'Export 4 Sizes (1x)');
     await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'), { timeout: 60000 });
     const files = await stream.files(); assert.equal(files.length, 4); assert.deepEqual(await snapshot(page), before);
     const outputs = [];
@@ -327,7 +332,7 @@ test('T5 actual Set controls export 200×200, 8000×200 and 200×8000 without re
       await fill(page, '[data-canvas-text-controls] [aria-label="Text y"]', height / 2);
       await fill(page, '[data-canvas-text-controls] [aria-label="Text width"]', Math.min(160, width));
       await paint(page); const before = await snapshot(page);
-      await clickButton(page, `Download 1x (${width}×${height})`);
+      await exportButton(page, `Download 1x (${width}×${height})`);
       const file = await takeDownload(stream, `extreme-${width}x${height}-font${size}.png`), metadata = await sharp(file).metadata();
       assert.equal(metadata.width, width); assert.equal(metadata.height, height);
       const pixels = await sharp(file).ensureAlpha().raw().toBuffer(); let ink = 0;
@@ -348,7 +353,7 @@ test('T5 mobile 360/390/430 complete native composition, styles, positioning, hi
       const page = await preparePage(browser, url, { viewport: { width, height: 850, deviceScaleFactor: 1 } });
       await (await page.$('input[aria-label="Main screenshot file"]')).uploadFile(path.resolve('../../output/devsnapkit/honeywerank-original.png'));
       await page.waitForFunction(() => window.__mockupBaseline.snapshot.imageName === 'honeywerank-original.png');
-      await clickButton(page, 'Export'); await clickButton(page, '1x Web');
+      await exportButton(page, '1x Web');
       await fill(page, 'input[aria-label="Canvas width"]', 1600, false); await fill(page, 'input[aria-label="Canvas height"]', 1200, false); await clickButton(page, 'Set');
       await clickButton(page, 'Add text');
       await page.evaluate(() => { window.__imeEvents = []; for (const type of ['compositionstart', 'compositionupdate', 'compositionend', 'input']) document.querySelector('[aria-label="Text content"]').addEventListener(type, event => window.__imeEvents.push({ type: event.type, trusted: event.isTrusted, composing: event.isComposing ?? null, data: event.data })); });
@@ -412,12 +417,12 @@ test('T5 failed unused secondary/background slots do not deadlock a valid Single
     await page.waitForFunction(() => [...document.querySelectorAll('[role="alert"]')].some(node => /Second screenshot.*decoded/i.test(node.textContent)));
     await page.focus('[aria-label="Move text"]'); await page.keyboard.press('1');
     const stream = await downloads(page, 'unused-slots');
-    await clickButton(page, 'Download 1x (1600×1200)');
+    await exportButton(page, 'Download 1x (1600×1200)');
     const single = await takeDownload(stream, 'unused-failed-secondary.png');
     await page.evaluate(() => window.__mockupBaseline.apply({ bgType: 'image' }, { pro: true })); await clickButton(page, 'Canvas');
     await (await page.$('[data-testid="bg-file-input"]')).uploadFile(invalid);
     await page.waitForFunction(() => [...document.querySelectorAll('[role="alert"]')].some(node => /Canvas background.*decoded/i.test(node.textContent)));
-    await clickButton(page, 'Solid'); await clickButton(page, 'Export'); await clickButton(page, 'Download 1x (1600×1200)');
+    await clickButton(page, 'Solid'); await exportButton(page, 'Download 1x (1600×1200)');
     const solid = await takeDownload(stream, 'unused-failed-background.png');
     await fs.writeFile(path.join(output, 'unused-slot-recovery.json'), JSON.stringify({ single, solid, mode: (await snapshot(page)).snapshot.layoutMode, bgType: (await snapshot(page)).snapshot.bgType }, null, 2)); await stream.close();
   } finally { await browser.close(); }
@@ -467,12 +472,12 @@ test('T5 validation uses the actual centered offset box plus its lower scroll ex
     await fs.writeFile(path.join(output, 'scroll-extent-measurement.json'), JSON.stringify(measured, null, 2));
     assert.ok(await page.$('[data-text-layout-errors]'), 'The preview flags the actual out-of-bounds extent');
     const stream = await downloads(page, 'scroll-extent');
-    await clickButton(page, 'Download 1x (200×210)');
+    await exportButton(page, 'Download 1x (200×210)');
     await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]') && [...document.querySelectorAll('[role="alert"]')].some(node => /Export blocked/.test(node.textContent)));
     assert.deepEqual(await stream.files(), []);
     await fill(page, '[data-canvas-text-controls] [aria-label="Text y"]', 100); await paint(page);
     assert.equal(await page.$('[data-text-layout-errors]'), null, 'Moving the real top to zero makes all 209 layout pixels fit');
-    await clickButton(page, 'Download 1x (200×210)'); const file = await takeDownload(stream, 'scroll-extent-repaired.png');
+    await exportButton(page, 'Download 1x (200×210)'); const file = await takeDownload(stream, 'scroll-extent-repaired.png');
     const metadata = await sharp(file).metadata(); assert.equal(metadata.width, 200); assert.equal(metadata.height, 210); await stream.close();
   } finally { await browser.close(); }
 });
@@ -524,12 +529,12 @@ test('T5 corrupt main screenshot blocks output with its name and a real replacem
     await (await page.$('input[aria-label="Main screenshot file"]')).uploadFile(invalid);
     await page.waitForFunction(() => [...document.querySelectorAll('[role="alert"]')].some(node => /Main screenshot.*decoded/i.test(node.textContent)));
     assert.deepEqual(await snapshot(page), before, 'Failed data never replaces the last valid screenshot');
-    await clickButton(page, 'Download 1x (1600×1200)'); await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
+    await exportButton(page, 'Download 1x (1600×1200)'); await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
     assert.deepEqual(await stream.files(), []);
     const message = await page.$$eval('[role="alert"]', nodes => nodes.map(node => node.textContent).join('\n'));
     assert.match(message, /Main screenshot.*decoded.*Replace/i);
     await (await page.$('input[aria-label="Main screenshot file"]')).uploadFile(path.resolve('../../output/devsnapkit/honeywerank-original.png'));
-    await clickButton(page, 'Download 1x (1600×1200)'); const file = await takeDownload(stream, 'recovered-main.png');
+    await exportButton(page, 'Download 1x (1600×1200)'); const file = await takeDownload(stream, 'recovered-main.png');
     assert.equal((await sharp(file).metadata()).width, 1600);
     assert.equal((await snapshot(page)).snapshot.imageName, 'honeywerank-original.png');
     await fs.writeFile(path.join(output, 'image-failure-recovery.json'), JSON.stringify({ message, file, samePageRetry: true, initialDocumentPreserved: true }, null, 2)); await stream.close();
@@ -541,14 +546,14 @@ test('T5 4K and batch stay Pro gated while ordinary text and 1x/2x remain availa
   try {
     const page = await preparePage(browser, url); await fixture(page, { pro: false });
     const stream = await downloads(page, 'pro-gates');
-    await clickButton(page, '4K Ultra');
+    await exportButton(page, '4K Ultra');
     await page.waitForSelector('button[title="Close"]'); assert.deepEqual(await stream.files(), []);
     await page.click('button[title="Close"]');
-    await clickButton(page, 'Unlock Batch Export in Pro'); await page.waitForSelector('button[title="Close"]');
+    await exportButton(page, 'Unlock Batch Export in Pro'); await page.waitForSelector('button[title="Close"]');
     assert.deepEqual(await stream.files(), []); await page.click('button[title="Close"]');
     const before = (await snapshot(page)).snapshot;
     await page.evaluate(() => window.__mockupBaseline.apply({}, { pro: true }));
-    await clickButton(page, '4K Ultra'); await clickButton(page, 'Download 4K (3840×2880)');
+    await exportButton(page, '4K Ultra'); await exportButton(page, 'Download 4K (3840×2880)');
     const file = await takeDownload(stream, 'pro-4k.png'), metadata = await sharp(file).metadata();
     assert.equal(metadata.width, 3840); assert.equal(metadata.height, 2880);
     assert.deepEqual((await snapshot(page)).snapshot.textDocument, before.textDocument);
@@ -597,7 +602,7 @@ test('T5 clipboard reports the underlying named admission failure rather than a 
     await (await page.$('input[aria-label="Main screenshot file"]')).uploadFile(invalid);
     await page.waitForFunction(() => [...document.querySelectorAll('[role="alert"]')].some(node => /Main screenshot.*decoded/.test(node.textContent)));
     const before = await snapshot(page);
-    await clickButton(page, 'Copy to Clipboard (2x HD)');
+    await exportButton(page, 'Copy to Clipboard (2x HD)');
     await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
     const message = await page.$$eval('[role="alert"]', nodes => nodes.map(node => node.textContent).join('\n'));
     assert.match(message, /Main screenshot.*decoded/, 'The real preparation failure survives clipboard promise rejection');
@@ -617,6 +622,7 @@ test('T5 indivisible grapheme overflow is checked on both horizontal sides in pr
     for (const [field, value] of [['Text size', 160], ['Text y', 200], ['Text width', 64]]) await fill(page, `[data-canvas-text-controls] [aria-label="${field}"]`, value);
     const stream = await downloads(page, 'horizontal'), rows = [];
     for (const [align, x] of [['left', 150], ['center', 150], ['right', 150]]) {
+      await clickButton(page, 'Text');
       await page.click(`[data-canvas-text-controls] [aria-label="Align ${align}"]`); await fill(page, '[data-canvas-text-controls] [aria-label="Text x"]', x); await paint(page);
       const measured = await page.$eval('#studio-canvas [data-canvas-text]', node => {
         const root = node.closest('[data-canvas-root]'), rootRect = root.getBoundingClientRect(), scale = rootRect.width / root.offsetWidth, range = document.createRange(); range.selectNodeContents(node);
@@ -626,18 +632,18 @@ test('T5 indivisible grapheme overflow is checked on both horizontal sides in pr
       await fs.writeFile(path.join(output, 'horizontal-overflow-measurement.json'), JSON.stringify(rows, null, 2));
       assert.ok(measured.fragments.some(rect => rect.left < -1 || rect.right > 201), 'Native text fragment really overflows the canvas');
       assert.ok(await page.$('[data-text-layout-errors]'), 'Preview flags actual grapheme overflow rather than only the nominal box');
-      await clickButton(page, 'Download 1x (200×400)'); await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
+      await exportButton(page, 'Download 1x (200×400)'); await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
       assert.deepEqual(await stream.files(), []);
     }
-    for (const format of ['WEBP', 'JPEG']) { await clickButton(page, format); await clickButton(page, 'Download 1x (200×400)'); await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]')); assert.deepEqual(await stream.files(), []); }
-    await clickButton(page, 'Copy to Clipboard (2x HD)'); await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
+    for (const format of ['WEBP', 'JPEG']) { await exportButton(page, format); await exportButton(page, 'Download 1x (200×400)'); await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]')); assert.deepEqual(await stream.files(), []); }
+    await exportButton(page, 'Copy to Clipboard (2x HD)'); await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
     assert.match(await page.$$eval('[role="alert"]', nodes => nodes.map(node => node.textContent).join('\n')), /Text 1.*W.*outside/i);
     await page.evaluate(() => [...document.querySelectorAll('.studio-inspector label')].find(label => /^Custom/.test(label.textContent.trim()) && label.querySelector('input[type="checkbox"]')).querySelector('input').click());
-    await clickButton(page, 'Export 5 Sizes (1x)'); await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
+    await exportButton(page, 'Export 5 Sizes (1x)'); await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
     assert.deepEqual(await stream.files(), []); assert.match(await page.$$eval('[role="alert"]', nodes => nodes.map(node => node.textContent).join('\n')), /Custom \(200×400\).*Text 1.*W/i);
-    await page.click('[data-canvas-text-controls] [aria-label="Align center"]'); await fill(page, '[data-canvas-text-controls] [aria-label="Text x"]', 50); await clickButton(page, 'PNG'); await paint(page);
+    await clickButton(page, 'Text'); await page.click('[data-canvas-text-controls] [aria-label="Align center"]'); await fill(page, '[data-canvas-text-controls] [aria-label="Text x"]', 50); await exportButton(page, 'PNG'); await paint(page);
     assert.equal(await page.$('[data-text-layout-errors]'), null);
-    await clickButton(page, 'Download 1x (200×400)'); const file = await takeDownload(stream, 'horizontal-repaired.png');
+    await exportButton(page, 'Download 1x (200×400)'); const file = await takeDownload(stream, 'horizontal-repaired.png');
     const metadata = await sharp(file).metadata(); assert.equal(metadata.width, 200); assert.equal(metadata.height, 400); await stream.close();
     await fs.writeFile(path.join(output, 'horizontal-overflow.json'), JSON.stringify({ rows, blocked: ['PNG', 'WebP', 'JPEG', 'Clipboard', 'Batch including Custom'], recovered: file }, null, 2));
   } finally { await browser.close(); }

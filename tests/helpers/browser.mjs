@@ -13,10 +13,25 @@ export async function launchBrowser(extraArgs = []) {
 }
 
 export async function clickButton(page, text) {
+  const hiddenTextAction = await page.evaluate(text => ![...document.querySelectorAll('button')].some(b => b.offsetParent !== null && b.innerText.replace(/\s+/g, ' ').trim() === text.replace(/\s+/g, ' ').trim()) && [...document.querySelectorAll('[data-canvas-text-controls] button')].some(b => b.innerText.replace(/\s+/g, ' ').trim() === text.replace(/\s+/g, ' ').trim()), text);
+  if (hiddenTextAction) await clickButton(page, 'Text');
   await page.waitForFunction(text => [...document.querySelectorAll('button')].some(b => b.offsetParent !== null && b.innerText.replace(/\s+/g, ' ').trim() === text.replace(/\s+/g, ' ').trim()), {}, text);
   const handle = await page.evaluateHandle(text => [...document.querySelectorAll('button')].find(b => b.offsetParent !== null && b.innerText.replace(/\s+/g, ' ').trim() === text.replace(/\s+/g, ' ').trim()), text);
   await handle.evaluate(button => button.click());
   await handle.dispose();
+}
+
+// Navigate the shipped Inspector before interacting; never fill a hidden tab.
+export async function revealInspectorControl(page, selector) {
+  const tab = await page.evaluate(selector => {
+    const node = document.querySelector(selector);
+    if (node?.getClientRects().length) return null;
+    if (/Canvas (width|height)/.test(selector)) return 'Export';
+    if (/data-canvas-text-controls|aria-label="(?:Current text|Text )/.test(selector)) return 'Text';
+    return null;
+  }, selector);
+  if (tab) await clickButton(page, tab);
+  await page.waitForSelector(selector, { visible: true });
 }
 
 export async function preparePage(browser, url, options = {}) {

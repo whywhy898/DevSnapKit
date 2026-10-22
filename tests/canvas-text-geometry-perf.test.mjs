@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { launchBrowser, preparePage } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, clickButton } from './helpers/browser.mjs';
 const url=process.env.TEST_UI_URL;
 const output=path.resolve('../../output/devsnapkit/canvas-text-v1/geometry');
 const paint=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
@@ -12,7 +12,7 @@ test('T4 actual handle and native text input response protocol, 3 runs per 1/5/1
   const browser=await launchBrowser();
   try{
     const page=await preparePage(browser,url),image=path.resolve('../../output/devsnapkit/honeywerank-original.png');
-    const sourceHashes={};for(const file of ['src/App.tsx','src/editorHistory.ts','src/useHistory.ts','src/CanvasLayout.tsx','src/MockupArtwork.tsx','src/canvasDimensions.ts','src/text/geometry.ts','src/text/CanvasTextOverlay.tsx','src/text/TextControls.tsx','src/text/useCanvasTextEditor.ts','src/text/useTextLayoutValidation.ts','src/text/document.ts'])sourceHashes[file]=createHash('sha256').update(await fs.readFile(file)).digest('hex');
+    const sourceHashes={};for(const file of ['src/App.tsx','src/editorHistory.ts','src/useHistory.ts','src/CanvasLayout.tsx','src/MockupArtwork.tsx','src/MockupUnit.tsx','src/canvasDimensions.ts','src/text/geometry.ts','src/text/CanvasTextOverlay.tsx','src/text/TextControls.tsx','src/text/text.css','src/text/useCanvasTextEditor.ts','src/text/useTextLayoutValidation.ts','src/text/document.ts'])sourceHashes[file]=createHash('sha256').update(await fs.readFile(file)).digest('hex');
     await (await page.$('[aria-label="Main screenshot file"]')).uploadFile(image);
     await page.waitForFunction(()=>window.__mockupBaseline.snapshot.imageName==='honeywerank-original.png'&&document.querySelector('#studio-canvas img')?.naturalWidth>0);
     const metadata={date:new Date().toISOString(),sourceHashes,sceneReferenceCommit:process.env.CANVAS_TEXT_SCENE_REFERENCE_COMMIT||null,sceneSkipExperiment:Boolean(process.env.CANVAS_TEXT_SKIP_REDUNDANT_SCENE),warmup:'Actual uploaded image naturalWidth>0, exact rendered layer count, document.fonts.ready, two settled rAFs before each timed phase. No CPU throttling. Short48px/long24px keeps the1000-codepoint case valid on1600x1200.',browser:await browser.version(),browserFlags:browser.process().spawnargs.filter(a=>a.startsWith('--')),hardware:{cpu:'13th Gen Intel(R) Core(TM) i9-13900H',logicalProcessors:20,ramGiB:31.75,os:'Windows NT 10.0.26300.0'},cpuThrottling:'none',image:{path:image,bytes:(await fs.stat(image)).size,width:1440,height:1000},...await page.evaluate(()=>({dpr:devicePixelRatio,viewport:{width:innerWidth,height:innerHeight},canvas:{width:1600,height:1200},font:'same-origin Poster Manrope 700 normal'})),budget:{frameP95Ms:33.4,inputToPaintOpportunityP95Ms:100},measurement:'Trusted pointermove and native textarea input through production React handlers. Continuous requestAnimationFrame intervals during drag. Event timestamp to rAF-following task estimates a paint opportunity; this is not GPU presentation timing. No bridge state update is timed. Fixture snapshots only set up layer counts/content.'};
@@ -44,6 +44,7 @@ test('T4 actual handle and native text input response protocol, 3 runs per 1/5/1
     for(const count of [1,5,10,20])for(const length of [20,1000])for(let run=1;run<=3;run++){
       await page.evaluate(({count,length})=>{const fontSize=length===1000?24:48;const layers=Array.from({length:count},(_,i)=>({id:'interaction-'+i,content:'A'.repeat(length),centerX:.5,centerY:.5+i*.003,widthRatio:.8,font:'manrope',fontSize,weight:700,italic:false,color:'#FFFFFF',align:'center'}));window.__mockupBaseline.apply({aspectRatioId:'custom',customCanvasSize:{width:1600,height:1200},textDocument:{version:1,layers}});},{count,length});
       await page.waitForFunction(count=>document.querySelectorAll('#studio-canvas [data-canvas-text]').length===count,{},count);await page.evaluate(()=>document.fonts.ready);await paint(page);
+      await clickButton(page, 'Text');
       await page.select('[aria-label="Current text"]','interaction-0');await paint(page);
       const handle=await page.$('[aria-label="Move text"]'),box=await handle.boundingBox();
       const beforeDrag=await page.evaluate(()=>({layer:window.__mockupBaseline.snapshot.textDocument.layers[0],scale:document.querySelector('[data-text-logical-overlay]').getBoundingClientRect().width/document.querySelector('[data-text-logical-overlay]').offsetWidth}));

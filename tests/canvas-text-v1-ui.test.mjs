@@ -100,10 +100,9 @@ test('T3 invalid style draft has reachable Cancel and blocks keyboard tool short
   await page.$eval('[aria-label="Text size"]', el => el.blur());
   await page.keyboard.press('2'); assert.equal(await page.evaluate(() => window.__mockupBaseline.snapshot.layoutMode), 'single');
   const baseline = await page.evaluate(() => JSON.stringify(window.__mockupBaseline.snapshot));
+  await clickButton(page, 'Frame');
+  assert.equal(await page.$eval('[aria-label="Text size"]', el => el.getClientRects().length > 0 && el.value === 'Infinity'), true, 'Invalid draft keeps its Text tab visible when another tab is requested');
   await page.evaluate(() => {
-    const input = [...document.querySelectorAll('input[type="range"]')].find(el => el.offsetParent !== null);
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-    setter.call(input, String(Number(input.value) + 1)); input.dispatchEvent(new Event('input', { bubbles: true }));
     const data = new DataTransfer(); data.items.add(new File(['<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"/>'], 'paste.svg', { type: 'image/svg+xml' }));
     document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true }));
   });

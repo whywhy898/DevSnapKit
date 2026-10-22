@@ -104,7 +104,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
   theme,
   imageSrc,
   imageName = 'Screenshot',
-  onReplace,
+  onReplace: requestReplace,
   interactive = true,
   shadowLevel = 'dramatic',
   shadowOpacity = 80,
@@ -115,6 +115,8 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
   hideFrame = false,
   zoomStyle,
 }) => {
+  const onReplace = interactive ? requestReplace : undefined;
+  const replaceTitle = onReplace ? 'Click to replace screenshot (or paste via Ctrl+V)' : undefined;
   const isPhone = theme === 'iphone-17' || theme === 'phone-clay';
   const backplates = CARD_BACKPLATES[cornerStyle];
   // The inner media needs its own clip once a frame separates it from the outer clip.
@@ -134,7 +136,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
           boxShadow: surfaceBoxShadow,
         }}
         onClick={onReplace}
-        title="Click to replace screenshot (or paste via Ctrl+V)"
+        title={replaceTitle}
       >
         <div className={`relative overflow-hidden ${isPhone ? 'h-full' : ''}`} style={mediaCornerStyle}>
         <img 
@@ -169,7 +171,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
             <div 
               className="relative w-full overflow-hidden bg-black aspect-[16/10] cursor-pointer group rounded-t-[18px]"
               onClick={onReplace}
-              title="Click to replace screenshot (or paste via Ctrl+V)"
+              title={replaceTitle}
             >
               <img 
                 src={imageSrc} 
@@ -226,7 +228,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
             <div 
               className="relative w-full overflow-hidden bg-black aspect-video cursor-pointer group rounded-[14px]"
               onClick={onReplace}
-              title="Click to replace screenshot (or paste via Ctrl+V)"
+              title={replaceTitle}
             >
               <img 
                 src={imageSrc} 
@@ -312,7 +314,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
               <div 
                 className="relative w-full h-full overflow-hidden bg-slate-950 cursor-pointer group"
                 onClick={onReplace}
-                title="Click to replace screenshot (or paste via Ctrl+V)"
+                title={replaceTitle}
               >
                 <img 
                   src={imageSrc} 
@@ -348,7 +350,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
             <div 
               className="relative w-full h-full rounded-[38px] overflow-hidden bg-black cursor-pointer group"
               onClick={onReplace}
-              title="Click to replace screenshot (or paste via Ctrl+V)"
+              title={replaceTitle}
             >
               <img 
                 src={imageSrc} 
@@ -396,7 +398,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
             className="relative group overflow-hidden bg-slate-950/40 cursor-pointer"
             style={mediaCornerStyle}
             onClick={onReplace}
-            title="Click to replace screenshot (or paste via Ctrl+V)"
+            title={replaceTitle}
           >
             <img 
               src={imageSrc} 
@@ -438,7 +440,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
             className="relative group overflow-hidden bg-slate-950/40 cursor-pointer"
             style={mediaCornerStyle}
             onClick={onReplace}
-            title="Click to replace screenshot (or paste via Ctrl+V)"
+            title={replaceTitle}
           >
             <img 
               src={imageSrc} 

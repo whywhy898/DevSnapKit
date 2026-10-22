@@ -172,14 +172,14 @@ test('real missing font, invalid text box and missing image report named actiona
     await clickDownload();
     await page.waitForFunction(() => [...document.querySelectorAll('[role=alert]')].some(n => /Outside headline.*outside the canvas/i.test(n.textContent)));
     await page.waitForFunction(() => !document.querySelector('[aria-busy=true]'));
-    const textError = await page.$eval('[data-canvas-text-controls] [role=alert]', n => n.textContent);
+    const textError = await page.$eval('[data-text-export-error]', n => n.textContent);
     await page.evaluate(() => window.__mockupBaseline.apply({ imageSrc:'', textDocument:{version:1,layers:[]} }));
     await page.waitForFunction(() => window.__mockupBaseline.snapshot.imageSrc === '');
     await clickDownload();
     await page.waitForFunction(() => [...document.querySelectorAll('[role=alert]')].some(n => /Main screenshot is required.*Upload/i.test(n.textContent)));
     await page.waitForFunction(() => !document.querySelector('[aria-busy=true]'));
     assert.equal(await page.$$eval('[aria-hidden=true] [data-canvas-root]', nodes => nodes.length), 0, 'Failed export cleans up offscreen renderer');
-    await fs.writeFile(path.join(output,'export-errors.json'), JSON.stringify({ missingFont, textError, missingImage:await page.$eval('[data-canvas-text-controls] [role=alert]',n=>n.textContent) },null,2));
+    await fs.writeFile(path.join(output,'export-errors.json'), JSON.stringify({ missingFont, textError, missingImage:await page.$eval('[data-text-export-error]',n=>n.textContent) },null,2));
   } finally { await browser.close(); }
 });
 
@@ -194,7 +194,8 @@ test('delayed real font embedding freezes editor tools, keyboard, paste and mode
     page.on('request', request => { if(hold && request.url().includes('/poster/fonts/')) pending.push(request); else request.continue(); });
     await exportPNGWithHold();
     async function exportPNGWithHold() {
-      await clickButton(page,'Export'); await clickButton(page,'1x Web');
+      await clickButton(page, 'Done');
+      await page.click('.export-trigger-btn'); await clickButton(page,'1x Web');
       await downloadPng(page,output,'frozen-export.png',async () => {
         await page.evaluate(() => [...document.querySelectorAll('button')].find(b=>b.offsetParent!==null && /^Download /.test(b.innerText.trim())).click());
         await page.waitForFunction(()=>document.querySelector('[aria-busy=true]')?.inert);
@@ -240,7 +241,7 @@ test('one failed embedded italic face blocks actual PNG even when another used f
     await page.evaluate(()=>[...document.querySelectorAll('button')].find(b=>b.offsetParent!==null&&/^Download /.test(b.innerText.trim())).click());
     await page.waitForFunction(()=>[...document.querySelectorAll('[role=alert]')].some(n=>/Poster Gelasio/.test(n.textContent)&&/embedded/.test(n.textContent)));
     assert.ok(failed>0,'Actual italic font embedding resource fails after the preview face has loaded');
-    const error=await page.$eval('[data-canvas-text-controls] [role=alert]',n=>n.textContent);
+    const error=await page.$eval('[data-text-export-error]',n=>n.textContent);
     assert.match(error,/italic 600/);assert.match(error,/try again/i);assert.equal(downloaded,0,'Partial font CSS must never download fallback text');
     await page.waitForFunction(()=>!document.querySelector('[aria-busy=true]'));
     assert.equal(await page.evaluate(()=>JSON.stringify(window.__mockupBaseline.snapshot)),snapshot,'Failed font embedding preserves the document');
@@ -269,7 +270,7 @@ test('a failed initial owned CSS font load recovers on the next click in the sam
     await clickButton(page,'Export');await clickButton(page,'1x Web');await page.evaluate(()=>[...document.querySelectorAll('button')].find(b=>b.offsetParent!==null&&/^Download /.test(b.innerText.trim())).click());
     await page.waitForFunction(()=>[...document.querySelectorAll('[role=alert]')].some(n=>/italic 600.*Poster Gelasio.*could not be loaded/i.test(n.textContent)));
     await page.waitForFunction(()=>!document.querySelector('[aria-busy=true]'));
-    const firstError=await page.$eval('[data-canvas-text-controls] [role=alert]',n=>n.textContent);
+    const firstError=await page.$eval('[data-text-export-error]',n=>n.textContent);
     assert.equal(await page.evaluate(()=>JSON.stringify(window.__mockupBaseline.snapshot)),snapshot);
     fail=false;
     let retry;
