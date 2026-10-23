@@ -31,13 +31,38 @@ export function validateText(layer: CanvasTextLayer) {
   if (!['left', 'center', 'right'].includes(layer.align)) throw new Error('Invalid text alignment.');
   return layer;
 }
-export function addText(doc: CanvasTextDocument, canvas: TextCanvasSize, color = '#FFFFFF', id = crypto.randomUUID()): CanvasTextDocument {
+export type TextCreationBox = { left: number; top: number; width: number; height: number };
+/** Prefer free layout space; never move older text to make a new box fit. */
+function creationPosition(canvas: TextCanvasSize, width: number, occupied: TextCreationBox[]) {
+  const height = Math.min(60, canvas.height), gap = 16;
+  const minX = Math.min(gap, (canvas.width - width) / 2), maxX = canvas.width - width - minX;
+  const minY = Math.min(gap, (canvas.height - height) / 2), maxY = canvas.height - height - minY;
+  const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+  const preferred = { left: (canvas.width - width) / 2, top: clamp(canvas.height * .2 - height / 2, minY, maxY) };
+  const xs = new Set([preferred.left, minX, maxX]), ys = new Set([preferred.top, minY, maxY]);
+  for (const box of occupied) {
+    xs.add(clamp(box.left + box.width + gap, minX, maxX)); xs.add(clamp(box.left - width - gap, minX, maxX));
+    ys.add(clamp(box.top + box.height + gap, minY, maxY)); ys.add(clamp(box.top - height - gap, minY, maxY));
+  }
+  const candidates = [...ys].flatMap(top => [...xs].map(left => {
+    const overlap = occupied.reduce((sum, box) => sum + Math.max(0, Math.min(left + width + gap, box.left + box.width) - Math.max(left - gap, box.left)) * Math.max(0, Math.min(top + height + gap, box.top + box.height) - Math.max(top - gap, box.top)), 0);
+    const distance = (left - preferred.left) ** 2 + (top - preferred.top) ** 2;
+    return { left, top, overlap, distance };
+  }));
+  candidates.sort((a, b) => a.overlap - b.overlap || a.distance - b.distance || b.top - a.top);
+  const best = candidates[0];
+  return { x: best.left + width / 2, y: best.top + height / 2 };
+}
+export function addText(doc: CanvasTextDocument, canvas: TextCanvasSize, color = '#FFFFFF', id = crypto.randomUUID(), measured?: TextCreationBox[]): CanvasTextDocument {
   if (doc.layers.length >= TEXT_LIMITS.layers) throw new Error('Maximum 20 text boxes. Delete a box before adding another.');
   if (doc.layers.some(x => x.id === id)) throw new Error('Text id already exists.');
   if (!Number.isFinite(canvas.width) || !Number.isFinite(canvas.height) || canvas.width < 32 || canvas.height <= 0) throw new Error('Canvas dimensions are invalid.');
-  const n = doc.layers.length, width = Math.min(480, canvas.width - 32);
-  const x = Math.min(canvas.width - width / 2, canvas.width / 2 + 24 * (n % 5));
-  const y = Math.min(canvas.height - 30, Math.max(30, canvas.height * .2 + 24 * Math.floor(n / 5)));
+  const width = Math.min(480, canvas.width - 32);
+  const occupied = measured ?? doc.layers.filter(layer => layer.content.trim()).map(layer => {
+    const height = layer.fontSize * 1.25 * layer.content.split('\n').length;
+    return { left: (layer.centerX - layer.widthRatio / 2) * canvas.width, top: layer.centerY * canvas.height - height / 2, width: layer.widthRatio * canvas.width, height };
+  });
+  const { x, y } = creationPosition(canvas, width, occupied);
   const layer: CanvasTextLayer = { id, content: 'Text', centerX: x / canvas.width, centerY: y / canvas.height, widthRatio: width / canvas.width, font: 'manrope', fontSize: 48, weight: 700, italic: false, color, align: 'center' };
   validateText(layer);
   return { ...doc, layers: [...doc.layers, layer] };

@@ -43,7 +43,7 @@ test('text document validates codepoints, fonts, finite geometry and object limi
   assert.equal(d.deleteText(doc, id).layers.some(x => x.id === id), false);
 });
 
-test('text logical position, width, layout bounds and five column creation offsets are stable', async () => {
+test('text logical position, width and layout bounds are stable', async () => {
   const g = await load('text/geometry');
   const next = g.moveTextByScreenDelta({ centerX: 0.5, centerY: 0.5 }, { x: 40, y: 20 }, { previewScale: 0.5, canvasWidth: 1600, canvasHeight: 1200 });
   assert.equal(next.centerX, 0.55);
@@ -52,7 +52,22 @@ test('text logical position, width, layout bounds and five column creation offse
   assert.equal(g.textBoxIssue({ centerX: 0.5, centerY: 0.5, widthRatio: 0.3, content: 'Title' }, { width: 1600, height: 1200 }, 60), null);
   assert.match(g.textBoxIssue({ centerX: 0.5, centerY: 0.98, widthRatio: 0.3, content: 'Title' }, { width: 1600, height: 1200 }, 100), /outside/i);
   assert.equal(g.textBoxIssue({ centerX: 0.5, centerY: 0.98, widthRatio: 0.3, content: ' ' }, { width: 1600, height: 1200 }, 100), null);
-  assert.deepEqual(g.creationOffset(5), { x: 0, y: 24 });
+});
+
+test('new text uses available space without moving existing text and handles a full small canvas', async () => {
+  const d = await load('text/document');
+  const size = { width: 1600, height: 1200 };
+  const one = d.addText(d.emptyTextDocument(), size, '#FFFFFF', 'first');
+  const tall = d.updateText(one, 'first', { content: 'One\nTwo\nThree', fontSize: 80 });
+  const two = d.addText(tall, size, '#FFFFFF', 'second');
+  assert.deepEqual(two.layers[0], tall.layers[0]);
+  assert.ok(Math.abs(two.layers[1].centerY - tall.layers[0].centerY) * size.height >= 180, 'New line box must clear the multiline box');
+  const measured = d.addText(one, size, '#FFFFFF', 'measured', [{ left: 0, top: 0, width: 1600, height: 600 }]);
+  assert.ok(measured.layers[1].centerY * size.height >= 646, 'Real measured occupancy overrides nominal line count');
+  let crowded = d.emptyTextDocument();
+  for (let i = 0; i < 20; i++) crowded = d.addText(crowded, { width: 200, height: 200 }, '#FFFFFF', 'text-' + i);
+  assert.equal(crowded.layers.length, 20);
+  assert.ok(crowded.layers.every(l => l.centerX >= 0 && l.centerX <= 1 && l.centerY >= .15 && l.centerY <= .85));
 });
 
 test('whole editor history flushes mixed values, groups updates, preserves redo for no-ops and cancels', async () => {

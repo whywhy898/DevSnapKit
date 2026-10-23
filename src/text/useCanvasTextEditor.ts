@@ -61,7 +61,14 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
   const add = () => {
     if (!finish()) return;
     try {
-      const next = addText(latest.current.textDocument, size, initialTextColor(latest.current.bgType, latest.current.solidColor));
+      const canvas = root.current, bounds = canvas?.getBoundingClientRect();
+      const scale = canvas && bounds && canvas.offsetWidth ? bounds.width / canvas.offsetWidth : 0;
+      const occupied = canvas && bounds && scale > 0 ? Array.from(canvas.querySelectorAll<HTMLElement>('[data-canvas-text]')).map(node => {
+        const rect = node.getBoundingClientRect(), horizontal = textHorizontalExtent(node, scale);
+        return { left: (rect.left - bounds.left) / scale + horizontal.left, top: (rect.top - bounds.top) / scale,
+          width: horizontal.right - horizontal.left, height: Math.max(rect.height / scale, node.offsetHeight, node.scrollHeight) };
+      }) : undefined;
+      const next = addText(latest.current.textDocument, size, initialTextColor(latest.current.bgType, latest.current.solidColor), crypto.randomUUID(), occupied);
       history.beginTransaction(latest.current); applyDocument(next); history.commitTransaction(latest.current);
       edit(next.layers[next.layers.length - 1].id);
     } catch (e) { setMessage((e as Error).message); }

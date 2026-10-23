@@ -5,7 +5,6 @@ export function moveTextByScreenDelta(position: { centerX: number; centerY: numb
   if (!values.every(Number.isFinite) || context.previewScale <= 0 || context.canvasWidth <= 0 || context.canvasHeight <= 0) throw new Error('Coordinates, scale and canvas dimensions must be finite and valid.');
   return { centerX: position.centerX + delta.x / context.previewScale / context.canvasWidth, centerY: position.centerY + delta.y / context.previewScale / context.canvasHeight };
 }
-export function creationOffset(n: number) { return { x: 24 * (n % 5), y: 24 * Math.floor(n / 5) }; }
 export type GeometryField = 'x' | 'y' | 'width';
 export function geometryPatch(field: GeometryField, draft: string, size: TextCanvasSize) {
   const value = draft.trim() === '' ? NaN : Number(draft);
