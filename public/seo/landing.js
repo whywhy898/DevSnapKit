@@ -4,7 +4,7 @@ if (comparison && reveal) {
   const updateReveal = () => {
     const position = Number(reveal.value);
     comparison.style.setProperty('--reveal', `${position}%`);
-    reveal.setAttribute('aria-valuetext', `${100 - position}% of the beautified screenshot revealed`);
+    reveal.setAttribute('aria-valuetext', `${100 - position}% of the styled export revealed`);
   };
   reveal.addEventListener('input', updateReveal);
   updateReveal();

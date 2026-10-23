@@ -4339,6 +4339,12 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             <span>Admin</span>
           </a>
         </div>
+        <nav aria-label="Screenshot tools" className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-white/60">
+          <a href="/screenshot-beautifier/" className="hover:text-white">Screenshot beautifier</a>
+          <a href="/og-image-generator/" className="hover:text-white">OG image generator</a>
+          <a href="/product-hunt-image-maker/" className="hover:text-white">Product Hunt image maker</a>
+          <a href="/add-text-to-image/" className="hover:text-white">Add text to image</a>
+        </nav>
         <p className="text-[11px] text-white/60 max-w-2xl mx-auto">
           © 2026 DevSnapKit. Studio-Grade Visual Asset Studio for Creators, Marketers & Builders • 100% Client-Side In-Browser Processing • Zero Server Uploads.
         </p>

@@ -15,7 +15,9 @@
     "test:canvas-text:v1": "node --test tests/canvas-text-v1.test.mjs tests/canvas-text-history-hook.test.mjs tests/canvas-text-v1-preparation.test.mjs tests/canvas-text-geometry.test.mjs tests/canvas-text-output.test.mjs",
     "test:canvas-text:v1:browser": "node tests/run-canvas-text-browser.mjs",
     "test:text:v1": "npm run test:canvas-text:v1",
-    "test:text:v1:browser": "npm run test:canvas-text:v1:browser"
+    "test:text:v1:browser": "npm run test:canvas-text:v1:browser",
+    "test:seo": "node --test tests/seo-landing-pages.test.mjs tests/seo-landing-assets.test.mjs",
+    "test:seo:browser": "node tests/run-seo-browser.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
