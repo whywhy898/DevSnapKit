@@ -14,6 +14,7 @@ import {
 import { MOCKUP_PRESETS } from './templates';
 import { GRADIENTS, PresetGradient } from './themes';
 import { verifyLicenseWithServer, claimLicenseViaApi } from './license';
+import { readPendingOrder, rememberPendingOrder, savePurchasedLicense, recoverPayPalLicense } from './paypalCheckout';
 import { LegalModals, LegalModalType } from './LegalModals';
 import { WelcomeOverlay } from './WelcomeOverlay';
 import { trackEvent } from './telemetry';
@@ -646,6 +647,10 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const paypalContainerRef = useRef<HTMLDivElement>(null);
   const [isCapturingPayment, setIsCapturingPayment] = useState<boolean>(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [pendingPayPalOrder, setPendingPayPalOrder] = useState(readPendingOrder);
+  const [paymentRecoveryAttempt, setPaymentRecoveryAttempt] = useState(0);
+  const purchaseCompleted = useRef(false);
   const [canvasDomSize, setCanvasDomSize] = useState<{ width: number; height: number }>({ width: 960, height: 600 });
 
   // Snapshot for History (Undo / Redo - F1)
@@ -985,13 +990,39 @@ export default function App() {
     return () => { cancelled = true; clearTimeout(timer); wake?.(); artworkTasks.current!.clear('qr'); };
   }, [qrUrl]);
 
+  const completePurchase = useCallback((key: string) => {
+    if (purchaseCompleted.current) return;
+    purchaseCompleted.current = true;
+    setPurchasedLicenseKey(key);
+    setIsProUnlocked(true);
+    savePurchasedLicense(key);
+    setPendingPayPalOrder('');
+    setPaymentError('');
+    setIsCapturingPayment(false);
+    setShowProModal(false);
+    setShowSuccessModal(true);
+  }, []);
+
+  useEffect(() => {
+    if (!pendingPayPalOrder) return;
+    const controller = new AbortController();
+    void recoverPayPalLicense(pendingPayPalOrder, controller.signal).then(key => {
+      if (key && !controller.signal.aborted) completePurchase(key);
+    });
+    return () => controller.abort();
+  }, [pendingPayPalOrder, paymentRecoveryAttempt, completePurchase]);
+
   // Dynamically load PayPal JavaScript SDK using client ID from server config
   useEffect(() => {
     let isMounted = true;
     fetch('/api/paypal-config')
       .then(res => res.json())
       .then(config => {
-        if (!isMounted || !config.clientId) return;
+        if (!isMounted) return;
+        if (!config.clientId) {
+          setPaymentError(config.error || 'PayPal checkout is temporarily unavailable. Please contact support@devsnapkit.com.');
+          return;
+        }
         const scriptId = 'paypal-sdk-script';
         if (!document.getElementById(scriptId)) {
           const script = document.createElement('script');
@@ -1001,7 +1032,7 @@ export default function App() {
           document.body.appendChild(script);
         }
       })
-      .catch(err => console.error('Failed to load PayPal config:', err));
+      .catch(() => { if (isMounted) setPaymentError('PayPal checkout could not load. Please refresh or contact support@devsnapkit.com.'); });
 
     return () => { isMounted = false; };
   }, []);
@@ -1024,14 +1055,21 @@ export default function App() {
               height: 44,
             },
             createOrder: async () => {
+              purchaseCompleted.current = false;
+              setPaymentError('');
               trackEvent('checkout_click');
               const res = await fetch('/api/paypal-create-order', { method: 'POST' });
               const data = await res.json();
               if (!data.id) throw new Error(data.error || 'Failed to initialize PayPal order');
+              rememberPendingOrder(data.id);
+              setPendingPayPalOrder(data.id);
               return data.id;
             },
             onApprove: async (data: any) => {
               setIsCapturingPayment(true);
+              rememberPendingOrder(data.orderID);
+              setPendingPayPalOrder(data.orderID);
+              setPaymentRecoveryAttempt(value => value + 1);
               try {
                 const res = await fetch('/api/paypal-capture-order', {
                   method: 'POST',
@@ -1040,23 +1078,24 @@ export default function App() {
                 });
                 const result = await res.json();
                 if (result.success && result.licenseKey) {
-                  setPurchasedLicenseKey(result.licenseKey);
-                  setIsProUnlocked(true);
-                  localStorage.setItem('devsnapkit_pro_unlocked', 'true');
-                  localStorage.setItem('devsnapkit_license_key', result.licenseKey);
-                  setShowProModal(false);
-                  setShowSuccessModal(true);
+                  completePurchase(result.licenseKey);
                 } else {
-                  alert(result.error || 'Payment capture failed. Please contact support@devsnapkit.com');
+                  if (!purchaseCompleted.current) setPaymentError(result.error || 'Payment is still being verified. We will recover your key once PayPal confirms it.');
                 }
-              } catch (err: any) {
-                alert('Payment capture error: ' + err.message);
+              } catch {
+                if (!purchaseCompleted.current) setPaymentError('The payment response was interrupted. We are checking your receipt; avoid paying again while verification is pending.');
               } finally {
                 setIsCapturingPayment(false);
               }
             },
-            onError: (err: any) => {
-              console.error('PayPal SDK Checkout Error:', err);
+            onCancel: () => {
+              rememberPendingOrder('');
+              setPendingPayPalOrder('');
+              setIsCapturingPayment(false);
+              setPaymentError('Checkout was cancelled. No license has been issued.');
+            },
+            onError: () => {
+              if (!purchaseCompleted.current) setPaymentError('PayPal checkout could not complete. If your card shows a charge, use Recover payment below before trying again.');
             }
           }).render(paypalContainerRef.current);
         } catch (e) {
@@ -1076,7 +1115,7 @@ export default function App() {
       }, 300);
       return () => clearInterval(timer);
     }
-  }, [showProModal]);
+  }, [showProModal, completePurchase]);
 
   // Theme list
   const filteredGradients = GRADIENTS;
@@ -4394,6 +4433,14 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                         <span>Verifying PayPal payment and issuing license key...</span>
                       </div>
                     )}
+                    {paymentError && <p role="alert" className="text-xs leading-relaxed text-rose-200 bg-rose-950/30 border border-rose-800/50 rounded-lg p-3">{paymentError}</p>}
+                    {pendingPayPalOrder && <div className="text-xs text-slate-300 rounded-lg border border-slate-700 p-3 space-y-2">
+                      <p>An unfinished payment is being checked. A pending card authorization alone does not confirm payment.</p>
+                      <button type="button" className="font-semibold text-cyan-300 underline" onClick={() => {
+                        setPaymentError('Checking your PayPal receipt. Your key will appear after the payment is confirmed.');
+                        setPaymentRecoveryAttempt(value => value + 1);
+                      }}>Recover payment</button>
+                    </div>}
                   </div>
 
                   {/* Trust Badges */}

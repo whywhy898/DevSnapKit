@@ -98,11 +98,17 @@ test('expired token is rejected', async () => {
 });
 test('capture issues a key accepted by configured verifier without real payment', async () => {
   const original = globalThis.fetch;
+  const licenseKey = await claim.generateSignedKey('CAPTURE-QA', secret);
+  const DB = { prepare: () => ({ bind() { return this; }, run: async () => ({ meta: { changes: 0 } }),
+    first: async () => ({ txn_id: 'CAPTURE-QA', status: 'COMPLETED', license_key: licenseKey }) }) };
   globalThis.fetch = async url => String(url).includes('/oauth2/token')
     ? new Response(JSON.stringify({ access_token: 'qa-token' }))
-    : new Response(JSON.stringify({ status: 'COMPLETED', payer: { email_address: 'buyer@example.com' }, purchase_units: [{ payments: { captures: [{ id: 'CAPTURE-QA', amount: { value: '1.00', currency_code: 'USD' } }] } }] }));
+    : new Response(JSON.stringify({ id: 'ORDER1234567890123', intent: 'CAPTURE', status: 'COMPLETED',
+      payer: { email_address: 'buyer@example.com' }, purchase_units: [{ reference_id: 'DSK_PRO_LIFETIME',
+        payee: { merchant_id: 'TEST-MERCHANT' }, amount: { value: '1.00', currency_code: 'USD' },
+        payments: { captures: [{ id: 'CAPTURE-QA', status: 'COMPLETED', amount: { value: '1.00', currency_code: 'USD' } }] } }] }));
   try {
-    const res = await post(capture.onRequestPost, { orderId: 'ORDER-QA' }, { ...env, PAYPAL_CLIENT_ID: 'qa-client', PAYPAL_CLIENT_SECRET: 'qa-secret', PAYPAL_MODE: 'sandbox' });
+    const res = await post(capture.onRequestPost, { orderId: 'ORDER1234567890123' }, { ...env, DB, PAYPAL_CLIENT_ID: 'qa-client', PAYPAL_CLIENT_SECRET: 'qa-secret', PAYPAL_MODE: 'sandbox' });
     assert.equal(res.status, 200); const data = await res.json();
     assert.equal((await (await post(verify.onRequestPost, { licenseKey: data.licenseKey })).json()).valid, true);
   } finally { globalThis.fetch = original; }

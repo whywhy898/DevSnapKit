@@ -67,7 +67,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     // 1. Check in Cloudflare D1 if bound
     if (env.DB) {
       try {
-        const query = 'SELECT txn_id, status FROM orders WHERE status = "COMPLETED" AND (order_id = ? OR txn_id = ?)';
+        const query = "SELECT txn_id, status FROM orders WHERE status = 'COMPLETED' AND (order_id = ? OR txn_id = ?)";
         const res = await env.DB.prepare(query).bind(cleanTx, cleanTx).first();
         if (res?.status === 'COMPLETED') {
           isDbVerified = true;

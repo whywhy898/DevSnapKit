@@ -69,6 +69,7 @@ export async function sendOrderNotification(payload: OrderNotificationPayload, e
 
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
+        signal: AbortSignal.timeout(8000),
         headers: {
           'Authorization': `Bearer ${env.RESEND_API_KEY}`,
           'Content-Type': 'application/json',
@@ -99,6 +100,7 @@ export async function sendOrderNotification(payload: OrderNotificationPayload, e
     try {
       const webhookRes = await fetch(env.NOTIFICATION_WEBHOOK, {
         method: 'POST',
+        signal: AbortSignal.timeout(8000),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           msgtype: 'text',
