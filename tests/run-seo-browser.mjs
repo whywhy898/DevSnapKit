@@ -1,20 +1,31 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { lookup } from 'node:dns/promises';
 import { launchBrowser } from './helpers/browser.mjs';
 
 const origin = process.argv[2] || 'http://127.0.0.1:4179';
 const output = path.resolve(process.argv[3] || 'D:/workspace/MarkMoney/output/devsnapkit/seo-landing-pages-2026-10-23/local-browser');
 const slugs = ['screenshot-beautifier', 'og-image-generator', 'product-hunt-image-maker', 'add-text-to-image'];
+const targets = process.argv[4] ? [process.argv[4]] : slugs;
+assert.ok(targets.every(slug => slugs.includes(slug)), 'supported landing page target');
 await fs.mkdir(output, { recursive: true });
-const browser = await launchBrowser();
+const browserArgs = ['--disable-quic'];
+// Opt in when the host's local DNS proxy differs from Chrome's resolver.
+if (process.env.SEO_SYSTEM_DNS === '1') {
+  const hostname = new URL(origin).hostname;
+  const { address } = await lookup(hostname, { family: 4 });
+  browserArgs.push(`--host-resolver-rules=MAP ${hostname} ${address}`);
+}
+const browser = await launchBrowser(browserArgs);
 const results = { origin, startedAt: new Date().toISOString(), routes: [], layouts: [], staticContent: [], errors: [] };
 
 try {
   const page = await browser.newPage();
-  await page.setCacheEnabled(false);
+  page.setDefaultNavigationTimeout(60000);
   page.on('pageerror', error => results.errors.push(error.message));
-  for (const slug of slugs) {
+  for (const slug of targets) {
+    await page.setCacheEnabled(false);
     const response = await page.goto(`${origin}/${slug}/`, { waitUntil: 'networkidle0' });
     assert.equal(response.status(), 200, slug);
     assert.equal(await page.$$eval('h1', nodes => nodes.length), 1, slug);
@@ -26,6 +37,7 @@ try {
     assert.equal(noSlash.status(), 200, `${slug}: no-slash route`);
     assert.equal(await page.$eval('link[rel="canonical"]', node => node.href), canonical);
     results.routes.push({ slug, status: response.status(), noSlashStatus: noSlash.status(), finalUrl: page.url(), canonical });
+    await page.setCacheEnabled(true);
 
     for (const width of [1440, 360, 390, 430]) {
       await page.setViewport({ width, height: 1000, deviceScaleFactor: 1 });
@@ -49,6 +61,12 @@ try {
         await page.waitForFunction(() => [...document.querySelectorAll('.reveal')].every(node => getComputedStyle(node).opacity === '1'));
         const dimensions = await page.evaluate(() => ({ viewport: innerWidth, body: document.body.scrollWidth, html: document.documentElement.scrollWidth }));
         assert.ok(dimensions.body <= width && dimensions.html <= width, `${slug} ${width} ${theme}: horizontal overflow ${JSON.stringify(dimensions)}`);
+        for (const image of await page.$$('img')) {
+          if (!await image.evaluate(node => node.complete && node.naturalWidth > 0)) {
+            await image.evaluate(node => node.scrollIntoView({ block: 'center', behavior: 'instant' }));
+            await page.waitForFunction(node => node.complete && node.naturalWidth > 0, { timeout: 15000 }, image);
+          }
+        }
         const images = await page.$$eval('img', nodes => nodes.map(node => ({ src: node.getAttribute('src'), loaded: node.complete && node.naturalWidth > 0 })));
         assert.ok(images.every(image => image.loaded), `${slug}: images loaded`);
         const heroRatio = await page.$eval('.finished-shot img', node => ({ rendered: node.offsetWidth / node.offsetHeight, intrinsic: node.naturalWidth / node.naturalHeight }));
@@ -81,7 +99,7 @@ try {
     }
   }
 
-  for (const slug of slugs) {
+  for (const slug of targets) {
     await page.setJavaScriptEnabled(false);
     await page.goto(`${origin}/${slug}/`, { waitUntil: 'networkidle0' });
     const staticState = await page.evaluate(() => ({ h1: document.querySelector('h1')?.textContent.trim(), faqs: document.querySelectorAll('details').length, visible: [...document.querySelectorAll('.reveal')].every(node => getComputedStyle(node).opacity === '1') }));
