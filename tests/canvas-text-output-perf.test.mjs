@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
-import { launchBrowser, preparePage, clickButton } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, clickButton, finishTextEditing } from './helpers/browser.mjs';
 
 const url = process.env.TEST_UI_URL;
 const output = path.resolve('../../output/devsnapkit/canvas-text-v1/outputs');
@@ -13,7 +13,7 @@ async function setup(browser, scale, batch) {
   const page = await preparePage(browser, url);
   await (await page.$('input[aria-label="Main screenshot file"]')).uploadFile(path.resolve('../../output/devsnapkit/honeywerank-original.png'));
   await page.waitForFunction(() => window.__mockupBaseline.snapshot.imageName === 'honeywerank-original.png');
-  await clickButton(page, 'Add text'); await clickButton(page, 'Done');
+  await clickButton(page, 'Add text'); await finishTextEditing(page);
   await page.evaluate(batch => {
     const layer = window.__mockupBaseline.snapshot.textDocument.layers[0];
     window.__mockupBaseline.apply({ aspectRatioId: 'custom', customCanvasSize: { width: 1600, height: 1200 }, bgType: 'transparent', vfxGlow: false,

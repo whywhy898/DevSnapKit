@@ -21,6 +21,36 @@ export async function clickButton(page, text) {
   await handle.dispose();
 }
 
+// Finish through the shipped Inspector tab, including when Text is already active.
+export async function finishTextEditing(page) {
+  await clickButton(page, 'Text');
+}
+
+// Invalid drafts expose recovery; valid drafts use the editor's real Escape path.
+export async function discardTextChanges(page) {
+  const recovery = await page.$('[data-text-edit-recovery] [data-text-cancel]');
+  if (recovery && await recovery.evaluate(node => node.getClientRects().length > 0)) {
+    await recovery.click();
+  } else {
+    const selector = await page.evaluate(() => {
+      const controls = '[data-canvas-text-controls] input, [data-canvas-text-controls] textarea, [data-canvas-text-controls] select, [aria-label="Text content"]';
+      if (document.activeElement?.matches(controls)) return null;
+      if (document.querySelector('[aria-label="Text content"]')?.getClientRects().length) return '[aria-label="Text content"]';
+      return '[data-canvas-text-controls] [aria-label="Text size"]';
+    });
+    if (selector) await page.focus(selector);
+    await page.keyboard.press('Escape');
+  }
+  await recovery?.dispose();
+}
+
+export function legacyPosterUrl(url) {
+  const target = new URL(url);
+  target.searchParams.set('editor', '1');
+  target.searchParams.set('mode', 'poster');
+  return target.href;
+}
+
 // Navigate the shipped Inspector before interacting; never fill a hidden tab.
 export async function revealInspectorControl(page, selector) {
   const tab = await page.evaluate(selector => {
@@ -42,7 +72,7 @@ export async function preparePage(browser, url, options = {}) {
     sessionStorage.setItem('dsk_session_id', 'qa_poster_v1_' + crypto.randomUUID());
   });
   await page.goto(url, { waitUntil: 'networkidle0' });
-  await page.waitForSelector('#studio-canvas');
+  await page.waitForSelector(new URL(url).searchParams.get('mode') === 'poster' ? '[data-poster-editor]' : '#studio-canvas');
   return page;
 }
 
@@ -68,6 +98,16 @@ export async function downloadPng(page, directory, filename, trigger) {
   }
   const target = path.join(directory, filename);
   await fs.rename(path.join(downloadDirectory, found), target);
-  await fs.rmdir(downloadDirectory);
+  // Chrome can briefly retain download bookkeeping after the PNG is moved.
+  // Retry only transient cleanup failures; never delete any remaining contents.
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      await fs.rmdir(downloadDirectory);
+      break;
+    } catch (error) {
+      if (!['ENOTEMPTY', 'EBUSY'].includes(error?.code) || attempt === 19) throw error;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
   return { path: target, milliseconds: Math.round(performance.now() - start) };
 }

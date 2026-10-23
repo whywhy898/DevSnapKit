@@ -3,15 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import { launchBrowser, preparePage, clickButton, downloadPng } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, clickButton, downloadPng, legacyPosterUrl } from './helpers/browser.mjs';
 
 test('M1 actual product PNG downloads prepare and embed fonts at 1x and 2x', { timeout: 120000 }, async () => {
   const browser = await launchBrowser();
   const directory = path.resolve('../../output/devsnapkit/poster-v1/m1');
   const evidence = [];
   try {
-    const page = await preparePage(browser, process.env.TEST_UI_URL || 'http://127.0.0.1:5179/?editor=1');
-    await clickButton(page, 'Poster');
+    const page = await preparePage(browser, legacyPosterUrl(process.env.TEST_UI_URL || 'http://127.0.0.1:5179/?editor=1'));
     await page.waitForSelector('[data-poster-artwork]');
     await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.querySelectorAll('[data-poster-artwork] img')].map(i => i.decode())); });
     const fonts = await page.evaluate(() => ({ manrope: document.fonts.check('800 73px "Poster Manrope"'), gelasio: document.fonts.check('italic 400 78px "Poster Gelasio"') }));
@@ -21,7 +20,7 @@ test('M1 actual product PNG downloads prepare and embed fonts at 1x and 2x', { t
     for (const [label, ratio] of [['cold-1x',1],['warm-1x',1],['cold-2x',2],['warm-2x',2]]) {
       if (label === 'cold-2x') {
         await page.reload({waitUntil:'networkidle0'});
-        await clickButton(page,'Poster');
+        await page.waitForSelector('[data-poster-artwork]');
       }
       await page.select('select[aria-label="Poster export size"]', String(ratio));
       const result = await downloadPng(page, directory, `${label}.png`, () => clickButton(page, 'Download PNG'));

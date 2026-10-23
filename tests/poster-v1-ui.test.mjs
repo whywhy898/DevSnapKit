@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { launchBrowser, preparePage, clickButton, downloadPng } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, clickButton, downloadPng, legacyPosterUrl } from './helpers/browser.mjs';
 const fixtures = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures/poster-v1');
 const evidence = path.resolve(fixtures, '../../../../../output/devsnapkit/poster-v1/ui');
 const url = process.env.TEST_UI_URL || 'http://127.0.0.1:5179/?editor=1';
@@ -14,8 +14,8 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const field = label => `${scope} [aria-label="${label}"]`;
 async function open(browser, width = 1600) {
   await fs.mkdir(evidence, { recursive: true });
-  const page = await preparePage(browser, url, { viewport: { width, height: 1000, deviceScaleFactor: 1 } });
-  await clickButton(page, 'Poster'); await page.waitForSelector('[data-poster-artwork]');
+  const page = await preparePage(browser, legacyPosterUrl(url), { viewport: { width, height: 1000, deviceScaleFactor: 1 } });
+  await page.waitForSelector('[data-poster-artwork]');
   await page.evaluate(() => document.fonts.ready); return page;
 }
 async function fill(page, selector, value) {
@@ -43,7 +43,7 @@ async function startRecording(page, name) {
     assert.equal(result.status, 0, result.stderr || 'ffmpeg recording conversion'); };
 }
 
-test('uploads are independent, text stays safe, undo is transactional and switching preserves session', { timeout: 90000 }, async () => {
+test('legacy uploads are independent, text stays safe, undo is transactional and resizing preserves session', { timeout: 90000 }, async () => {
   const browser = await launchBrowser(); let stop;
   try {
     const page = await open(browser); stop = await startRecording(page, 'desktop-main-flow');
@@ -56,7 +56,8 @@ test('uploads are independent, text stays safe, undo is transactional and switch
     const injection = '<script>alert(1)</script>'; await fill(page, field('Brand'), injection); assert.equal(await page.$eval('[data-poster-text="brand"]', n => n.textContent), injection); assert.equal(await page.$('[data-poster-artwork] script'), null);
     await clickButton(page, 'Undo'); assert.equal(await page.$eval('[data-poster-text="brand"]', n => n.textContent), 'Bloomboard'); await clickButton(page, 'Redo'); assert.equal(await page.$eval('[data-poster-text="brand"]', n => n.textContent), injection);
     await fill(page, field('Brand'), 'HoneyWeRank'); await fill(page, field('Headline'), 'Be the brand AI'); await fill(page, field('Highlight'), 'recommends.'); await fill(page, field('Website'), 'honeywerank.com');
-    await clickButton(page, 'Mockup'); await clickButton(page, 'Poster'); assert.equal(await source(page, 'main'), main); assert.notEqual(await source(page, 'detail'), detail); assert.equal(await page.$eval('[data-poster-text="brand"]', n => n.textContent), 'HoneyWeRank');
+    await page.setViewport({ width: 1280, height: 1000, deviceScaleFactor: 1 }); await delay(100); await page.setViewport({ width: 1600, height: 1000, deviceScaleFactor: 1 }); await delay(100);
+    assert.equal(await source(page, 'main'), main); assert.notEqual(await source(page, 'detail'), detail); assert.equal(await page.$eval('[data-poster-text="brand"]', n => n.textContent), 'HoneyWeRank');
     await page.focus(field('Brand')); const prevented = await page.$eval(field('Brand'), n => [false,true].map(isComposing=>{ const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true, isComposing }); n.dispatchEvent(event); return event.defaultPrevented; })); assert.deepEqual(prevented, [false,false]);
     await page.$eval(field('Brand'), n => { n.selectionStart=n.selectionEnd=n.value.length; n.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })); }); await page.keyboard.sendCharacter('中文'); await page.keyboard.press('Tab'); await page.$eval(field('Brand'), n => n.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '中文' }))); assert.equal(await page.$eval('[data-poster-text="brand"]', n => n.textContent), 'HoneyWeRank中文'); await clickButton(page,'Undo'); assert.equal(await page.$eval('[data-poster-text="brand"]', n => n.textContent), 'HoneyWeRank');
     await page.screenshot({ path: path.join(evidence, 'desktop-edited.png') }); await clickButton(page, 'Detail card'); await clickButton(page, 'Reset position');
@@ -95,7 +96,7 @@ test('browser title font overflow blocks export and preserves the fixed browser 
   }finally{await browser.close();}
 });
 
-test('real delayed font embedding freezes editing, export size and mode navigation until download completes',{timeout:90000},async()=>{
+test('legacy delayed font embedding freezes editing and export size until download completes',{timeout:90000},async()=>{
   const browser=await launchBrowser();let pending=[];
   try{
     const page=await open(browser); await fill(page,field('Brand'),'Frozen during export');
@@ -109,7 +110,8 @@ test('real delayed font embedding freezes editing, export size and mode navigati
       assert.equal(state.disabled,true,JSON.stringify(state));
       const unlocked=await page.$$eval(`${scope} .poster-controls input, ${scope} .poster-controls textarea, ${scope} .poster-controls select, ${scope} .poster-controls button, ${scope} [aria-label="Poster export size"]`,nodes=>nodes.filter(n=>!n.matches(':disabled')).map(n=>n.getAttribute('aria-label')||n.textContent));
       assert.deepEqual(unlocked,[],'no editable control stays enabled during export');
-      assert.deepEqual(await page.$$eval('button',nodes=>nodes.filter(n=>['Mockup','Poster'].includes(n.textContent.trim())).map(n=>n.disabled)),[true,true]);
+      assert.equal(await page.$('nav[aria-label="Studio mode"]'),null,'Legacy editor has no mode navigation during output');
+      await page.click(field('Brand')); await page.keyboard.type('Blocked edit');
       assert.equal(await page.$eval('[data-poster-text="brand"]',n=>n.textContent),'Frozen during export');
       await page.screenshot({path:path.join(evidence,'export-controls-frozen-preview.png')});
       hold=false; for(const request of pending)await request.continue(); pending=[];

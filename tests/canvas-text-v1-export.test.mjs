@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import { launchBrowser, preparePage, clickButton, downloadPng } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, clickButton, downloadPng, finishTextEditing } from './helpers/browser.mjs';
 
 const url = process.env.TEST_UI_URL;
 const output = path.resolve('../../output/devsnapkit/canvas-text-v1/m1');
@@ -183,7 +183,7 @@ test('real missing font, invalid text box and missing image report named actiona
   } finally { await browser.close(); }
 });
 
-test('delayed real font embedding freezes editor tools, keyboard, paste and mode while preserving snapshot', { skip: !url, timeout: 90000 }, async () => {
+test('delayed real font embedding freezes editor tools, keyboard, paste and Inspector while preserving snapshot', { skip: !url, timeout: 90000 }, async () => {
   const browser = await launchBrowser(raster); let pending = [];
   try {
     const page = await preparePage(browser, url);
@@ -194,7 +194,7 @@ test('delayed real font embedding freezes editor tools, keyboard, paste and mode
     page.on('request', request => { if(hold && request.url().includes('/poster/fonts/')) pending.push(request); else request.continue(); });
     await exportPNGWithHold();
     async function exportPNGWithHold() {
-      await clickButton(page, 'Done');
+      await finishTextEditing(page);
       await page.click('.export-trigger-btn'); await clickButton(page,'1x Web');
       await downloadPng(page,output,'frozen-export.png',async () => {
         await page.evaluate(() => [...document.querySelectorAll('button')].find(b=>b.offsetParent!==null && /^Download /.test(b.innerText.trim())).click());
@@ -206,10 +206,11 @@ test('delayed real font embedding freezes editor tools, keyboard, paste and mode
         await page.keyboard.press('2');
         await page.keyboard.down('Control'); await page.keyboard.press('z'); await page.keyboard.up('Control');
         await page.evaluate(()=>window.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true})));
-        await page.evaluate(()=> { const button=[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='Poster'); const r=button.getBoundingClientRect(); window.__m1PosterPoint={x:r.x+r.width/2,y:r.y+r.height/2}; });
-        const point=await page.evaluate(()=>window.__m1PosterPoint); await page.mouse.click(point.x,point.y);
+        await page.evaluate(()=> { const button=[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='Frame'); const r=button.getBoundingClientRect(); window.__m1InspectorPoint={x:r.x+r.width/2,y:r.y+r.height/2}; });
+        const point=await page.evaluate(()=>window.__m1InspectorPoint); await page.mouse.click(point.x,point.y);
         assert.equal(await page.evaluate(()=>JSON.stringify(window.__mockupBaseline.snapshot)),snapshot,'Editing and shortcuts cannot mutate document during output');
-        assert.equal(await page.$eval('nav[aria-label="Studio mode"] button',n=>n.getAttribute('aria-pressed')),'true','Mode stays Mockup');
+        assert.equal(await page.$('nav[aria-label="Studio mode"]'),null,'Retired mode navigation is absent during output');
+        assert.equal(await page.$eval('[data-canvas-text-controls]',n=>n.getClientRects().length>0),true,'Inspector remains on Text while output is frozen');
         await page.screenshot({path:path.join(output,'frozen-export.preview.png')});
         hold=false;for(const request of pending) await request.continue();pending=[];
       });
@@ -286,11 +287,13 @@ test('a failed initial owned CSS font load recovers on the next click in the sam
       return ['Poster Gelasio','M1 Reference Gelasio'].map(family=>{const span=document.createElement('span');Object.assign(span.style,{position:'absolute',left:'-10000px',whiteSpace:'pre',fontFamily:`"${family}"`,fontWeight:'600',fontStyle:'italic',fontSize:'48px'});span.textContent='Recover this draft';document.body.appendChild(span);const range=document.createRange();range.selectNodeContents(span);const width=range.getBoundingClientRect().width;span.remove();return width;});
     });
     assert.ok(Math.abs(glyphWidths[0]-glyphWidths[1])<.1,'Recovered preview family uses actual Gelasio glyph advances instead of fallback');
-    // Switching modes must reuse the recovered face, not await the old CSS error.
-    await clickButton(page,'Poster');await page.select('select[aria-label="Poster export size"]','1');
-    const posterRetry=await downloadPng(page,output,'initial-font-load-poster-retry.png',()=>clickButton(page,'Download PNG'));
-    assert.equal((await sharp(posterRetry.path).metadata()).width,1600);
-    await fs.writeFile(path.join(output,'initial-font-load-recovery.json'),JSON.stringify({firstError,failed,recoveredRequests,retry,faces,glyphWidths,posterRetry,documentUnchanged:true,reloaded:false},null,2));
+    // Inspector navigation must reuse the recovered face, not await the old CSS error.
+    await clickButton(page,'Frame');await clickButton(page,'Text');
+    const inspectorRetry=await exportPNG(page,'initial-font-load-inspector-retry.png');
+    const retrySize=await sharp(retry.path).metadata(),inspectorRetrySize=await sharp(inspectorRetry.path).metadata();
+    assert.equal(inspectorRetrySize.width,retrySize.width);assert.equal(inspectorRetrySize.height,retrySize.height);
+    assert.equal(await page.evaluate(()=>JSON.stringify(window.__mockupBaseline.snapshot)),snapshot);
+    await fs.writeFile(path.join(output,'initial-font-load-recovery.json'),JSON.stringify({firstError,failed,recoveredRequests,retry,faces,glyphWidths,inspectorRetry,documentUnchanged:true,reloaded:false},null,2));
     await page.setRequestInterception(false);
   } finally {await browser.close();}
 });

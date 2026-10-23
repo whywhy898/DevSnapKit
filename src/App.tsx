@@ -512,8 +512,7 @@ export default function App() {
   const [secondarySrc, setSecondarySrc] = useState<string | null>(null);
   const [secondaryName, setSecondaryName] = useState<string>('');
   const [layoutMode, setLayoutMode] = useState<'single' | 'duo'>('single');
-  const [studioMode, setStudioMode] = useState<'mockup' | 'poster'>('mockup');
-  const [posterExporting, setPosterExporting] = useState(false);
+  const [studioMode] = useState<'mockup' | 'poster'>(() => new URLSearchParams(window.location.search).get('mode') === 'poster' ? 'poster' : 'mockup');
   const [duoLayout, setDuoLayout] = useState<DuoLayoutType>('side');
   const [isSlot2Dragging, setIsSlot2Dragging] = useState<boolean>(false);
   const secondaryFileInputRef = useRef<HTMLInputElement>(null);
@@ -832,7 +831,7 @@ export default function App() {
   const effectivePaddingY = Math.min(padding, Math.max(0, (canvasLogicalSize.height - 120) / 2));
   const textEditor = useCanvasTextEditor(currentSnapshot, setTextDocument, canvasLogicalSize, { beginTransaction, commitTransaction, cancelTransaction }, canvasRef);
   const switchInspectorTab = (tab: typeof sidebarTab) => {
-    if (sidebarTab === 'text' && tab !== 'text' && !textEditor.finish()) return;
+    if (!textEditor.finish()) return;
     setSidebarTab(tab);
   };
   const sizingAction = useRef<CanvasSizingAction | null>(null);
@@ -1805,13 +1804,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
         </div>
       </header>
 
-      <nav aria-label="Studio mode" className="flex justify-center gap-2 p-2 border-b border-slate-700">
-        <button type="button" disabled={posterExporting} aria-pressed={studioMode === 'mockup'} onClick={() => setStudioMode('mockup')} className="px-4 py-2 rounded-lg border border-slate-400 text-sm">Mockup</button>
-        <button type="button" disabled={posterExporting} aria-pressed={studioMode === 'poster'} onClick={() => setStudioMode('poster')} className="px-4 py-2 rounded-lg border border-slate-400 text-sm">Poster</button>
-      </nav>
-      <div hidden={studioMode !== 'poster'}>
-        <PosterEditor active={studioMode === 'poster'} isProUnlocked={isProUnlocked} onRequestPro={() => setShowProModal(true)} onExportingChange={setPosterExporting} />
-      </div>
+      {studioMode === 'poster' && <PosterEditor isProUnlocked={isProUnlocked} onRequestPro={() => setShowProModal(true)} />}
       <div hidden={studioMode !== 'mockup'}>
       {/* Main Studio Workspace - Edge-to-Edge Shots.so Layout */}
       <main className="flex-1 w-full flex flex-col lg:flex-row lg:h-[calc(100vh-64px)] lg:overflow-hidden bg-[#08090d]">
@@ -2047,6 +2040,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           <CanvasStage width={canvasLogicalSize.width} height={canvasLogicalSize.height} freezePreviewWhileEditing={!!textEditor.editingId || textEditor.gesturing} onDeselect={() => textEditor.select(null)}>
           <MockupArtwork {...artworkProps()} editingTextId={textEditor.editingId} />
           <CanvasTextOverlay document={textDocument} size={canvasLogicalSize} activeId={textEditor.activeId} editingId={textEditor.editingId}
+            recoveryMessage={textEditor.session?.error || (textEditor.session?.composing ? textEditor.message : '')}
             issues={textLayout.issues} onGestureStart={textEditor.beginGesture} onGestureMove={textEditor.moveGesture}
             onGestureActive={textEditor.hasGesture}
             draft={textEditor.session?.kind === 'content' ? textEditor.session.value : ''} light={themeMode === 'light'}

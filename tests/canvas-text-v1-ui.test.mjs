@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { launchBrowser, preparePage, clickButton } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, clickButton, finishTextEditing, discardTextChanges } from './helpers/browser.mjs';
 const url = process.env.TEST_UI_URL;
 const output = path.resolve('../../output/devsnapkit/canvas-text-v1/editing');
 const snap = page => page.evaluate(() => window.__mockupBaseline.snapshot.textDocument);
@@ -15,7 +15,7 @@ test('T3 inline editor owns focus, draft, cancel, plain content, and independent
   assert.equal(await page.$eval('[aria-label="Text content"]', el => el.closest('[data-canvas-root]') === null && el === document.activeElement && el.selectionStart === 0 && el.selectionEnd === 4), true);
   assert.equal(await page.$eval('[data-canvas-text]', el => getComputedStyle(el).visibility), 'hidden');
   await input(page, 'Hello\n世界🙂\n<script>alert(1)</script>'); await wait(page, 'Hello\n世界🙂\n<script>alert(1)</script>');
-  await clickButton(page, 'Done');
+  await finishTextEditing(page);
   const id = (await snap(page)).layers[0].id;
   await undo(page); await wait(page, 'Text');
   await undo(page); await page.waitForFunction(() => !window.__mockupBaseline.snapshot.textDocument.layers.length);
@@ -27,10 +27,10 @@ test('T3 inline editor owns focus, draft, cancel, plain content, and independent
   await clickButton(page, 'Edit text'); await input(page, '🙂'.repeat(1001));
   assert.equal(await page.$eval('[aria-label="Text content"]', el => Array.from(el.value).length), 1001);
   assert.equal((await snap(page)).layers[0].content, 'Text');
-  await clickButton(page, 'Poster'); assert.equal(await page.$eval('button[aria-pressed="true"]', el => el.textContent), 'Mockup');
+  await clickButton(page, 'Frame'); assert.equal(await page.$eval('[data-canvas-text-controls]', el => el.getClientRects().length > 0), true, 'Invalid content keeps Text Inspector active');
   assert.match(await page.$eval('[role="alert"]', el => el.textContent), /Draft not applied|finish/i);
   await page.focus('[aria-label="Text content"]'); await page.keyboard.press('Escape');
-  await clickButton(page, 'Edit text'); await input(page, ''); await clickButton(page, 'Done');
+  await clickButton(page, 'Edit text'); await input(page, ''); await finishTextEditing(page);
   assert.equal((await snap(page)).layers[0].content, ''); assert.equal(await page.$('[data-canvas-text]'), null);
   await page.select('[aria-label="Current text"]', ''); assert.equal(await page.$('[aria-label="Delete text"]'), null);
   await page.select('[aria-label="Current text"]', id); await clickButton(page, 'Delete text');
@@ -38,8 +38,8 @@ test('T3 inline editor owns focus, draft, cancel, plain content, and independent
   assert.equal((await snap(page)).layers[0].id, id);
 }));
 test('T3 actual style controls target selection, validate drafts, normalize fonts and group undo', { skip: !url, timeout: 60000 }, () => withPage(async page => {
-  await clickButton(page, 'Add text'); await input(page, 'First'); await clickButton(page, 'Done');
-  await clickButton(page, 'Add text'); await input(page, 'Second'); await clickButton(page, 'Done');
+  await clickButton(page, 'Add text'); await input(page, 'First'); await finishTextEditing(page);
+  await clickButton(page, 'Add text'); await input(page, 'Second'); await finishTextEditing(page);
   const original = await snap(page); const id = original.layers[1].id;
   await page.select('[aria-label="Text weight"]', '800');
   await page.select('[aria-label="Text font"]', 'gelasio');
@@ -54,16 +54,13 @@ test('T3 actual style controls target selection, validate drafts, normalize font
   await undo(page); await page.waitForFunction(() => window.__mockupBaseline.snapshot.textDocument.layers[1].fontSize === 48);
   assert.equal((await snap(page)).layers[1].id, id);
   await page.focus('[aria-label="Text size"]'); await page.keyboard.down('Control'); await page.keyboard.press('a'); await page.keyboard.up('Control'); await page.keyboard.type('72');
-  const cancel = await page.evaluateHandle(() => [...document.querySelectorAll('[data-canvas-text-controls] button')].find(el => el.textContent === 'Cancel'));
-  await cancel.click(); assert.equal((await snap(page)).layers[1].fontSize, 48);
+  await discardTextChanges(page); assert.equal((await snap(page)).layers[1].fontSize, 48);
   await page.focus('[aria-label="Text size"]'); await page.keyboard.down('Control'); await page.keyboard.press('a'); await page.keyboard.up('Control'); await page.keyboard.type('76');
-  const keyboardCancel = await page.evaluateHandle(() => [...document.querySelectorAll('[data-canvas-text-controls] button')].find(el => el.textContent === 'Cancel'));
-  await keyboardCancel.focus(); await page.keyboard.press('Enter'); assert.equal((await snap(page)).layers[1].fontSize, 48);
+  await page.keyboard.press('Escape'); assert.equal((await snap(page)).layers[1].fontSize, 48);
   await page.focus('[aria-label="Text color picker"]');
   await page.$eval('[aria-label="Text color picker"]', el => { const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(el, '#123456'); el.dispatchEvent(new Event('input', { bubbles: true })); });
   assert.equal((await snap(page)).layers[1].color, '#123456');
-  const colorCancel = await page.evaluateHandle(() => [...document.querySelectorAll('[data-canvas-text-controls] button')].find(el => el.textContent === 'Cancel'));
-  await colorCancel.focus(); await page.keyboard.press('Enter'); assert.equal((await snap(page)).layers[1].color, '#FFFFFF');
+  await page.keyboard.press('Escape'); assert.equal((await snap(page)).layers[1].color, '#FFFFFF');
   await clickButton(page, 'Dark text'); assert.equal((await snap(page)).layers[1].color, '#111827');
   await clickButton(page, 'Light text'); assert.equal((await snap(page)).layers[1].color, '#FFFFFF');
   await page.select('[aria-label="Current text"]', original.layers[0].id); await page.focus('[aria-label="Current text"]'); await page.keyboard.press('Delete');
@@ -76,10 +73,10 @@ test('T3 IME retains complete over-limit draft and prevents tool changes until c
   await clickButton(page, 'Add text');
   await page.$eval('[aria-label="Text content"]', el => el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })));
   await input(page, '中'.repeat(1001)); assert.equal((await snap(page)).layers[0].content, 'Text');
-  await clickButton(page, 'Done'); assert.ok(await page.$('[aria-label="Text content"]'));
+  await clickButton(page, 'Text'); assert.ok(await page.$('[aria-label="Text content"]'), 'The real Text tab cannot finish a composing draft');
   await page.$eval('[aria-label="Text content"]', el => el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })));
   assert.equal(await page.$eval('[aria-label="Text content"]', el => el.value.length), 1001);
-  await clickButton(page, 'Cancel'); await wait(page, 'Text');
+  await discardTextChanges(page); await wait(page, 'Text');
 }));
 test('T3 native text undo stays local and selected Delete preserves the second screenshot', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await clickButton(page, 'Add text'); await page.keyboard.type('Native typing'); await undo(page);
@@ -93,10 +90,10 @@ test('T3 native text undo stays local and selected Delete preserves the second s
   assert.equal(await page.evaluate(() => window.__mockupBaseline.snapshot.layoutMode), 'duo');
   assert.equal(await page.evaluate(() => window.__mockupBaseline.snapshot.secondaryName), 'Second.png');
 }));
-test('T3 invalid style draft has reachable Cancel and blocks keyboard tool shortcuts', { skip: !url, timeout: 60000 }, () => withPage(async page => {
-  await clickButton(page, 'Add text'); await clickButton(page, 'Done'); await page.focus('[aria-label="Text size"]');
+test('T3 invalid style draft has reachable Discard changes and blocks keyboard tool shortcuts', { skip: !url, timeout: 60000 }, () => withPage(async page => {
+  await clickButton(page, 'Add text'); await finishTextEditing(page); await page.focus('[aria-label="Text size"]');
   await page.keyboard.down('Control'); await page.keyboard.press('a'); await page.keyboard.up('Control'); await page.keyboard.type('Infinity');
-  assert.ok(await page.$('button') && await page.evaluate(() => [...document.querySelectorAll('[data-canvas-text-controls] button')].some(el => el.textContent === 'Cancel')));
+  assert.equal(await page.$eval('[data-text-edit-recovery] [data-text-cancel]', el => el.getClientRects().length > 0 && el.textContent.trim() === 'Discard changes'), true);
   await page.$eval('[aria-label="Text size"]', el => el.blur());
   await page.keyboard.press('2'); assert.equal(await page.evaluate(() => window.__mockupBaseline.snapshot.layoutMode), 'single');
   const baseline = await page.evaluate(() => JSON.stringify(window.__mockupBaseline.snapshot));
@@ -108,7 +105,7 @@ test('T3 invalid style draft has reachable Cancel and blocks keyboard tool short
   });
   await new Promise(resolve => setTimeout(resolve, 300));
   assert.equal(await page.evaluate(() => JSON.stringify(window.__mockupBaseline.snapshot)), baseline);
-  await clickButton(page, 'Cancel'); assert.equal((await snap(page)).layers[0].fontSize, 48);
+  await discardTextChanges(page); assert.equal((await snap(page)).layers[0].fontSize, 48);
 }));
 test('T3 style controls cannot replace an invalid or composing content draft', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await clickButton(page, 'Add text');
@@ -121,11 +118,11 @@ test('T3 style controls cannot replace an invalid or composing content draft', {
     await page.$eval('[aria-label="Text color picker"]', el => { const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(el, '#123456'); el.dispatchEvent(new Event('input', { bubbles: true })); });
     assert.equal(await page.$eval('[aria-label="Text content"]', el => el.value), draft);
     assert.equal((await snap(page)).layers[0].color, '#FFFFFF');
-    await clickButton(page, 'Cancel'); await clickButton(page, 'Edit text');
+    await discardTextChanges(page); await clickButton(page, 'Edit text');
   }
 }));
 test('T3 text cap explains 20 boxes, overlap chooser and empty text remain reachable', { skip: !url, timeout: 60000 }, () => withPage(async page => {
-  await clickButton(page, 'Add text'); await clickButton(page, 'Done');
+  await clickButton(page, 'Add text'); await finishTextEditing(page);
   await page.evaluate(() => { const layer = window.__mockupBaseline.snapshot.textDocument.layers[0]; window.__mockupBaseline.apply({ textDocument: { version: 1, layers: Array.from({ length: 20 }, (_, i) => ({ ...layer, id: 'cap-' + i, content: i ? 'Overlap' : '' })) } }); });
   await page.waitForFunction(() => document.querySelector('[aria-label="Add text"]').disabled);
   assert.match(await page.$eval('[data-canvas-text-controls]', el => el.textContent), /20 text boxes/);
@@ -135,7 +132,7 @@ test('T3 mobile inline layout matches final text and keyboard height preserves l
   await fs.mkdir(output, { recursive: true });
   const metrics = [];
   for (const width of [360, 390, 430]) await withPage(async page => {
-    await clickButton(page, 'Add text'); await clickButton(page, 'Done');
+    await clickButton(page, 'Add text'); await finishTextEditing(page);
     if (width !== 360) await page.select('[aria-label="Text font"]', 'gelasio');
     await page.select('[aria-label="Text weight"]', '600');
     if (width === 430) await page.click('[aria-label="Text italic"]');
@@ -152,16 +149,17 @@ test('T3 mobile inline layout matches final text and keyboard height preserves l
     assert.equal(during.previewScale, before.previewScale); assert.ok(Math.abs(during.screenScale - before.screenScale) < .0001);
     await page.screenshot({ path: path.join(output, 'mobile-' + width + '-editing.png'), fullPage: true });
     await page.evaluate(() => { window.scrollTo(0, 600); window.visualViewport?.dispatchEvent(new Event('scroll')); });
-    assert.ok(await page.$eval('[data-text-edit-dock]', el => { const rect = el.getBoundingClientRect(), viewport = window.visualViewport; return rect.top >= (viewport?.offsetTop ?? 0) && rect.bottom <= (viewport ? viewport.offsetTop + viewport.height : innerHeight); }));
-    await page.click('[data-text-edit-dock] button'); const after = await page.$eval('[data-canvas-text]', el => ({ h: el.offsetHeight, w: el.offsetWidth }));
+    assert.equal(await page.$('[data-text-edit-dock]'), null, 'A valid mobile draft has no floating action dock');
+    assert.equal(await page.$('[data-text-edit-recovery]'), null);
+    await finishTextEditing(page); const after = await page.$eval('[data-canvas-text]', el => ({ h: el.offsetHeight, w: el.offsetWidth }));
     assert.ok(Math.abs(after.h - before.h) <= 2, JSON.stringify({ before, after })); assert.ok(Math.abs(after.w - before.w) <= 2);
     metrics.push({ viewport: width, font: width === 360 ? 'Manrope 600 normal' : width === 390 ? 'Gelasio 600 normal' : 'Gelasio 600 italic', before, during, after });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     if (width === 360) {
       await page.evaluate(() => Object.defineProperty(window, 'visualViewport', { configurable: true, value: undefined }));
       await clickButton(page, 'Edit text');
-      assert.equal(await page.$eval('[data-text-edit-dock]', el => getComputedStyle(el).bottom), '12px');
-      await page.click('[data-text-edit-dock] button');
+      assert.equal(await page.$('[data-text-edit-dock]'), null, 'Valid editing needs no action dock without VisualViewport');
+      await finishTextEditing(page);
     }
   }, { width, height: 850, deviceScaleFactor: 1 });
   await fs.writeFile(path.join(output, 'mobile-layout-metrics.json'), JSON.stringify(metrics, null, 2));

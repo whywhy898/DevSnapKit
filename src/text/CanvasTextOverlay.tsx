@@ -7,6 +7,7 @@ interface Props {
   draft: string; light: boolean; onEdit: (id: string) => void; onChange: (value: string, composing?: boolean) => void;
   onDone: () => boolean; onCancel: () => void; onDeselect: () => void;
   issues: Record<string, string>;
+  recoveryMessage?: string;
   onGestureStart: (id: string, kind: 'move' | 'left' | 'right', scale: number) => number | false;
   onGestureMove: (x: number, y: number) => void;
   onGestureActive: (token: number) => boolean;
@@ -18,16 +19,17 @@ export function textLayoutStyle(layer: CanvasTextLayer): React.CSSProperties {
     letterSpacing: 'normal', padding: 0, margin: 0, border: 0, boxSizing: 'border-box' };
 }
 export function CanvasTextOverlay(props: Props) {
-  const { document, size, editingId, activeId } = props;
+  const { document, size, editingId, activeId, recoveryMessage } = props;
+  const recovery = useRef<HTMLDivElement>(null);
   const [dockTop, setDockTop] = useState<number>();
-  useEffect(() => {
-    if (!editingId) return;
+  useLayoutEffect(() => {
+    if (!recoveryMessage) return;
     const viewport = window.visualViewport;
-    if (!viewport) { setDockTop(undefined); return; }
-    const place = () => setDockTop(Math.max(8, viewport.offsetTop + viewport.height - 60));
-    place(); viewport.addEventListener('resize', place); viewport.addEventListener('scroll', place);
-    return () => { viewport.removeEventListener('resize', place); viewport.removeEventListener('scroll', place); };
-  }, [editingId]);
+    const place = () => setDockTop(viewport ? Math.max(viewport.offsetTop + 8, viewport.offsetTop + viewport.height - (recovery.current?.getBoundingClientRect().height ?? 80) - 12) : undefined);
+    place(); const observer = new ResizeObserver(place); if (recovery.current) observer.observe(recovery.current);
+    viewport?.addEventListener('resize', place); viewport?.addEventListener('scroll', place);
+    return () => { observer.disconnect(); viewport?.removeEventListener('resize', place); viewport?.removeEventListener('scroll', place); };
+  }, [recoveryMessage]);
   return <div data-export-ignore="true" data-text-editor-ui style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 50 }}>
     <div data-text-logical-overlay style={{ position: 'absolute', width: size.width, height: size.height, transform: 'scale(var(--canvas-preview-scale, 1))', transformOrigin: 'top left', pointerEvents: 'none' }}>
       {document.layers.map(layer => <div key={layer.id}>{editingId === layer.id ? <InlineText {...props} layer={layer} /> : <button type="button" aria-label={`Edit text ${document.layers.indexOf(layer) + 1}`}
@@ -42,11 +44,10 @@ export function CanvasTextOverlay(props: Props) {
       {activeId === layer.id && <TextHandles {...props} layer={layer} />}
       </div>)}
     </div>
-    {editingId && <div data-text-edit-dock aria-label="Finish text editing" className="flex items-center gap-2 rounded-xl border border-slate-500 bg-slate-900 px-3 py-2 text-white shadow-lg"
-      style={{ position: 'fixed', top: dockTop, bottom: dockTop === undefined ? 12 : undefined, left: '50%', transform: 'translateX(-50%)', zIndex: 80, pointerEvents: 'auto', maxWidth: 'calc(100vw - 24px)' }}>
-      <span className="text-xs text-slate-300">Editing text</span>
-      <button type="button" onPointerDown={event => event.preventDefault()} onClick={props.onDone} className="rounded-lg bg-indigo-600 px-3 py-1 text-sm">Done</button>
-      <button type="button" data-text-cancel onPointerDown={event => event.preventDefault()} onClick={props.onCancel} className="rounded-lg border border-slate-500 px-3 py-1 text-sm">Cancel</button>
+    {recoveryMessage && <div ref={recovery} data-text-edit-recovery aria-label="Recover text edit" className="rounded-xl border border-rose-400 bg-slate-900 px-3 py-3 text-white shadow-lg"
+      style={{ position: 'fixed', top: dockTop, bottom: dockTop === undefined ? 12 : undefined, left: '50%', transform: 'translateX(-50%)', zIndex: 80, pointerEvents: 'auto', width: 'min(420px, calc(100vw - 24px))', maxWidth: 'calc(100vw - 24px)' }}>
+      <p role="alert" className="text-xs leading-relaxed">{recoveryMessage}</p>
+      <button type="button" data-text-cancel onPointerDown={event => event.preventDefault()} onClick={props.onCancel} className="mt-2 rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-100">Discard changes</button>
     </div>}
   </div>;
 }

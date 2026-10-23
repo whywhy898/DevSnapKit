@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { launchBrowser, preparePage, clickButton } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, clickButton, finishTextEditing } from './helpers/browser.mjs';
 const url=process.env.TEST_UI_URL;
 const output=path.resolve('../../output/devsnapkit/canvas-text-v1/geometry');
 const paint=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
@@ -64,7 +64,7 @@ test('T4 actual handle and native text input response protocol, 3 runs per 1/5/1
       const expectedContent='A'.repeat(length-1)+'B';
       const appliedInput=await page.evaluate(()=>({textarea:document.querySelector('[aria-label="Text content"]').value,renderer:document.querySelector('#studio-canvas [data-canvas-text]').textContent,document:window.__mockupBaseline.snapshot.textDocument.layers[0].content}));
       assert.equal(appliedInput.textarea,expectedContent,'The native input draft really changed');
-      await page.click('[data-text-edit-dock] button');
+      await finishTextEditing(page);
       await paint(page);
       const committedInput=await page.evaluate(()=>({renderer:document.querySelector('#studio-canvas [data-canvas-text]').textContent,document:window.__mockupBaseline.snapshot.textDocument.layers[0].content}));
       assert.equal(committedInput.renderer,expectedContent);assert.equal(committedInput.document,expectedContent);

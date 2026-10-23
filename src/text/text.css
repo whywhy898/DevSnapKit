@@ -3,6 +3,12 @@
 @font-face{font-family:'Poster Gelasio';src:url('/poster/fonts/Gelasio.ttf') format('truetype');font-style:normal;font-weight:400 700;font-display:swap}
 @font-face{font-family:'Poster Gelasio';src:url('/poster/fonts/Gelasio-Italic.ttf') format('truetype');font-style:italic;font-weight:400 700;font-display:swap}
 [data-canvas-text][data-trailing-newline="true"]::after{content:'\200b'}
+.canvas-text-delete{background-color:#dc2626;border-color:#b91c1c;color:#fff;cursor:pointer}
+.canvas-text-delete:hover{background-color:#b91c1c}
+.canvas-text-color-control{background-color:rgba(255,255,255,.04);border-color:#64748b;color:#f8fafc}
+.canvas-text-color-control:hover{border-color:#818cf8}
+.theme-light aside.studio-inspector .canvas-text-color-control{background-color:#fff;border-color:#94a3b8;color:#0f172a}
+.theme-light aside.studio-inspector .canvas-text-color-control:hover{border-color:#6366f1}
 [data-media-upload-enabled="false"] [data-scene-slot] .cursor-pointer{cursor:default}
 .theme-light aside.studio-inspector [data-canvas-text-controls] .canvas-text-field{background-color:#fff;border-color:#cbd5e1;color:#0f172a}
 .theme-light aside.studio-inspector [data-inspector-tabs]{background-color:#f1f5f9;border-color:#e2e8f0}

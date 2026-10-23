@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import { launchBrowser, preparePage, clickButton, downloadPng, revealInspectorControl } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, clickButton, downloadPng, revealInspectorControl, finishTextEditing, discardTextChanges } from './helpers/browser.mjs';
 const url = process.env.TEST_UI_URL;
 const output = path.resolve('../../output/devsnapkit/canvas-text-v1/geometry');
 const snapshot = page => page.evaluate(() => window.__mockupBaseline.snapshot);
@@ -12,7 +12,7 @@ async function withPage(fn) { const browser = await launchBrowser(); try { const
 async function field(page, name, value) { const selector = `[data-canvas-text-controls] [aria-label="${name}"]`; await revealInspectorControl(page, selector); const el = await page.$(selector); assert.ok(el, `${name} exists`); await el.focus(); await page.keyboard.down('Control'); await page.keyboard.press('a'); await page.keyboard.up('Control'); await page.keyboard.type(value); await page.keyboard.press('Enter'); }
 async function undo(page) { await page.focus('[aria-label="Move text"]'); await page.keyboard.down('Control'); await page.keyboard.press('z'); await page.keyboard.up('Control'); await paint(page); }
 async function fixture(page, recovery = false) {
-  await clickButton(page, 'Add text'); await clickButton(page, 'Done');
+  await clickButton(page, 'Add text'); await finishTextEditing(page);
   await page.evaluate(recovery => { const s = window.__mockupBaseline.snapshot, l = s.textDocument.layers[0]; window.__mockupBaseline.apply({ aspectRatioId: 'custom', customCanvasSize: { width: 1600, height: 1200 }, textDocument: { version: 1, layers: [{ ...l, content: recovery ? 'MMMMMMMMMMMM\nMMMMMMMMMMMM\nMMMMMMMMMMMM' : 'A title that reflows when its width changes', centerX: .5, centerY: recovery ? .2 : .5, widthRatio: recovery ? .6875 : .3, fontSize: recovery ? 80 : 48 }] } }); }, recovery);
   await page.waitForFunction(() => document.querySelector('#studio-canvas').offsetWidth === 1600); await page.evaluate(() => document.fonts.ready); await paint(page);
   await page.select('[aria-label="Current text"]', (await snapshot(page)).textDocument.layers[0].id);
@@ -42,7 +42,7 @@ test('T4 width reflows without font scaling, numeric invalid drafts stay local, 
   assert.ok(await page.$eval('[data-canvas-text]', el => el.offsetHeight) > originalHeight);
   await field(page, 'Text x', 'Infinity'); assert.equal((await snapshot(page)).textDocument.layers[0].centerX, .5);
   assert.equal(await page.$eval('[aria-label="Text x"]', el => el.value), 'Infinity'); assert.equal(await page.$eval('[aria-label="Text x"]', el => el.getAttribute('aria-invalid')), 'true');
-  await clickButton(page, 'Cancel'); await page.focus('[aria-label="Move text"]');
+  await discardTextChanges(page); await page.focus('[aria-label="Move text"]');
   for (let i = 0; i < 10; i++) await page.keyboard.down('ArrowRight'); await page.keyboard.up('ArrowRight');
   assert.ok(Math.abs((await snapshot(page)).textDocument.layers[0].centerX * 1600 - 810) < .01);
   await undo(page); assert.equal((await snapshot(page)).textDocument.layers[0].centerX, .5);
@@ -85,10 +85,10 @@ test('T4 recovered A to Twitter uses A; valid intermediate and history clear sta
   await clickButton(page, '1:1'); await paint(page); await page.click('[data-text-size-recovery]'); await paint(page);
   await clickButton(page, 'Twitter'); await paint(page);
   assert.match(await page.$eval('[data-text-size-recovery]', el => el.textContent), /1600×1200/);
-  await clickButton(page, 'Poster'); await paint(page); await clickButton(page, 'Mockup'); await paint(page);
+  await clickButton(page, 'Frame'); await paint(page); await clickButton(page, 'Text'); await paint(page);
   assert.match(await page.$eval('[data-text-size-recovery]', el => el.textContent), /1600×1200/);
   // Cancel a geometry draft must not be mistaken for Undo/Redo navigation.
-  await field(page, 'Text x', 'Infinity'); await clickButton(page, 'Cancel');
+  await field(page, 'Text x', 'Infinity'); await discardTextChanges(page);
   assert.match(await page.$eval('[data-text-size-recovery]', el => el.textContent), /1600×1200/);
   await page.click('[data-text-size-recovery]'); await paint(page);
   assert.deepEqual((await snapshot(page)).textDocument, original);
@@ -104,7 +104,7 @@ test('T4 initial invalid has no recovery promise and text editing remains access
   assert.ok(await page.$('[data-text-layout-errors]')); assert.equal(await page.$('[data-text-size-recovery]'), null);
   await clickButton(page, 'Text');
   await page.select('[aria-label="Current text"]', 'initial-invalid'); await clickButton(page,'Edit text');
-  assert.equal(await page.$eval('[aria-label="Text content"]', el => el.value), 'Outside'); await clickButton(page,'Done');
+  assert.equal(await page.$eval('[aria-label="Text content"]', el => el.value), 'Outside'); await finishTextEditing(page);
   await page.select('[aria-label="Current text"]', 'overlap'); await field(page,'Text y','400');
   assert.equal((await snapshot(page)).textDocument.layers[0].centerY,0);
 }));
@@ -115,7 +115,7 @@ test('T4 Auto upload recovery names image action and later edits use exact Custo
   await sharp({create:{width:1600,height:300,channels:3,background:'#654321'}}).png().toFile(wide);
   const upload = async file => { await page.$eval('[aria-label="Main screenshot file"]',el=>el.value=''); await (await page.$('[aria-label="Main screenshot file"]')).uploadFile(file); await page.waitForFunction(name=>window.__mockupBaseline.snapshot.imageName===name,{},path.basename(file)); await new Promise(r=>setTimeout(r,180)); await paint(page); };
   await upload(tall); await clickButton(page,'Auto'); await clickButton(page,'Add text');
-  await page.$eval('[aria-label="Text content"]', el => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'First line\nSecond line\nThird line'); el.dispatchEvent(new Event('input',{bubbles:true})); }); await clickButton(page,'Done');
+  await page.$eval('[aria-label="Text content"]', el => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'First line\nSecond line\nThird line'); el.dispatchEvent(new Event('input',{bubbles:true})); }); await finishTextEditing(page);
   const original=await page.$eval('#studio-canvas', el=>({width:el.offsetWidth,height:el.offsetHeight}));
   assert.equal(await page.$('[data-text-layout-errors]'),null);
   await upload(wide); await page.waitForSelector('[data-text-size-recovery]');
@@ -130,17 +130,17 @@ test('T4 Auto upload recovery names image action and later edits use exact Custo
 }));
 test('T4 Auto starter preset recovery accurately names the preset action and retains text ids', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await (await page.$('[aria-label="Main screenshot file"]')).uploadFile(path.resolve('../../output/devsnapkit/honeywerank-original.png'));await page.waitForFunction(()=>window.__mockupBaseline.snapshot.imageName==='honeywerank-original.png');await new Promise(r=>setTimeout(r,200));
-  await clickButton(page,'Add text');await clickButton(page,'Done');await page.evaluate(()=>{const layer=window.__mockupBaseline.snapshot.textDocument.layers[0];window.__mockupBaseline.apply({textDocument:{version:1,layers:[{...layer,content:'A\nB\nC',fontSize:100,centerY:.22,widthRatio:.6}]}});});await page.evaluate(()=>document.fonts.ready);await paint(page);assert.equal(await page.$('[data-text-layout-errors]'),null);
+  await clickButton(page,'Add text');await finishTextEditing(page);await page.evaluate(()=>{const layer=window.__mockupBaseline.snapshot.textDocument.layers[0];window.__mockupBaseline.apply({textDocument:{version:1,layers:[{...layer,content:'A\nB\nC',fontSize:100,centerY:.22,widthRatio:.6}]}});});await page.evaluate(()=>document.fonts.ready);await paint(page);assert.equal(await page.$('[data-text-layout-errors]'),null);
   const before=await snapshot(page),size=await page.$eval('#studio-canvas',el=>({width:el.offsetWidth,height:el.offsetHeight}));await page.click('button[title="Select starter demo template"]');await clickButton(page,'Code Terminal Dev');await page.waitForSelector('[data-text-size-recovery]');
   assert.match(await page.$eval('[data-text-size-recovery]',el=>el.textContent),new RegExp(`Undo preset change.*${size.width}×${size.height}`));await page.click('[data-text-size-recovery]');await paint(page);await paint(page);assert.equal((await snapshot(page)).imageName,before.imageName);assert.deepEqual((await snapshot(page)).textDocument,before.textDocument);assert.equal(await page.$('[data-text-layout-errors]'),null);
 }));
-test('T4 movement cannot run with other tools; Escape, scroll, mode and export end transactions', { skip: !url, timeout: 60000 }, () => withPage(async page => {
+test('T4 movement cannot run with other tools; Escape, scroll, Inspector and export end transactions', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await fixture(page); const initial=(await snapshot(page)).textDocument;
   const start = async () => { const h=await page.$('[aria-label="Move text"]'),b=await h.boundingBox();await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2+15,b.y+b.height/2);return h; };
   await start();await page.keyboard.press('Escape');await page.mouse.up();await paint(page);assert.deepEqual((await snapshot(page)).textDocument,initial);
   await start();await page.evaluate(()=>window.dispatchEvent(new Event('scroll')));await page.mouse.up();await paint(page);assert.deepEqual((await snapshot(page)).textDocument,initial);
-  await start(); await clickButton(page,'Poster');await page.mouse.up();await paint(page);assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),false);
-  await clickButton(page,'Mockup');await paint(page); await start(); await clickButton(page,'Export');await page.mouse.up();await paint(page);assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),false);
+  await start(); await clickButton(page,'Frame');await page.mouse.up();await paint(page);assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),false);
+  await clickButton(page,'Text');await paint(page); await start(); await clickButton(page,'Export');await page.mouse.up();await paint(page);assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),false);
 }));
 test('T4 camera, background, frame, duo, presets and reset retain independent text above artwork', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await fixture(page); const initial=(await snapshot(page)).textDocument;
@@ -163,7 +163,7 @@ test('T4 delayed actual Auto measurement retains upload commit identity after a 
   await sharp({create:{width:1600,height:1200,channels:3,background:'#123456'}}).png().toFile(tall);
   await sharp({create:{width:1600,height:300,channels:3,background:'#654321'}}).png().toFile(wide);
   await (await page.$('[aria-label="Main screenshot file"]')).uploadFile(tall);await page.waitForFunction(()=>window.__mockupBaseline.snapshot.imageName==='delayed-original.png');await new Promise(r=>setTimeout(r,200));await paint(page);
-  await clickButton(page,'Add text');await page.$eval('[aria-label="Text content"]',el=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'First line\nSecond line\nThird line');el.dispatchEvent(new Event('input',{bubbles:true}));});await clickButton(page,'Done');
+  await clickButton(page,'Add text');await page.$eval('[aria-label="Text content"]',el=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'First line\nSecond line\nThird line');el.dispatchEvent(new Event('input',{bubbles:true}));});await finishTextEditing(page);
   const before=await page.$eval('#studio-canvas',el=>({width:el.offsetWidth,height:el.offsetHeight}));
   // Test-only delivery gate holds the REAL renderer's measured natural size,
   // leaving image upload, decode, DOM layout and all editing handlers intact.
@@ -177,7 +177,7 @@ test('T4 delayed actual Auto measurement retains upload commit identity after a 
   await fs.writeFile(path.join(output,'delayed-auto-origin.json'),JSON.stringify({before,uploadCommit,styleCommit,label,after:{size:after.customCanvasSize,color:after.textDocument.layers[0].color,image:after.imageName},measurement:'Real FittedScene callback delivery held in test-only source transform'},null,2));
 }));
 test('T4 one padding range gesture with 100 input updates creates one commit and restores valid baseline dimensions', { skip: !url, timeout: 60000 }, () => withPage(async page => {
-  await clickButton(page,'Add text');await clickButton(page,'Done');await new Promise(r=>setTimeout(r,450));
+  await clickButton(page,'Add text');await finishTextEditing(page);await new Promise(r=>setTimeout(r,450));
   await clickButton(page, 'Frame');
   const before=await snapshot(page), initialHistory=await page.evaluate(()=>window.__mockupBaseline.history.count);
   const slider=await page.$('[aria-label="Canvas padding slider"]');await slider.evaluate(el=>el.scrollIntoView({block:'center'}));const box=await slider.boundingBox();await page.mouse.move(box.x+box.width*.5,box.y+box.height/2);await page.mouse.down();
@@ -188,7 +188,7 @@ test('T4 one padding range gesture with 100 input updates creates one commit and
   await undo(page);assert.equal((await snapshot(page)).padding,before.padding);assert.equal((await snapshot(page)).aspectRatioId,before.aspectRatioId);
 }));
 test('T4 invalid padding gesture recovery names and restores its full valid transaction baseline', { skip: !url, timeout: 60000 }, () => withPage(async page => {
-  await clickButton(page,'Add text');await clickButton(page,'Done');
+  await clickButton(page,'Add text');await finishTextEditing(page);
   await clickButton(page, 'Frame');
   await page.evaluate(()=>{const layer=window.__mockupBaseline.snapshot.textDocument.layers[0];window.__mockupBaseline.apply({padding:200,textDocument:{version:1,layers:[{...layer,content:'A\nB\nC',fontSize:160,centerY:.35,widthRatio:.6}]}});});await page.evaluate(()=>document.fonts.ready);await new Promise(r=>setTimeout(r,200));await paint(page);
   const before=await page.$eval('#studio-canvas',el=>({width:el.offsetWidth,height:el.offsetHeight}));assert.equal(await page.$('[data-text-layout-errors]'),null);await new Promise(r=>setTimeout(r,450));const count=await page.evaluate(()=>window.__mockupBaseline.history.count);
@@ -206,7 +206,7 @@ test('T4 numeric composition keeps native Enter and arrows local until compositi
   await page.$eval('[aria-label="Text width"]',el=>el.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true})));await page.keyboard.press('Enter');assert.equal((await snapshot(page)).textDocument.layers[0].widthRatio*1600,320);
 }));
 test('T4 physically clicked padding number keeps one focus transaction through typing and blur', { skip: !url, timeout: 60000 }, () => withPage(async page => {
-  await clickButton(page,'Add text');await clickButton(page,'Done');await new Promise(r=>setTimeout(r,450));const before=await snapshot(page),count=await page.evaluate(()=>window.__mockupBaseline.history.count);
+  await clickButton(page,'Add text');await finishTextEditing(page);await new Promise(r=>setTimeout(r,450));const before=await snapshot(page),count=await page.evaluate(()=>window.__mockupBaseline.history.count);
   await clickButton(page, 'Frame');
   await page.click('[aria-label="Canvas padding"]');assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),true,'Initial pointer release must not end number focus session');
   await page.keyboard.down('Control');await page.keyboard.press('a');await page.keyboard.up('Control');await page.keyboard.type('160');assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),true);
@@ -215,7 +215,7 @@ test('T4 physically clicked padding number keeps one focus transaction through t
 test('T4 an old pointer release cannot finish a newer style session', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await fixture(page);const handle=await page.$('[aria-label="Move text"]'),box=await handle.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+20,box.y+box.height/2);
   const input=await page.$('[data-canvas-text-controls] [aria-label="Text size"]');await input.focus();await page.keyboard.down('Control');await page.keyboard.press('a');await page.keyboard.up('Control');await page.keyboard.type('64');await page.mouse.up();await paint(page);
-  assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),true,'New style session still owns its transaction');await clickButton(page,'Cancel');assert.equal((await snapshot(page)).textDocument.layers[0].fontSize,48);assert.notEqual((await snapshot(page)).textDocument.layers[0].centerX,.5,'Completed movement remains committed');
+  assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),true,'New style session still owns its transaction');await discardTextChanges(page);assert.equal((await snapshot(page)).textDocument.layers[0].fontSize,48);assert.notEqual((await snapshot(page)).textDocument.layers[0].centerX,.5,'Completed movement remains committed');
 }));
 test('T4 old pointer completion cannot split a replacement keyboard gesture or cancel another pointer id', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await fixture(page);const initial=(await snapshot(page)).textDocument;const handle=await page.$('[aria-label="Move text"]'),box=await handle.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+20,box.y+box.height/2);await paint(page);

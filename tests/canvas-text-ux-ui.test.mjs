@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { launchBrowser, preparePage } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, finishTextEditing } from './helpers/browser.mjs';
 
 const url = process.env.TEST_UI_URL;
 const output = path.resolve('../../output/devsnapkit/canvas-text-v1/ux-review-fix');
@@ -26,12 +26,12 @@ test('UX text properties live in Inspector and remain usable at desktop and thre
       const page = await preparePage(browser, url, { viewport: { width, height: width < 600 ? 850 : 1100, deviceScaleFactor: 1 } });
       assert.equal(await page.$eval('[data-canvas-text-controls]', node => !!node.closest('.studio-inspector')), true, 'Full text properties belong to Inspector, not the canvas viewport');
       assert.equal(await page.$('.studio-canvas-viewport [aria-label="Text font"]'), null);
-      await button(page, 'Add text'); await click(page, '[data-text-edit-dock] button', 'Done');
+      await button(page, 'Add text'); await finishTextEditing(page);
       assert.equal(await page.$eval('[data-canvas-text-controls]', node => !!node.getClientRects().length), true);
       await button(page, 'Frame');
       await click(page, '[data-text-hit]');
       assert.equal(await page.$eval('[aria-label="Text content"]', node => node.value), 'Text');
-      await click(page, '[data-text-edit-dock] button', 'Done');
+      await finishTextEditing(page);
       const font = await page.$('[data-canvas-text-controls] [aria-label="Text font"]');
       await font.evaluate(node => node.scrollIntoView({ block: 'center' })); await font.select('gelasio'); await paint(page);
       assert.equal(await font.evaluate(node => !!node.getClientRects().length), true);
@@ -62,7 +62,7 @@ test('UX text artwork disables image click upload across frame variants while ex
       await page.mouse.click(bounds.x + bounds.width * .5, bounds.y + bounds.height * .7);
     };
     assert.equal(await chooserDuring(page, pictureClick), true, 'Old image-only canvas click remains available');
-    await button(page, 'Add text'); await click(page, '[data-text-edit-dock] button', 'Done');
+    await button(page, 'Add text'); await finishTextEditing(page);
     const rows = [];
     for (const theme of ['none', 'mac-dark', 'browser', 'macbook', 'studio-display', 'iphone-17', 'phone-clay']) {
       await page.evaluate(theme => window.__mockupBaseline.apply({ windowTheme: theme }), theme); await paint(page);

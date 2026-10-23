@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import { launchBrowser, preparePage, clickButton, revealInspectorControl } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, clickButton, revealInspectorControl, finishTextEditing } from './helpers/browser.mjs';
 
 const url = process.env.TEST_UI_URL;
 const output = path.resolve('../../output/devsnapkit/canvas-text-v1/outputs');
@@ -20,7 +20,7 @@ async function exportButton(page, label) {
   await clickButton(page, label);
 }
 async function fixture(page, { pro = true, narrow = false } = {}) {
-  await clickButton(page, 'Add text'); await clickButton(page, 'Done');
+  await clickButton(page, 'Add text'); await finishTextEditing(page);
   await page.evaluate(({ pro, narrow }) => {
     const s = window.__mockupBaseline.snapshot, layer = s.textDocument.layers[0];
     window.__mockupBaseline.apply({ aspectRatioId: 'custom', customCanvasSize: { width: 1600, height: 1200 }, bgType: 'transparent', vfxGlow: false,
@@ -71,7 +71,7 @@ test('T5 batch preflights every target before any download and keeps the whole e
   } finally { await browser.close(); }
 });
 
-test('T5 export lock blocks captured old range input, keyboard, paste and mode tools while real font preparation waits', { skip: !url, timeout: 90000 }, async () => {
+test('T5 export lock blocks captured old range input, keyboard, paste and Inspector tools while real font preparation waits', { skip: !url, timeout: 90000 }, async () => {
   const browser = await launchBrowser();
   let release;
   try {
@@ -100,7 +100,7 @@ test('T5 export lock blocks captured old range input, keyboard, paste and mode t
     await page.evaluate(() => {
       const dt = new DataTransfer(); dt.items.add(new File(['bad'], 'queued.png', { type: 'image/png' }));
       window.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }));
-      [...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Poster').click();
+      [...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Text').click();
     });
     await paint(page);
     assert.deepEqual(await snapshot(page), before, 'Ongoing controls cannot mutate the frozen editor while fonts wait');
@@ -322,7 +322,7 @@ test('T5 actual Set controls export 200×200, 8000×200 and 200×8000 without re
   try {
     const page = await preparePage(browser, url); await fixture(page, { pro: false });
     await page.evaluate(() => window.__mockupBaseline.apply({ hideMockup: true }));
-    await clickButton(page, 'Edit text'); await fill(page, '[aria-label="Text content"]', 'I', false); await clickButton(page, 'Done');
+    await clickButton(page, 'Edit text'); await fill(page, '[aria-label="Text content"]', 'I', false); await finishTextEditing(page);
     const stream = await downloads(page, 'extremes'), rows = [];
     for (const [width, height, size] of [[200, 200, 8], [8000, 200, 8], [200, 8000, 160]]) {
       await fill(page, 'input[aria-label="Canvas width"]', width, false); await fill(page, 'input[aria-label="Canvas height"]', height, false); await clickButton(page, 'Set');
@@ -368,7 +368,7 @@ test('T5 mobile 360/390/430 complete native composition, styles, positioning, hi
       const layout = () => page.evaluate(() => { const root = document.querySelector('#studio-canvas'), text = root.querySelector('[data-canvas-text]'); return { width: root.offsetWidth, height: root.offsetHeight, textWidth: text.offsetWidth, textHeight: text.offsetHeight, scale: root.getBoundingClientRect().width / root.offsetWidth }; });
       const keyboardBefore = await layout(); await page.setViewport({ width, height: 520, deviceScaleFactor: 1 }); await paint(page); const keyboardAfter = await layout();
       assert.deepEqual(keyboardAfter, keyboardBefore, 'Height-only viewport changes preserve logical layout and actual preview scale');
-      await page.evaluate(() => window.scrollTo(0, 200)); await clickButton(page, 'Done');
+      await page.evaluate(() => window.scrollTo(0, 200)); await finishTextEditing(page);
       await page.setViewport({ width, height: 850, deviceScaleFactor: 1 }); await paint(page);
       await page.select('[aria-label="Text font"]', 'gelasio'); await page.select('[aria-label="Text weight"]', '600'); await page.click('[aria-label="Text italic"]');
       await fill(page, '[data-canvas-text-controls] [aria-label="Text x"]', 550);
@@ -383,12 +383,12 @@ test('T5 mobile 360/390/430 complete native composition, styles, positioning, hi
       await page.keyboard.press('2'); await page.waitForFunction(() => window.__mockupBaseline.snapshot.layoutMode === 'duo');
       await (await page.$('input[aria-label="Second screenshot file"]')).uploadFile(path.resolve('../../output/devsnapkit/honeywerank-platforms.png'));
       await page.waitForFunction(() => window.__mockupBaseline.snapshot.secondaryName === 'honeywerank-platforms.png');
-      await page.focus('[aria-label="Move text"]'); await page.keyboard.press('1'); await clickButton(page, 'Poster'); await clickButton(page, 'Mockup');
+      await page.focus('[aria-label="Move text"]'); await page.keyboard.press('1'); await clickButton(page, 'Frame'); await clickButton(page, 'Text');
       assert.deepEqual((await snapshot(page)).snapshot.textDocument, documentBeforeDelete);
       // Rotation changes the real container width while retaining the text draft.
       await clickButton(page, 'Edit text'); await page.setViewport({ width: 850, height: width, deviceScaleFactor: 1 }); await paint(page);
       assert.equal(await page.$eval('[aria-label="Text content"]', el => el.value), content);
-      assert.equal((await layout()).textWidth, 640); await page.setViewport({ width, height: 850, deviceScaleFactor: 1 }); await paint(page); await clickButton(page, 'Done');
+      assert.equal((await layout()).textWidth, 640); await page.setViewport({ width, height: 850, deviceScaleFactor: 1 }); await paint(page); await finishTextEditing(page);
       const stream = await downloads(page, `mobile-${width}`);
       await page.$eval('.export-trigger-btn', button => button.click()); await paint(page);
       const geometry = await page.evaluate(() => ({ body: document.body.scrollWidth, html: document.documentElement.scrollWidth, viewport: innerWidth, menu: document.querySelector('.export-popover').getBoundingClientRect().toJSON() }));
@@ -463,7 +463,7 @@ test('T5 validation uses the actual centered offset box plus its lower scroll ex
   try {
     const page = await preparePage(browser, url); await fixture(page, { pro: false });
     await page.evaluate(() => window.__mockupBaseline.apply({ hideMockup: true }));
-    await clickButton(page, 'Edit text'); await fill(page, '[aria-label="Text content"]', 'I', false); await clickButton(page, 'Done');
+    await clickButton(page, 'Edit text'); await fill(page, '[aria-label="Text content"]', 'I', false); await finishTextEditing(page);
     await fill(page, '[aria-label="Canvas width"]', 200, false); await fill(page, '[aria-label="Canvas height"]', 210, false); await clickButton(page, 'Set');
     for (const [field, value] of [['Text size', 160], ['Text x', 100], ['Text y', 105], ['Text width', 160]]) await fill(page, `[data-canvas-text-controls] [aria-label="${field}"]`, value);
     await paint(page);
@@ -487,7 +487,7 @@ test('T5 font160 inline editing keeps the renderer origin while covering its com
   try {
     const page = await preparePage(browser, url); await fixture(page);
     await page.evaluate(() => window.__mockupBaseline.apply({ hideMockup: true }, { pro: true }));
-    await clickButton(page, 'Edit text'); await fill(page, '[aria-label="Text content"]', 'I', false); await clickButton(page, 'Done');
+    await clickButton(page, 'Edit text'); await fill(page, '[aria-label="Text content"]', 'I', false); await finishTextEditing(page);
     await fill(page, '[data-canvas-text-controls] [aria-label="Text size"]', 160);
     await clickButton(page, 'Edit text'); await paint(page);
     const measurements = await page.evaluate(() => {
@@ -512,7 +512,7 @@ test('T5 font160 inline editing keeps the renderer origin while covering its com
     await page.$eval('[aria-label="Text content"]', textarea => { textarea.setSelectionRange(0, 0); textarea.style.caretColor = 'transparent'; });
     const beforeFile = path.join(output, 'inline-font160.png'), afterFile = path.join(output, 'inline-font160-committed.png');
     await page.screenshot({ path: beforeFile, clip: await (await page.$('#studio-canvas')).boundingBox() });
-    await clickButton(page, 'Done'); await page.select('[aria-label="Current text"]', ''); await paint(page);
+    await finishTextEditing(page); await page.select('[aria-label="Current text"]', ''); await paint(page);
     await page.screenshot({ path: afterFile, clip: await (await page.$('#studio-canvas')).boundingBox() });
     const boxes = [];
     for (const file of [beforeFile, afterFile]) {
@@ -591,10 +591,10 @@ test('T5 CDP composition cancellation and over-limit drafts keep all text, with 
     await page.keyboard.press('Escape'); await clickButton(page, 'Edit text');
     await client.send('Input.insertText', { text: '无需键盘 API 🙂' });
     await page.setViewport({ width: 390, height: 520, deviceScaleFactor: 1 }); await paint(page);
-    const dock = await page.$eval('[data-text-edit-dock]', node => node.getBoundingClientRect().toJSON());
-    assert.ok(dock.x >= 0 && dock.right <= 390 && dock.y >= 0 && dock.bottom <= 520);
-    await clickButton(page, 'Done'); assert.equal((await snapshot(page)).snapshot.textDocument.layers[0].content, '无需键盘 API 🙂');
-    await fs.writeFile(path.join(output, 'ime-fallback.json'), JSON.stringify({ cancellationPreserved: true, completeDraftCodepoints: 1001, oldDocumentKept: true, dock, API: 'CDP Chromium; real iOS/physical OS IME untested' }, null, 2));
+    assert.equal(await page.$('[data-text-edit-dock]'), null, 'A valid draft has no floating actions without VisualViewport');
+    assert.equal(await page.$('[data-text-edit-recovery]'), null);
+    await finishTextEditing(page); assert.equal((await snapshot(page)).snapshot.textDocument.layers[0].content, '无需键盘 API 🙂');
+    await fs.writeFile(path.join(output, 'ime-fallback.json'), JSON.stringify({ cancellationPreserved: true, completeDraftCodepoints: 1001, oldDocumentKept: true, validDraftDockAbsent: true, API: 'CDP Chromium; real iOS/physical OS IME untested' }, null, 2));
     await client.detach();
   } finally { await browser.close(); }
 });
@@ -623,7 +623,7 @@ test('T5 indivisible grapheme overflow is checked on both horizontal sides in pr
     await browser.defaultBrowserContext().overridePermissions(new URL(url).origin, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
     const page = await preparePage(browser, url); await fixture(page);
     await page.evaluate(() => window.__mockupBaseline.apply({ hideMockup: true }, { pro: true }));
-    await clickButton(page, 'Edit text'); await fill(page, '[aria-label="Text content"]', 'W', false); await clickButton(page, 'Done');
+    await clickButton(page, 'Edit text'); await fill(page, '[aria-label="Text content"]', 'W', false); await finishTextEditing(page);
     await fill(page, '[aria-label="Canvas width"]', 200, false); await fill(page, '[aria-label="Canvas height"]', 400, false); await clickButton(page, 'Set');
     for (const [field, value] of [['Text size', 160], ['Text y', 200], ['Text width', 64]]) await fill(page, `[data-canvas-text-controls] [aria-label="${field}"]`, value);
     const stream = await downloads(page, 'horizontal'), rows = [];

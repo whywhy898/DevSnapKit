@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import {launchBrowser, preparePage, clickButton, downloadPng} from './helpers/browser.mjs';
+import {launchBrowser, preparePage, clickButton, downloadPng, legacyPosterUrl} from './helpers/browser.mjs';
 
 const directory = path.resolve('../../output/devsnapkit/poster-v1/export');
 const fixture = name => path.resolve(`tests/fixtures/poster-v1/${name}.png`);
@@ -51,8 +51,8 @@ async function compareRegions(preview, output) {
 test('Honey raw uploads, editable fields, own preview matching and multiple aspect downloads', {timeout:180000}, async()=>{
   const browser=await launchBrowser();const downloads=[];
   try {
-    const page=await preparePage(browser,process.env.TEST_UI_URL||'http://127.0.0.1:5179/?editor=1',{viewport:{width:2200,height:1650,deviceScaleFactor:1}});
-    await clickButton(page,'Poster');await page.waitForSelector('[data-poster-artwork]');
+    const page=await preparePage(browser,legacyPosterUrl(process.env.TEST_UI_URL||'http://127.0.0.1:5179/?editor=1'),{viewport:{width:2200,height:1650,deviceScaleFactor:1}});
+    await page.waitForSelector('[data-poster-artwork]');
     await upload(page,'main','honey-main');await upload(page,'detail','honey-detail');
     for(const [label,value] of [['Brand','HoneyWeRank'],['Headline','Be the\nbrand AI'],['Highlight','recommends.'],['Description','Content. Publishing. Backlinks.\nA sweeter way to get discovered.'],['CTA label','Join the waitlist'],['Website','honeywerank.com'],['Browser title','honeywerank.com'],['Badge','JOIN THE WAITLIST'],['Eyebrow','YOUR NEXT CHAPTER IN DISCOVERY'],['Detail heading','Publish content. Build authority.'],['Detail label','HOW IT WORKS · ILLUSTRATIVE WORKFLOW'],['Example data disclosure','Product preview · Dashboard contains illustrative sample data']]) await fill(page,label,value);
     await fs.mkdir(directory,{recursive:true});

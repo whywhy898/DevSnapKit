@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import { createHash } from 'node:crypto';
-import { launchBrowser, preparePage, clickButton, downloadPng } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, clickButton, downloadPng, legacyPosterUrl } from './helpers/browser.mjs';
 const url = process.env.PREVIEW_URL;
 if (!url) throw new Error('PREVIEW_URL is required.');
 const output = path.resolve('../../output/devsnapkit/poster-v1/preview');
@@ -17,8 +17,7 @@ assert.equal(response.headers.get('content-security-policy'), expectedPolicy);
 const browser = await launchBrowser(), downloads = [];
 try {
   for (const width of [1440, 1280, 390]) {
-    const page = await preparePage(browser, url, { viewport: { width, height: 1000, deviceScaleFactor: 1 } });
-    await clickButton(page, 'Poster');
+    const page = await preparePage(browser, legacyPosterUrl(url), { viewport: { width, height: 1000, deviceScaleFactor: 1 } });
     if (width === 390) await clickButton(page, 'Edit poster');
     for (const [role, name] of [['main', width === 390 ? 'phone' : 'honey-main'], ['detail', 'honey-detail']]) {
       const imagePath = width === 1280 ? path.resolve(`public/seo/examples/${role === 'main' ? 'astro' : 'github'}-original.png`) : fixture(name);
