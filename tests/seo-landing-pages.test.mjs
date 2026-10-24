@@ -5,6 +5,12 @@ import { readFileSync } from 'node:fs';
 const publicRoot = new URL('../public/', import.meta.url);
 const slugs = ['screenshot-beautifier', 'og-image-generator', 'product-hunt-image-maker', 'add-text-to-image'];
 const read = path => readFileSync(new URL(path, publicRoot), 'utf8');
+const editorEntries = {
+  'screenshot-beautifier': '/?editor=1',
+  'og-image-generator': '/?editor=1&amp;aspect=og',
+  'product-hunt-image-maker': '/?editor=1&amp;mode=duo&amp;aspect=og',
+  'add-text-to-image': '/?editor=1&amp;tool=text',
+};
 
 test('all landing pages expose a distinct, crawlable canonical document', () => {
   const titles = new Set();
@@ -27,7 +33,7 @@ test('all landing pages expose a distinct, crawlable canonical document', () => 
     assert.ok(html.includes('href="/seo/landing.css"'));
     assert.ok(html.includes('src="/seo/landing.js"'));
     for (const href of html.matchAll(/href="([^"#]+)"/g)) {
-      if (href[1].startsWith('/?')) assert.equal(href[1], '/?editor=1');
+      if (href[1].startsWith('/?')) assert.equal(href[1], editorEntries[slug], `${slug}: task entry`);
     }
     for (const target of slugs) assert.ok(html.includes(`href="/${target}/"`), `${slug} links ${target}`);
   }

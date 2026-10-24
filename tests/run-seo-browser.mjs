@@ -115,7 +115,8 @@ try {
   await page.goto(`${origin}/og-image-generator/`, { waitUntil: 'networkidle0' });
   await page.click('.hero-copy a.button');
   await page.waitForSelector('#studio-canvas');
-  assert.equal(new URL(page.url()).search, '?editor=1');
+  assert.equal(new URL(page.url()).search, '?editor=1&aspect=og');
+  assert.deepEqual(await page.$eval('#studio-canvas', node => ({ width: node.offsetWidth, height: node.offsetHeight })), { width: 1200, height: 630 });
   const tools = await page.$$eval('nav[aria-label="Screenshot tools"] a', nodes => nodes.map(node => new URL(node.href).pathname));
   for (const slug of slugs) assert.ok(tools.includes(`/${slug}/`), `editor footer: ${slug}`);
   results.editorEntry = { url: page.url(), canvas: true, toolLinks: tools };

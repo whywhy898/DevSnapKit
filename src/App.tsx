@@ -477,6 +477,8 @@ const CuratedThumbnail: React.FC<{
 };
 
 export default function App() {
+  // Entry presets are read once; subsequent user edits and history own the state.
+  const [entryParams] = useState(() => new URLSearchParams(window.location.search));
   // Preset Template State (default to Social Launch 'social')
   const initialPreset = MOCKUP_PRESETS.find(p => p.id === 'social') || MOCKUP_PRESETS[0];
   const [selectedPreset, setSelectedPreset] = useState<string>(initialPreset.id);
@@ -486,7 +488,8 @@ export default function App() {
 
   // Styling Customizations
   const [gradient, setGradient] = useState<PresetGradient>(GRADIENTS[0]);
-  const [aspectRatio, setAspectRatio] = useState<AspectOption>(ASPECT_RATIOS[0]);
+  const [aspectRatio, setAspectRatio] = useState<AspectOption>(() =>
+    ['og', 'twitter'].includes(entryParams.get('aspect') || '') ? ASPECT_RATIOS[1] : ASPECT_RATIOS[0]);
   const [customCanvasSize, setCustomCanvasSize] = useState<SceneSize>({ width: 1500, height: 900 });
   const [dimensionDraft, setDimensionDraft] = useState({ width: '1500', height: '900' });
   const [dimensionError, setDimensionError] = useState('');
@@ -512,8 +515,8 @@ export default function App() {
   // Dual-Image State (v2 Specification)
   const [secondarySrc, setSecondarySrc] = useState<string | null>(null);
   const [secondaryName, setSecondaryName] = useState<string>('');
-  const [layoutMode, setLayoutMode] = useState<'single' | 'duo'>('single');
-  const [studioMode] = useState<'mockup' | 'poster'>(() => new URLSearchParams(window.location.search).get('mode') === 'poster' ? 'poster' : 'mockup');
+  const [layoutMode, setLayoutMode] = useState<'single' | 'duo'>(() => entryParams.get('mode') === 'duo' ? 'duo' : 'single');
+  const [studioMode] = useState<'mockup' | 'poster'>(() => entryParams.get('mode') === 'poster' ? 'poster' : 'mockup');
   const [duoLayout, setDuoLayout] = useState<DuoLayoutType>('side');
   const [isSlot2Dragging, setIsSlot2Dragging] = useState<boolean>(false);
   const secondaryFileInputRef = useRef<HTMLInputElement>(null);
@@ -622,7 +625,7 @@ export default function App() {
   const [showDemoTemplatesMenu, setShowDemoTemplatesMenu] = useState<boolean>(false);
 
   // Interactive UI States
-  const [sidebarTab, setSidebarTab] = useState<'style' | 'background' | 'text' | 'brand' | 'export'>('style');
+  const [sidebarTab, setSidebarTab] = useState<'style' | 'background' | 'text' | 'brand' | 'export'>(() => entryParams.get('tool') === 'text' ? 'text' : 'style');
   const [copied, setCopied] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [showProModal, setShowProModal] = useState<boolean>(false);
