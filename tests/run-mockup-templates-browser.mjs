@@ -67,9 +67,9 @@ async function png(page, filename, width, height) {
     const measure = canvas => {
       const scale = canvas.getBoundingClientRect().width / canvas.offsetWidth;
       const bounds = canvas.getBoundingClientRect();
-      return [...canvas.querySelectorAll('[data-canvas-text], [data-scene-fit]')].map(node => {
+      return [...canvas.querySelectorAll('[data-canvas-text], [data-scene-inner], [data-scene-bounds], [data-scene-slot], [data-media-surface], [data-media-surface] img')].map((node, index) => {
         const r = node.getBoundingClientRect();
-        return { key: node.getAttribute('data-canvas-text') || 'media', x: (r.x - bounds.x) / scale, y: (r.y - bounds.y) / scale, w: r.width / scale, h: r.height / scale, font: getComputedStyle(node).fontFamily, weight: getComputedStyle(node).fontWeight };
+        return { key: node.getAttribute('data-canvas-text') || `media-${index}`, x: (r.x - bounds.x) / scale, y: (r.y - bounds.y) / scale, w: r.width / scale, h: r.height / scale, font: getComputedStyle(node).fontFamily, weight: getComputedStyle(node).fontWeight };
       });
     };
     window.__previewGeometry = measure(document.querySelector('#studio-canvas'));
