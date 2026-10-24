@@ -1,4 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { flushSync } from 'react-dom';
+import type { PrimaryMediaOrigin, TemplateContext } from './templates/types';
+import { buildSocialLaunchSnapshot, SOCIAL_SAMPLE } from './templates/apply';
+import { TemplateMenu } from './templates/TemplateMenu';
 import { 
   Download, Copy, Upload, Check, Sliders, SlidersHorizontal,
   Lock, Zap, ShieldCheck, 
@@ -484,6 +488,9 @@ export default function App() {
   const [selectedPreset, setSelectedPreset] = useState<string>(initialPreset.id);
   const [imageSrc, setImageSrc] = useState<string>(initialPreset.svgDataUri);
   const [imageName, setImageName] = useState<string>('social-launch.svg');
+  const [templateContext, setTemplateContext] = useState<TemplateContext | null>(null);
+  const [primaryMediaOrigin, setPrimaryMediaOrigin] = useState<PrimaryMediaOrigin>({ kind: 'builtin', sampleId: initialPreset.id });
+  const applyingTemplate = useRef(false);
   const [, setImageNaturalSize] = useState<{ width: number; height: number }>({ width: 820, height: 480 });
 
   // Styling Customizations
@@ -672,6 +679,7 @@ export default function App() {
     if (bgType !== 'image') artworkTasks.current!.clear('background');
   }, [bgType]);
   const currentSnapshot: EditorSnapshot = useMemo(() => ({
+    templateContext, primaryMediaOrigin,
     textDocument,
     gradientId: gradient.id,
     selectedPreset,
@@ -724,6 +732,7 @@ export default function App() {
     imageOffsetX,
     imageOffsetY,
   }), [
+    templateContext, primaryMediaOrigin,
     textDocument, gradient.id, selectedPreset, imageSrc, imageName, windowTheme, windowTitle,
     padding, roundedCorners, shadowLevel, shadowOpacity, activeCuratedLayout,
     cornerStyle, layoutPreset, aspectRatio.id, customCanvasSize, secondarySrc, secondaryName,
@@ -738,6 +747,8 @@ export default function App() {
   const handleRestoreSnapshot = useCallback((snap: EditorSnapshot) => {
     for (const key of ['main', 'secondary', 'background', 'logo', 'qr']) artworkTasks.current!.clear(key);
     setTextDocument(snap.textDocument ?? emptyTextDocument());
+    setTemplateContext(snap.templateContext ?? null);
+    setPrimaryMediaOrigin(snap.primaryMediaOrigin ?? { kind: 'unknown' });
     if (snap.gradientId) setGradient(GRADIENTS.find(g => g.id === snap.gradientId) ?? GRADIENTS[0]);
     setSelectedPreset(snap.selectedPreset);
     setImageSrc(snap.imageSrc);
@@ -787,7 +798,7 @@ export default function App() {
     setMockupZoom(snap.mockupZoom ?? 100);
     setMockupOffsetX(snap.mockupOffsetX ?? 0);
     setMockupOffsetY(snap.mockupOffsetY ?? 0);
-    // Image Fit & Position 区域已隐藏，历史快照中的裁剪值一律归零，避免不可逆的"神秘裁剪"
+    // Hidden crop controls retain their canonical reset on every history restore.
     setImageZoom(100);
     setImageOffsetX(0);
     setImageOffsetY(0);
@@ -1132,10 +1143,10 @@ export default function App() {
       const img = await decodeArtworkImage(dataUrl);
       return { dataUrl, width: img.naturalWidth, height: img.naturalHeight };
     }, ({ dataUrl, width, height }) => {
-      setImageSrc(dataUrl); setImageName(fileName);
+      setImageSrc(dataUrl); setImageName(fileName); setPrimaryMediaOrigin({ kind: 'user' });
       setImageNaturalSize({ width, height });
       // Auto-detect mobile screenshot: if height exceeds width by 15%, auto-select iPhone 17 frame
-      if (height > width * 1.15) {
+      if (!templateContext && height > width * 1.15) {
         setWindowTheme('iphone-17');
       }
     });
@@ -1540,6 +1551,7 @@ export default function App() {
 
   // Handle Reset to Default Studio Styling
   const handleReset = () => {
+    setTemplateContext(null);
     for (const key of ['main', 'secondary', 'background', 'logo', 'qr']) artworkTasks.current!.clear(key);
     setPadding(88);
     setAspectRatio(ASPECT_RATIOS[0]);
@@ -1664,8 +1676,20 @@ export default function App() {
   // Handle Starter Preset Template Application
   const handleApplyPreset = (preset: typeof MOCKUP_PRESETS[0]) => {
     artworkTasks.current!.clear('main');
+    if (templateContext) {
+      void artworkTasks.current!.run('main', 'Sample screenshot', () => decodeArtworkImage(preset.svgDataUri), image => {
+        setSelectedPreset(preset.id);
+        setImageSrc(preset.svgDataUri);
+        setPrimaryMediaOrigin({ kind: 'builtin', sampleId: preset.id });
+        setImageName(preset.id + '.svg');
+        setImageNaturalSize({ width: image.naturalWidth, height: image.naturalHeight });
+      });
+      trackEvent('preset_change', { preset: preset.id, name: preset.name });
+      return;
+    }
     setSelectedPreset(preset.id);
     setImageSrc(preset.svgDataUri);
+    setPrimaryMediaOrigin({ kind: 'builtin', sampleId: preset.id });
     setImageName(preset.id + '.svg');
     setWindowTitle(preset.title);
     if (preset.id === 'mobile') {
@@ -1682,6 +1706,35 @@ export default function App() {
       setImageNaturalSize({ width: 820, height: 480 });
     }
     trackEvent('preset_change', { preset: preset.id, name: preset.name });
+  };
+
+  const handleApplySocialTemplate = async () => {
+    if (applyingTemplate.current || exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) {
+      setTextError('Finish the current image, canvas, or export operation before applying a template.'); return;
+    }
+    applyingTemplate.current = true;
+    try {
+      // Decode the real sample; image geometry must never depend on catalog guesses.
+      const sample = await decodeArtworkImage(SOCIAL_SAMPLE.svgDataUri);
+      if (exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) {
+        setTextError('Finish the current operation before applying a template.'); return;
+      }
+      let valid = false;
+      flushSync(() => { valid = textEditor.finish(); });
+      if (!valid || editorHistory.isInTransaction()) return;
+      const before = editorHistory.getLatestSnapshot();
+      const roles = before.templateContext?.id === 'social-launch' ? before.templateContext.textRoles : {
+        headline: crypto.randomUUID(), description: crypto.randomUUID(),
+      };
+      const next = buildSocialLaunchSnapshot(before, roles);
+      if (editorHistory.applyCommand(next)) {
+        if (before.primaryMediaOrigin?.kind === 'builtin') setImageNaturalSize({ width: sample.naturalWidth, height: sample.naturalHeight });
+        setDimensionError(''); setTextError('');
+      }
+      setShowDemoTemplatesMenu(false);
+    } catch {
+      setTextError('The template screenshot could not be prepared. Try again.');
+    } finally { applyingTemplate.current = false; }
   };
 
   // Handle Random Background Palette Shuffle (Pro-aware)
@@ -2144,9 +2197,11 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               <button
                 type="button"
                 onClick={() => setShowDemoTemplatesMenu(!showDemoTemplatesMenu)}
-                className="h-full px-2 rounded-r-xl border border-white/15 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center"
-                title="Select starter demo template"
+                className="h-full px-2 rounded-r-xl border border-white/15 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center gap-1 text-xs font-semibold"
+                title="Templates"
+                aria-label="Templates"
               >
+                <span>Templates</span>
                 <ChevronDown className={`w-3 h-3 transition-transform ${showDemoTemplatesMenu ? 'rotate-180' : ''}`} />
               </button>
 
@@ -2154,29 +2209,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               {showDemoTemplatesMenu && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowDemoTemplatesMenu(false)} />
-                  <div className="starter-demo-popover absolute bottom-full mb-2 left-0 w-52 bg-slate-900 border border-slate-700/80 rounded-xl p-1.5 shadow-2xl z-50 space-y-0.5 backdrop-blur-xl">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-white/40 px-2 py-1">
-                      Starter Demos
-                    </div>
-                    {MOCKUP_PRESETS.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => {
-                          handleApplyPreset(p);
-                          setShowDemoTemplatesMenu(false);
-                        }}
-                        className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
-                          selectedPreset === p.id && imageSrc === p.svgDataUri
-                            ? 'bg-indigo-600/30 text-indigo-200 border border-indigo-500/30 font-bold'
-                            : 'text-slate-300 hover:text-white hover:bg-white/10'
-                        }`}
-                      >
-                        <span>{p.name}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">{p.badge}</span>
-                      </button>
-                    ))}
-                  </div>
+                  <TemplateMenu onApply={handleApplySocialTemplate} disabled={isExporting} />
                 </>
               )}
             </div>
@@ -2437,7 +2470,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
                   {/* Quick Starter Demos */}
                   <div className="pt-1.5 border-t border-white/[0.06] flex items-center justify-between gap-1">
-                    <span className="text-[11px] text-white/40 font-medium">Starter Demo:</span>
+                    <span className="text-[11px] text-white/40 font-medium">Sample image:</span>
                     <div className="flex items-center gap-1">
                       {MOCKUP_PRESETS.map((p) => (
                         <button
@@ -2449,7 +2482,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                               ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 font-semibold'
                               : 'text-white/50 hover:text-white hover:bg-white/10 border border-transparent'
                           }`}
-                          title={`Load "${p.name}" starter template`}
+                          title={`Load "${p.name}" sample image`}
                         >
                           {p.name.split(' ')[0]}
                         </button>

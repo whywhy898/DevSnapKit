@@ -4,8 +4,11 @@ import type { CanvasTextDocument } from './text/types';
 import { WindowTheme } from './MockupUnit';
 import { CornerStyle, LayoutPreset } from './stylePresets';
 import { DuoLayoutType } from './DuoThumbnail';
+import type { PrimaryMediaOrigin, TemplateContext } from './templates/types';
 
 export interface EditorSnapshot {
+  templateContext?: TemplateContext | null;
+  primaryMediaOrigin?: PrimaryMediaOrigin;
   textDocument: CanvasTextDocument;
   gradientId: string;
   selectedPreset: string;
@@ -110,14 +113,22 @@ export function useEditorHistory(
     if (!target) return false;
     stopTimer(); apply(target, true); return true;
   }, [stopTimer, apply]);
+  // Explicit commands enter history before restoring React state. Immediate
+  // navigation therefore works even before the restored render is acknowledged.
+  const applyCommand = useCallback((snapshot: EditorSnapshot) => {
+    const h = history.current!;
+    if (awaiting.current || h.inTransaction || h.equal(latest.current, snapshot)) return false;
+    stopTimer(); h.flush(latest.current); h.flush(snapshot); apply(snapshot); return true;
+  }, [stopTimer, apply]);
   const pending = !history.current.equal(history.current.current, currentSnapshot);
   return { canUndo: history.current.canUndo || pending, canRedo: history.current.canRedo && !pending,
     historyCount: history.current.count, historyIndex: history.current.index,
-    undo, redo, flush, beginTransaction, commitTransaction, cancelTransaction,
+    undo, redo, flush, beginTransaction, commitTransaction, cancelTransaction, applyCommand,
     undoCommit, getCommitId: () => history.current!.currentCommitId,
     navigationRevision,
     isCurrentCommit: (id: number) => !history.current!.inTransaction && history.current!.currentCommitId === id && history.current!.equal(history.current!.current, latest.current),
     getCommittedSnapshot: () => history.current!.current,
+    getLatestSnapshot: () => latest.current,
     getPreviousSnapshot: () => history.current!.previous,
     isInTransaction: () => history.current!.inTransaction };
 }

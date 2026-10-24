@@ -52,6 +52,32 @@ test('same-value cancel and empty undo do not stall subsequent effect recording'
   }
 });
 
+test('explicit template command records once and supports immediate undo and redo', () => {
+  const h = harness();
+  h.edit(1);
+  assert.equal(h.api.applyCommand({ v: 2 }), true);
+  h.render();
+  assert.equal(h.api.historyCount, 3, 'pending user edit is preserved before the command');
+  assert.equal(h.api.applyCommand({ v: 2 }), false, 'identical reapply is a no-op');
+  h.api.undo(); h.render();
+  assert.equal(h.snapshot.v, 1);
+  h.api.redo(); h.render();
+  assert.equal(h.snapshot.v, 2);
+  h.tick();
+  assert.equal(h.api.historyCount, 3, 'debounce must not duplicate an explicit command');
+});
+
+test('explicit command refuses an active draft and waits for restore acknowledgement', () => {
+  const h = harness({ delayedRestore: true });
+  h.api.beginTransaction();
+  assert.equal(h.api.applyCommand({ v: 1 }), false);
+  h.api.commitTransaction();
+  assert.equal(h.api.applyCommand({ v: 1 }), true);
+  assert.equal(h.api.applyCommand({ v: 2 }), false);
+  h.acknowledgeRestore();
+  assert.equal(h.api.applyCommand({ v: 2 }), true);
+});
+
 test('delayed restore acknowledgement suppresses recording until the restored render actually arrives', () => {
   const h = harness({ delayedRestore: true });
   h.edit(1); h.tick(); h.edit(2); h.tick();

@@ -14,7 +14,7 @@ const noop = () => {};
 
 /** Copy artwork inputs independently of selection and editing UI. */
 export function freezeArtworkProps(props: MockupArtworkProps): MockupArtworkProps {
-  return { ...props, textDocument: structuredClone(props.textDocument), canvasLogicalSize: { ...props.canvasLogicalSize },
+  return { ...props, templateContext: props.templateContext ? structuredClone(props.templateContext) : null, textDocument: structuredClone(props.textDocument), canvasLogicalSize: { ...props.canvasLogicalSize },
     gradient: { ...props.gradient }, zoomStyle: { ...props.zoomStyle }, canvasRef: null, emptySlot: null, editingTextId: null,
     onReplace: noop, onReplaceSecondary: noop, handleNaturalSceneSize: noop, preview: false };
 }

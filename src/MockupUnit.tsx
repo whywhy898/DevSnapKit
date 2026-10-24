@@ -27,6 +27,7 @@ export interface MockupUnitProps {
   windowTitleStyle?: React.CSSProperties;
   hideFrame?: boolean;
   zoomStyle?: React.CSSProperties;
+  mediaFit?: 'contain';
 }
 
 export const getDeviceBoxShadow = (level: string, opacityPercent: number) => {
@@ -114,6 +115,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
   windowTitleStyle,
   hideFrame = false,
   zoomStyle,
+  mediaFit,
 }) => {
   const onReplace = interactive ? requestReplace : undefined;
   const replaceTitle = onReplace ? 'Click to replace screenshot (or paste via Ctrl+V)' : undefined;
@@ -142,7 +144,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
         <img 
           src={imageSrc} 
           alt={imageName}
-          style={zoomStyle}
+          style={{ ...zoomStyle, ...(mediaFit ? { objectFit: mediaFit, objectPosition: 'center' } : {}) }}
           className={`w-full ${isPhone ? 'h-full' : 'h-auto'} object-cover block select-none pointer-events-none`}
         />
         {interactive && onReplace && <MediaHoverOverlay />}
@@ -176,7 +178,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
               <img 
                 src={imageSrc} 
                 alt={imageName}
-                style={zoomStyle}
+                style={{ ...zoomStyle, ...(mediaFit ? { objectFit: mediaFit, objectPosition: 'center' } : {}) }}
                 className="w-full h-full object-cover object-top block select-none pointer-events-none"
               />
 
@@ -233,7 +235,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
               <img 
                 src={imageSrc} 
                 alt={imageName}
-                style={zoomStyle}
+                style={{ ...zoomStyle, ...(mediaFit ? { objectFit: mediaFit, objectPosition: 'center' } : {}) }}
                 className="w-full h-full object-cover object-top block select-none pointer-events-none"
               />
 
@@ -319,7 +321,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
                 <img 
                   src={imageSrc} 
                   alt={imageName}
-                  style={zoomStyle}
+                  style={{ ...zoomStyle, ...(mediaFit ? { objectFit: mediaFit, objectPosition: 'center' } : {}) }}
                   className="w-full h-full object-cover object-top block select-none pointer-events-none"
                 />
 
@@ -355,7 +357,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
               <img 
                 src={imageSrc} 
                 alt={imageName}
-                style={zoomStyle}
+                style={{ ...zoomStyle, ...(mediaFit ? { objectFit: mediaFit, objectPosition: 'center' } : {}) }}
                 className="w-full h-full object-cover object-top block select-none pointer-events-none"
               />
               {interactive && onReplace && <MediaHoverOverlay />}
@@ -403,7 +405,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
             <img 
               src={imageSrc} 
               alt={imageName}
-              style={zoomStyle}
+              style={{ ...zoomStyle, ...(mediaFit ? { objectFit: mediaFit, objectPosition: 'center' } : {}) }}
               className="w-full h-auto object-cover block select-none pointer-events-none"
             />
             {interactive && onReplace && <MediaHoverOverlay />}
@@ -445,7 +447,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
             <img 
               src={imageSrc} 
               alt={imageName}
-              style={zoomStyle}
+              style={{ ...zoomStyle, ...(mediaFit ? { objectFit: mediaFit, objectPosition: 'center' } : {}) }}
               className="w-full h-auto object-cover block select-none pointer-events-none"
             />
             {interactive && onReplace && <MediaHoverOverlay />}

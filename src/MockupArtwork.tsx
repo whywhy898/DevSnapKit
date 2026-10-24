@@ -6,6 +6,7 @@ import { CanvasTextLayerRenderer } from './text/CanvasTextLayerRenderer';
 
 export interface MockupArtworkProps extends Pick<EditorSnapshot,
   | 'textDocument'
+  | 'templateContext'
   | 'bgType'
   | 'isCustomGradient'
   | 'selectedPattern'
@@ -68,6 +69,7 @@ export interface MockupArtworkProps extends Pick<EditorSnapshot,
 /** Original artwork tree; App retains the stage, state, history and export ownership. */
 export function MockupArtwork({
   textDocument,
+  templateContext,
   preview = true,
   editingTextId,
   bgType,
@@ -220,6 +222,7 @@ export function MockupArtwork({
       )}
 
       <FittedScene
+        mediaRegion={templateContext?.mediaRegion}
         measurementKey={sceneMeasurementKey}
         width={canvasLogicalSize.width} height={canvasLogicalSize.height}
         paddingX={effectivePaddingX} paddingY={effectivePaddingY}
@@ -228,6 +231,7 @@ export function MockupArtwork({
         projection={layoutPreset} onNaturalSize={handleNaturalSceneSize}
       >
         <DeviceComposition
+          mediaFit={templateContext ? 'contain' : undefined}
           mode={layoutMode} duoLayout={duoLayout}
           theme={windowTheme} imageSrc={imageSrc} imageName={imageName}
           interactive={preview && textDocument.layers.length === 0}

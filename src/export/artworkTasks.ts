@@ -6,6 +6,7 @@ type Task = { pending: boolean; done: Promise<void>; error?: Error };
 export class ArtworkTasks {
   private tasks = new Map<string, Task>();
   revision = 0;
+  get pending() { return [...this.tasks.values()].some(task => task.pending); }
   constructor(private onError: (message: string) => void) {}
   clear(key: string) { if (this.tasks.delete(key)) this.revision++; }
   run<T>(key: string, label: string, prepare: () => Promise<T>, apply: (value: T) => void) {

@@ -2,6 +2,7 @@ import React, { useLayoutEffect, useRef, useState } from 'react';
 import { MockupUnit, MockupUnitProps } from './MockupUnit';
 import { DuoLayoutType } from './DuoThumbnail';
 import { getLayoutTransform, LayoutPreset } from './stylePresets';
+import type { MediaRegion } from './templates/types';
 
 export interface SceneSize { width: number; height: number }
 interface Bounds extends SceneSize { x: number; y: number }
@@ -82,6 +83,7 @@ export function DeviceComposition({ mode, duoLayout, secondarySrc, secondaryName
 }
 
 interface FittedSceneProps extends SceneSize {
+  mediaRegion?: MediaRegion;
   measurementKey?: unknown;
   paddingX: number;
   paddingY: number;
@@ -95,7 +97,7 @@ interface FittedSceneProps extends SceneSize {
 }
 
 /** Measures the complete composition, including hardware, rotated slots and backplates. */
-export function FittedScene({ width, height, paddingX, paddingY, basisWidth, zoom, offsetX, offsetY, projection, onNaturalSize, children, measurementKey = children }: FittedSceneProps) {
+export function FittedScene({ width, height, paddingX, paddingY, basisWidth, zoom, offsetX, offsetY, projection, onNaturalSize, children, mediaRegion, measurementKey = children }: FittedSceneProps) {
   const origin = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState<Bounds>({ x: 0, y: 0, width: basisWidth, height: 600 });
   useLayoutEffect(() => {
@@ -141,12 +143,14 @@ export function FittedScene({ width, height, paddingX, paddingY, basisWidth, zoo
     schedule();
     return () => { cancelAnimationFrame(raf); observer.disconnect(); el.removeEventListener('load', schedule, true); document.fonts.removeEventListener('loadingdone', schedule); };
   }, [measurementKey, basisWidth, projection, onNaturalSize]);
-  const innerW = Math.max(1, width - 2 * paddingX), innerH = Math.max(1, height - 2 * paddingY);
+  const paddedW = Math.max(1, width - 2 * paddingX), paddedH = Math.max(1, height - 2 * paddingY);
+  const region = mediaRegion ?? { x: 0, y: 0, width: 1, height: 1 };
+  const innerW = paddedW * region.width, innerH = paddedH * region.height;
   // The measurement basis is fixed, not the canvas width; fit may therefore grow
   // as well as shrink. The composition keeps its own proportions in either case.
   const fit = Math.min(innerW / bounds.width, innerH / bounds.height);
   return (
-    <div data-scene-inner style={{ position: 'absolute', left: paddingX, top: paddingY, width: innerW, height: innerH }}>
+    <div data-scene-inner style={{ position: 'absolute', left: paddingX + region.x * paddedW, top: paddingY + region.y * paddedH, width: innerW, height: innerH }}>
       <div data-scene-camera style={{ position: 'absolute', inset: 0, transform: `translate(${offsetX}%, ${offsetY}%) scale(${zoom / 100})`, transformOrigin: 'center' }}>
         <div data-scene-fit={fit} style={{ position: 'absolute', left: '50%', top: '50%', width: 0, height: 0, transform: `scale(${fit})` }}>
           <div ref={origin} className="artwork-origin" style={{ position: 'absolute', width: basisWidth, left: -bounds.x - bounds.width / 2, top: -bounds.y - bounds.height / 2 }}>
