@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { flushSync } from 'react-dom';
-import type { PrimaryMediaOrigin, TemplateContext } from './templates/types';
-import { buildSocialLaunchSnapshot, SOCIAL_SAMPLE } from './templates/apply';
+import type { PrimaryMediaOrigin, TemplateContext, MockupTemplate } from './templates/types';
+import { buildTemplateSnapshot, restoreTemplateLayout, releaseTemplateMediaRegion } from './templates/apply';
+import { getTemplate } from './templates/catalog';
+import { equalValues } from './editorHistory';
 import { TemplateMenu } from './templates/TemplateMenu';
 import { 
   Download, Copy, Upload, Check, Sliders, SlidersHorizontal,
@@ -491,6 +493,7 @@ export default function App() {
   const [templateContext, setTemplateContext] = useState<TemplateContext | null>(null);
   const [primaryMediaOrigin, setPrimaryMediaOrigin] = useState<PrimaryMediaOrigin>({ kind: 'builtin', sampleId: initialPreset.id });
   const applyingTemplate = useRef(false);
+  const [preparingTemplate, setPreparingTemplate] = useState(false);
   const [, setImageNaturalSize] = useState<{ width: number; height: number }>({ width: 820, height: 480 });
 
   // Styling Customizations
@@ -670,8 +673,9 @@ export default function App() {
   const exportAdmissionError = useRef('');
   const capturedPointers = useRef(new Map<number, HTMLElement>());
   const frozenArtwork = useRef<MockupArtworkProps | null>(null);
+  const [assetBusy, setAssetBusy] = useState(false);
   const artworkTasks = useRef<ArtworkTasks>();
-  artworkTasks.current ??= new ArtworkTasks(message => setTextError(message));
+  artworkTasks.current ??= new ArtworkTasks(message => setTextError(message), setAssetBusy);
   const latestExportInputs = useRef<{ artwork: MockupArtworkProps; snapshot: EditorSnapshot; auto: SceneSize; custom: SceneSize } | null>(null);
   useEffect(() => {
     // Changing away from image background is newer intent than an unfinished
@@ -1676,46 +1680,26 @@ export default function App() {
   // Handle Starter Preset Template Application
   const handleApplyPreset = (preset: typeof MOCKUP_PRESETS[0]) => {
     artworkTasks.current!.clear('main');
-    if (templateContext) {
-      void artworkTasks.current!.run('main', 'Sample screenshot', () => decodeArtworkImage(preset.svgDataUri), image => {
-        setSelectedPreset(preset.id);
-        setImageSrc(preset.svgDataUri);
-        setPrimaryMediaOrigin({ kind: 'builtin', sampleId: preset.id });
-        setImageName(preset.id + '.svg');
-        setImageNaturalSize({ width: image.naturalWidth, height: image.naturalHeight });
-      });
-      trackEvent('preset_change', { preset: preset.id, name: preset.name });
-      return;
-    }
-    setSelectedPreset(preset.id);
-    setImageSrc(preset.svgDataUri);
-    setPrimaryMediaOrigin({ kind: 'builtin', sampleId: preset.id });
-    setImageName(preset.id + '.svg');
-    setWindowTitle(preset.title);
-    if (preset.id === 'mobile') {
-      setWindowTheme('iphone-17');
-      setImageNaturalSize({ width: 393, height: 852 });
-    } else if (preset.id === 'code') {
-      setWindowTheme('mac-dark');
-      setImageNaturalSize({ width: 800, height: 480 });
-    } else if (preset.id === 'saas') {
-      setWindowTheme('none');
-      setImageNaturalSize({ width: 860, height: 520 });
-    } else {
-      setWindowTheme('none');
-      setImageNaturalSize({ width: 820, height: 480 });
-    }
+    void artworkTasks.current!.run('main', 'Sample screenshot', () => decodeArtworkImage(preset.svgDataUri), image => {
+      setSelectedPreset(preset.id); setImageSrc(preset.svgDataUri);
+      setPrimaryMediaOrigin({ kind: 'builtin', sampleId: preset.id });
+      setImageName(preset.id + '.svg');
+      setImageNaturalSize({ width: image.naturalWidth, height: image.naturalHeight });
+    });
     trackEvent('preset_change', { preset: preset.id, name: preset.name });
   };
 
-  const handleApplySocialTemplate = async () => {
+  const handleApplyTemplate = async (template: MockupTemplate) => {
     if (applyingTemplate.current || exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) {
       setTextError('Finish the current image, canvas, or export operation before applying a template.'); return;
     }
     applyingTemplate.current = true;
+    setPreparingTemplate(true);
     try {
       // Decode the real sample; image geometry must never depend on catalog guesses.
-      const sample = await decodeArtworkImage(SOCIAL_SAMPLE.svgDataUri);
+      const sampleSource = MOCKUP_PRESETS.find(item => item.id === template.sampleId);
+      if (!sampleSource) throw new Error('Template sample missing');
+      const sample = await decodeArtworkImage(sampleSource.svgDataUri);
       if (exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) {
         setTextError('Finish the current operation before applying a template.'); return;
       }
@@ -1723,18 +1707,29 @@ export default function App() {
       flushSync(() => { valid = textEditor.finish(); });
       if (!valid || editorHistory.isInTransaction()) return;
       const before = editorHistory.getLatestSnapshot();
-      const roles = before.templateContext?.id === 'social-launch' ? before.templateContext.textRoles : {
-        headline: crypto.randomUUID(), description: crypto.randomUUID(),
-      };
-      const next = buildSocialLaunchSnapshot(before, roles);
+      const previousRoles = before.templateContext?.id === template.id ? before.templateContext.textRoles : null;
+      const unchanged = previousRoles && equalValues(before, buildTemplateSnapshot(before, template, previousRoles));
+      const roles = unchanged && previousRoles ? previousRoles : { headline: crypto.randomUUID(), description: crypto.randomUUID() };
+      const next = buildTemplateSnapshot(before, template, roles);
       if (editorHistory.applyCommand(next)) {
         if (before.primaryMediaOrigin?.kind === 'builtin') setImageNaturalSize({ width: sample.naturalWidth, height: sample.naturalHeight });
         setDimensionError(''); setTextError('');
       }
+      setSidebarTab('style');
       setShowDemoTemplatesMenu(false);
     } catch {
       setTextError('The template screenshot could not be prepared. Try again.');
-    } finally { applyingTemplate.current = false; }
+    } finally { applyingTemplate.current = false; setPreparingTemplate(false); }
+  };
+
+  const handleRestoreTemplateLayout = () => {
+    if (applyingTemplate.current || exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) return;
+    let valid = false;
+    flushSync(() => { valid = textEditor.finish(); });
+    if (!valid || editorHistory.isInTransaction()) return;
+    const before = editorHistory.getLatestSnapshot();
+    const template = before.templateContext && getTemplate(before.templateContext.id);
+    if (template) editorHistory.applyCommand(restoreTemplateLayout(before, template));
   };
 
   // Handle Random Background Palette Shuffle (Pro-aware)
@@ -2125,6 +2120,10 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             </div>
           </div>
 
+          {templateContext && getTemplate(templateContext.id) && <div data-template-status className="w-full flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs py-1 text-slate-600 dark:text-slate-300">
+            <span>Applied: {getTemplate(templateContext.id)!.name}</span>
+            <button type="button" onClick={handleRestoreTemplateLayout} disabled={isExporting} title="Restore template layout, keeping your content and styles" className="underline underline-offset-2 cursor-pointer text-indigo-600 dark:text-indigo-300 disabled:opacity-50">Restore layout</button>
+          </div>}
           {/* Canvas Node Captured by html-to-image */}
           {textError && <p data-text-export-error role="alert" className="w-full rounded-lg border border-red-400 bg-slate-900 p-2 text-xs text-red-200 whitespace-pre-wrap">{textError}</p>}
           {!!Object.keys(textLayout.issues).length && <div data-text-layout-errors data-text-editor-ui data-export-ignore="true" role="alert" className="w-full rounded-lg border border-red-400 bg-slate-900 p-2 text-xs text-red-200">
@@ -2209,7 +2208,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               {showDemoTemplatesMenu && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowDemoTemplatesMenu(false)} />
-                  <TemplateMenu onApply={handleApplySocialTemplate} disabled={isExporting} />
+                  <TemplateMenu onApply={handleApplyTemplate} disabled={isExporting || preparingTemplate || assetBusy} busy={preparingTemplate || assetBusy} />
                 </>
               )}
             </div>
@@ -2852,6 +2851,16 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                       <button
                         key={p.id}
                         onClick={() => {
+                          if (templateContext) {
+                            if (exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) return;
+                            let valid = false;
+                            flushSync(() => { valid = textEditor.finish(); });
+                            if (!valid || editorHistory.isInTransaction()) return;
+                            const next = releaseTemplateMediaRegion(editorHistory.getLatestSnapshot());
+                            editorHistory.applyCommand({ ...next, activeCuratedLayout: p.id, layoutPreset: p.layout, cornerStyle: p.corner, padding: p.padding, shadowLevel: p.shadow });
+                            trackEvent('preset_change', { curated: p.id, type: 'curated_composition' });
+                            return;
+                          }
                           setActiveCuratedLayout(p.id);
                           setLayoutPreset(p.layout);
                           setCornerStyle(p.corner);
@@ -2864,7 +2873,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                             ? 'bg-[#eef2ff] border-indigo-300 text-indigo-950 dark:bg-[#242746] dark:border-indigo-500/50 dark:text-white shadow-sm ring-1 ring-indigo-300 dark:ring-indigo-500/30' 
                             : 'bg-[#f8fafc] border-slate-200/80 text-slate-800 hover:text-slate-950 hover:bg-slate-200/60 dark:bg-[#151726] dark:border-white/[0.08] dark:text-white/80 dark:hover:text-white dark:hover:border-white/15 dark:hover:bg-[#1e2136]'
                         }`}
-                        title={p.desc}
+                        title={templateContext ? `${p.desc}. Changes the image composition to use the full canvas area; Restore layout returns to the template.` : p.desc}
                       >
                         <CuratedThumbnail
                           id={p.id}

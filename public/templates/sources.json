@@ -1,0 +1,48 @@
+{
+  "assets": [
+    {
+      "id": "social-launch",
+      "version": 1,
+      "thumbnail": "social-launch-v1.webp",
+      "source": "social-launch-default.png",
+      "sourceSHA256": "2e2356dae76d6b8c6cf30ba56dc9dd3229e20d1dbb147f3d6931023368f38beb",
+      "width": 480,
+      "height": 252,
+      "bytes": 7184,
+      "method": "Actual in-app PNG download; proportional resize and WebP encoding only"
+    },
+    {
+      "id": "saas-dashboard",
+      "version": 1,
+      "thumbnail": "saas-dashboard-v1.webp",
+      "source": "saas-dashboard-default.png",
+      "sourceSHA256": "82e57afcfa51cea4828cddde5c75566c3220e964850203ff3d99821f9b19f555",
+      "width": 480,
+      "height": 270,
+      "bytes": 8016,
+      "method": "Actual in-app PNG download; proportional resize and WebP encoding only"
+    },
+    {
+      "id": "mobile-app",
+      "version": 1,
+      "thumbnail": "mobile-app-v1.webp",
+      "source": "mobile-app-default.png",
+      "sourceSHA256": "b7cb01e3c75fb61301ea888db5fb9e88332916a259b910c6914329675e1b3dc6",
+      "width": 180,
+      "height": 320,
+      "bytes": 5290,
+      "method": "Actual in-app PNG download; proportional resize and WebP encoding only"
+    },
+    {
+      "id": "code-terminal",
+      "version": 1,
+      "thumbnail": "code-terminal-v1.webp",
+      "source": "code-terminal-default.png",
+      "sourceSHA256": "0cc5014011c1f0f4cac160128ad077bd4c88519828a1b3527a241407108060aa",
+      "width": 480,
+      "height": 270,
+      "bytes": 6652,
+      "method": "Actual in-app PNG download; proportional resize and WebP encoding only"
+    }
+  ]
+}

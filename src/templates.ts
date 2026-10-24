@@ -195,25 +195,16 @@ const CODE_WINDOW_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2
   <circle cx="48" cy="48" r="6" fill="%23F43F5E"/>
   <circle cx="68" cy="48" r="6" fill="%23F59E0B"/>
   <circle cx="88" cy="48" r="6" fill="%2310B981"/>
-  <text x="48" y="100" fill="%23818CF8" font-family="monospace" font-size="15" font-weight="bold">import</text>
-  <text x="110" y="100" fill="%23E2E8F0" font-family="monospace" font-size="15">{ DevSnapKit, createMockup }</text>
-  <text x="360" y="100" fill="%23818CF8" font-family="monospace" font-size="15" font-weight="bold">from</text>
-  <text x="405" y="100" fill="%2334D399" font-family="monospace" font-size="15">'@devsnap/core'</text>
-  <text x="48" y="145" fill="%2394A3B8" font-family="monospace" font-size="13">// 1. Transform plain screenshot into 4K mockup</text>
-  <text x="48" y="175" fill="%2338BDF8" font-family="monospace" font-size="15">const</text>
-  <text x="100" y="175" fill="%23F1F5F9" font-family="monospace" font-size="15">card =</text>
-  <text x="160" y="175" fill="%23FBBF24" font-family="monospace" font-size="15">createMockup</text>
-  <text x="270" y="175" fill="%23E2E8F0" font-family="monospace" font-size="15">({</text>
-  <text x="72" y="210" fill="%23CBD5E1" font-family="monospace" font-size="14">theme: <tspan fill="%2334D399">'aurora-gradient'</tspan>,</text>
-  <text x="72" y="240" fill="%23CBD5E1" font-family="monospace" font-size="14">frame: <tspan fill="%2334D399">'macos-dark'</tspan>,</text>
-  <text x="72" y="270" fill="%23CBD5E1" font-family="monospace" font-size="14">shadow: <tspan fill="%2334D399">'dramatic-3d'</tspan>,</text>
-  <text x="72" y="300" fill="%23CBD5E1" font-family="monospace" font-size="14">aspectRatio: <tspan fill="%2334D399">'1200x630'</tspan>,</text>
-  <text x="48" y="335" fill="%23E2E8F0" font-family="monospace" font-size="15">});</text>
-  <text x="48" y="375" fill="%2394A3B8" font-family="monospace" font-size="13">// 2. Export 1-click retina image for Product Hunt &amp; Twitter</text>
-  <text x="48" y="405" fill="%23818CF8" font-family="monospace" font-size="15">await</text>
-  <text x="100" y="405" fill="%23F1F5F9" font-family="monospace" font-size="15">card.</text>
-  <text x="145" y="405" fill="%2338BDF8" font-family="monospace" font-size="15">exportRetina</text>
-  <text x="250" y="405" fill="%23E2E8F0" font-family="monospace" font-size="15">({ scale: 2 });</text>
+  <text x="48" y="100" fill="%23E2E8F0" font-family="monospace" font-size="15"><tspan fill="%23818CF8">const</tspan> projects = [</text>
+  <text x="72" y="130" fill="%23CBD5E1" font-family="monospace" font-size="15">{ name: <tspan fill="%2334D399">'Orbit'</tspan>, shipped: true },</text>
+  <text x="72" y="160" fill="%23CBD5E1" font-family="monospace" font-size="15">{ name: <tspan fill="%2334D399">'Signal'</tspan>, shipped: false },</text>
+  <text x="48" y="190" fill="%23E2E8F0" font-family="monospace" font-size="15">];</text>
+  <text x="48" y="235" fill="%23E2E8F0" font-family="monospace" font-size="15"><tspan fill="%23818CF8">const</tspan> shipped = projects</text>
+  <text x="72" y="265" fill="%23CBD5E1" font-family="monospace" font-size="15">.<tspan fill="%23FBBF24">filter</tspan>(project =&gt; project.shipped)</text>
+  <text x="72" y="295" fill="%23CBD5E1" font-family="monospace" font-size="15">.<tspan fill="%23FBBF24">map</tspan>(project =&gt; project.name);</text>
+  <text x="48" y="340" fill="%23E2E8F0" font-family="monospace" font-size="15"><tspan fill="%23818CF8">const</tspan> count = new Intl.NumberFormat(<tspan fill="%2334D399">'en-US'</tspan>);</text>
+  <text x="48" y="375" fill="%23CBD5E1" font-family="monospace" font-size="15">console.<tspan fill="%2338BDF8">log</tspan>(shipped.join(<tspan fill="%2334D399">', '</tspan>));</text>
+  <text x="48" y="405" fill="%23CBD5E1" font-family="monospace" font-size="15">console.<tspan fill="%2338BDF8">log</tspan>(count.format(shipped.length));</text>
 </svg>`;
 
 // 4. Viral Social Announcement / Creator Launch Card

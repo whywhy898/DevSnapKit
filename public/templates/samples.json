@@ -1,0 +1,8 @@
+{
+  "notice": "Self-authored illustrative UI screenshots, not customer evidence. Text inside these screenshots is image content; template titles and descriptions remain separate editable text.",
+  "samples": [
+    { "id": "saas", "source": "src/templates.ts / MOCKUP_PRESETS", "width": 860, "height": 520, "usedBy": ["social-launch", "saas-dashboard"], "content": "Illustrative PulseSaaS analytics dashboard and fictional metrics" },
+    { "id": "mobile", "source": "src/templates.ts / MOCKUP_PRESETS", "width": 393, "height": 852, "usedBy": ["mobile-app"], "content": "Illustrative mobile finance interface and fictional account data" },
+    { "id": "code", "source": "src/templates.ts / MOCKUP_PRESETS", "width": 800, "height": 460, "usedBy": ["code-terminal"], "content": "Self-authored JavaScript example using Array.filter/map and Intl.NumberFormat; no product SDK claims" }
+  ]
+}

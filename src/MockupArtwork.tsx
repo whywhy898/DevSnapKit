@@ -235,6 +235,7 @@ export function MockupArtwork({
           mode={layoutMode} duoLayout={duoLayout}
           theme={windowTheme} imageSrc={imageSrc} imageName={imageName}
           interactive={preview && !editingTextId}
+          deferHoverOverlay={textDocument.layers.length > 0}
           onReplace={onReplace}
           shadowLevel={shadowLevel} shadowOpacity={shadowOpacity}
           cornerStyle={cornerStyle} roundedCorners={roundedCorners}

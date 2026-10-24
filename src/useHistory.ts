@@ -118,7 +118,9 @@ export function useEditorHistory(
   const applyCommand = useCallback((snapshot: EditorSnapshot) => {
     const h = history.current!;
     if (awaiting.current || h.inTransaction || h.equal(latest.current, snapshot)) return false;
-    stopTimer(); h.flush(latest.current); h.flush(snapshot); apply(snapshot); return true;
+    // A command is an explicit restoration, like Undo/Redo. Size validation
+    // must not re-record its before/after snapshots as a separate size edit.
+    stopTimer(); h.flush(latest.current); h.flush(snapshot); apply(snapshot, true); return true;
   }, [stopTimer, apply]);
   const pending = !history.current.equal(history.current.current, currentSnapshot);
   return { canUndo: history.current.canUndo || pending, canRedo: history.current.canRedo && !pending,

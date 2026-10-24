@@ -3,7 +3,7 @@
  * Optional object values are omitted and array holes/nonfinite numbers are null,
  * matching the prior JSON serialization; property order is semantically irrelevant.
  */
-function equalValues(a: unknown, b: unknown, arrayEntry = false): boolean {
+export function equalValues(a: unknown, b: unknown, arrayEntry = false): boolean {
   const omitted = (value: unknown) => value === undefined || typeof value === 'function' || typeof value === 'symbol';
   if ((typeof a === 'number' && !Number.isFinite(a)) || (arrayEntry && omitted(a))) a = null;
   if ((typeof b === 'number' && !Number.isFinite(b)) || (arrayEntry && omitted(b))) b = null;

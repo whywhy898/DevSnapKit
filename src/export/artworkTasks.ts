@@ -7,18 +7,19 @@ export class ArtworkTasks {
   private tasks = new Map<string, Task>();
   revision = 0;
   get pending() { return [...this.tasks.values()].some(task => task.pending); }
-  constructor(private onError: (message: string) => void) {}
-  clear(key: string) { if (this.tasks.delete(key)) this.revision++; }
+  constructor(private onError: (message: string) => void, private onPendingChange: (pending: boolean) => void = () => {}) {}
+  clear(key: string) { if (this.tasks.delete(key)) { this.revision++; this.onPendingChange(this.pending); } }
   run<T>(key: string, label: string, prepare: () => Promise<T>, apply: (value: T) => void) {
     const task: Task = { pending: true, done: Promise.resolve() };
     this.tasks.set(key, task); this.revision++;
+    this.onPendingChange(this.pending);
     task.done = Promise.resolve().then(prepare).then(value => {
       if (this.tasks.get(key) === task) apply(value);
     }).catch(error => {
       if (this.tasks.get(key) !== task) return;
       task.error = new Error(`${label}: ${error instanceof Error ? error.message : 'could not be prepared'}. Replace it and try again.`);
       this.onError(task.error.message);
-    }).finally(() => { task.pending = false; });
+    }).finally(() => { task.pending = false; this.onPendingChange(this.pending); });
     return task.done;
   }
   async settle(required?: readonly string[]) {

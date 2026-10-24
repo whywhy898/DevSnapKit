@@ -19,6 +19,7 @@ export interface MockupUnitProps {
   imageName?: string;
   onReplace?: () => void;
   interactive?: boolean;
+  deferHoverOverlay?: boolean;
   shadowLevel?: string;
   shadowOpacity?: number;
   cornerStyle?: CornerStyle;
@@ -107,6 +108,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
   imageName = 'Screenshot',
   onReplace: requestReplace,
   interactive = true,
+  deferHoverOverlay = false,
   shadowLevel = 'dramatic',
   shadowOpacity = 80,
   cornerStyle = 'default',
@@ -118,9 +120,15 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
   mediaFit,
 }) => {
   const onReplace = interactive ? requestReplace : undefined;
+  const [mediaHovered, setMediaHovered] = React.useState(false);
+  // Text canvases previously had no upload layer. Mount their backdrop only
+  // during a real hover, so an invisible blur cannot change preview rasterization.
+  const showMediaOverlay = onReplace && (!deferHoverOverlay || mediaHovered);
   const pointerStart = React.useRef<{ x: number; y: number } | null>(null);
   const mediaEvents = {
     'data-media-surface': true,
+    onPointerEnter: () => setMediaHovered(true),
+    onPointerLeave: () => { setMediaHovered(false); pointerStart.current = null; },
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
       pointerStart.current = event.button === 0 && onReplace ? { x: event.clientX, y: event.clientY } : null;
     },
@@ -159,7 +167,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
           style={{ ...zoomStyle, ...(mediaFit ? { objectFit: mediaFit, objectPosition: 'center' } : {}) }}
           className={`w-full ${isPhone ? 'h-full' : 'h-auto'} object-cover block select-none pointer-events-none`}
         />
-        {interactive && onReplace && <MediaHoverOverlay />}
+        {showMediaOverlay && <MediaHoverOverlay />}
         </div>
       </div>
     ) : (
@@ -195,7 +203,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
               />
 
               {/* Hover Drop/Click Overlay */}
-              {interactive && onReplace && <MediaHoverOverlay />}
+              {showMediaOverlay && <MediaHoverOverlay />}
 
               {/* Diagonal Screen Sheen */}
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.03] to-transparent pointer-events-none z-20" />
@@ -252,7 +260,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
               />
 
               {/* Hover Drop/Click Overlay */}
-              {interactive && onReplace && <MediaHoverOverlay />}
+              {showMediaOverlay && <MediaHoverOverlay />}
 
               {/* Diagonal Screen Sheen */}
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.03] to-transparent pointer-events-none z-20" />
@@ -338,7 +346,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
                 />
 
                 {/* Hover Drop/Click To Replace Overlay */}
-                {interactive && onReplace && <MediaHoverOverlay />}
+                {showMediaOverlay && <MediaHoverOverlay />}
               </div>
 
               {/* Subtle Glass Sheen / Reflection */}
@@ -372,7 +380,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
                 style={{ ...zoomStyle, ...(mediaFit ? { objectFit: mediaFit, objectPosition: 'center' } : {}) }}
                 className="w-full h-full object-cover object-top block select-none pointer-events-none"
               />
-              {interactive && onReplace && <MediaHoverOverlay />}
+              {showMediaOverlay && <MediaHoverOverlay />}
               <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-24 h-1 bg-white/30 rounded-full z-30 pointer-events-none" />
             </div>
           </div>
@@ -420,7 +428,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
               style={{ ...zoomStyle, ...(mediaFit ? { objectFit: mediaFit, objectPosition: 'center' } : {}) }}
               className="w-full h-auto object-cover block select-none pointer-events-none"
             />
-            {interactive && onReplace && <MediaHoverOverlay />}
+            {showMediaOverlay && <MediaHoverOverlay />}
           </div>
         </div>
       ) : (
@@ -462,7 +470,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
               style={{ ...zoomStyle, ...(mediaFit ? { objectFit: mediaFit, objectPosition: 'center' } : {}) }}
               className="w-full h-auto object-cover block select-none pointer-events-none"
             />
-            {interactive && onReplace && <MediaHoverOverlay />}
+            {showMediaOverlay && <MediaHoverOverlay />}
           </div>
         </div>
       )}

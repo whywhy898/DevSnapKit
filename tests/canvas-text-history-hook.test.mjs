@@ -58,6 +58,7 @@ test('explicit template command records once and supports immediate undo and red
   assert.equal(h.api.applyCommand({ v: 2 }), true);
   h.render();
   assert.equal(h.api.historyCount, 3, 'pending user edit is preserved before the command');
+  assert.equal(h.api.navigationRevision, 1, 'layout validation recognizes an explicit command restoration');
   assert.equal(h.api.applyCommand({ v: 2 }), false, 'identical reapply is a no-op');
   h.api.undo(); h.render();
   assert.equal(h.snapshot.v, 1);

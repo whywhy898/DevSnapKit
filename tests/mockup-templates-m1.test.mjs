@@ -8,7 +8,9 @@ const compile = file => ts.transpileModule(fs.readFileSync(new URL(`../src/${fil
 const catalog = { exports: {} };
 vm.runInNewContext(compile('templates'), { exports: catalog.exports, module: catalog });
 const module = { exports: {} };
-vm.runInNewContext(compile('templates/apply'), { exports: module.exports, module, require: () => catalog.exports });
+const descriptors = { exports: {} };
+vm.runInNewContext(compile('templates/catalog'), { exports: descriptors.exports, module: descriptors });
+vm.runInNewContext(compile('templates/apply'), { exports: module.exports, module, require: name => name === './catalog' ? descriptors.exports : catalog.exports });
 const { buildSocialLaunchSnapshot: build, SOCIAL_SAMPLE } = module.exports;
 const before = { imageSrc: 'user.svg', imageName: 'My screenshot.svg', windowTitle: 'My product', secondarySrc: 'second.png', secondaryName: 'Keep second', customBrandWatermark: 'Acme', logoDataUrl: 'brand.png', qrUrl: 'https://example.com', textDocument: { version: 1, layers: [{ id: 'old' }] } };
 const ids = { headline: 'headline', description: 'description' };
