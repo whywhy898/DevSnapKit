@@ -9,6 +9,10 @@ export const baselineCases = ['single', 'duo'].flatMap((layoutMode, modeIndex) =
   return {
     id: `${layoutMode}-${windowTheme}-${background}`,
     patch: {
+      textDocument: { version: 1, layers: index % 2 === 0 ? [] : [
+        { id: 'baseline-headline', content: 'A clearer product update', centerX: .5, centerY: .12, widthRatio: .84, font: 'manrope', fontSize: 32, weight: 600, italic: false, color: '#FFFFFF', align: 'center' },
+        { id: 'baseline-caption', content: 'Same artwork, same export.', centerX: .5, centerY: .2, widthRatio: .78, font: 'gelasio', fontSize: 18, weight: 600, italic: true, color: '#E2E8F0', align: 'center' },
+      ] },
       imageSrc: primary, imageName: 'baseline-primary.svg', secondarySrc: layoutMode === 'duo' ? secondary : null, secondaryName: 'baseline-secondary.svg',
       layoutMode, windowTheme, windowTitle: 'Baseline browser', duoLayout: ['side', 'hero', 'stack'][index % 3],
       aspectRatioId: 'custom', customCanvasSize: { width: 960, height: 720 },

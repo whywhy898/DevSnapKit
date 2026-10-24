@@ -26,8 +26,8 @@ export default mergeConfig(base, {
     };
     const schedule = () =>`);
       if (!id.replaceAll('\\', '/').endsWith('/src/App.tsx')) return;
-      const anchor = '  const { canUndo, canRedo, undo, redo, flush, beginTransaction, commitTransaction, cancelTransaction } = editorHistory;';
-      if (!source.includes(anchor)) throw new Error('Baseline state driver anchor missing');
+      const anchor = source.match(/^  const \{ canUndo, canRedo, undo, redo, flush, beginTransaction, commitTransaction, cancelTransaction(?:, applyCommand)? \} = editorHistory;$/m)?.[0];
+      if (!anchor) throw new Error('Baseline state driver anchor missing');
       return source.replace(anchor, `${anchor}
   useEffect(() => {
     (window as any).__mockupBaseline = {
