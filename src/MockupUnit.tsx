@@ -54,7 +54,7 @@ export const getShadowClass = (level: string = 'dramatic') => {
 const MediaHoverOverlay: React.FC = () => (
   <div 
     data-export-ignore="true"
-    className="media-hover-overlay absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-4 text-center z-10 backdrop-blur-[2px] pointer-events-none select-none"
+    className="media-hover-overlay absolute inset-0 bg-black/50 opacity-0 group-hover/media:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-4 text-center z-10 backdrop-blur-[2px] pointer-events-none select-none"
   >
     <div className="w-10 h-10 rounded-full bg-white/20 border border-white/30 flex items-center justify-center text-white shadow-lg">
       <Upload className="w-5 h-5" />
@@ -118,6 +118,18 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
   mediaFit,
 }) => {
   const onReplace = interactive ? requestReplace : undefined;
+  const pointerStart = React.useRef<{ x: number; y: number } | null>(null);
+  const mediaEvents = {
+    'data-media-surface': true,
+    onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
+      pointerStart.current = event.button === 0 && onReplace ? { x: event.clientX, y: event.clientY } : null;
+    },
+    onPointerCancel: () => { pointerStart.current = null; },
+    onClick: (event: React.MouseEvent<HTMLDivElement>) => {
+      const start = pointerStart.current; pointerStart.current = null;
+      if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) < 4) onReplace?.();
+    },
+  };
   const replaceTitle = onReplace ? 'Click to replace screenshot (or paste via Ctrl+V)' : undefined;
   const isPhone = theme === 'iphone-17' || theme === 'phone-clay';
   const backplates = CARD_BACKPLATES[cornerStyle];
@@ -132,12 +144,12 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
   ].filter(shadow => shadow && shadow !== 'none').join(', ') || 'none';
   const surface = hideFrame ? (
       <div 
-        className={`w-full ${isPhone ? 'h-full aspect-[393/852]' : 'h-auto'} overflow-hidden relative z-30 cursor-pointer group ${getCornerStyleClass(cornerStyle, backplates ? 'none' : theme)}`}
+        className={`w-full ${isPhone ? 'h-full aspect-[393/852]' : 'h-auto'} overflow-hidden relative z-30 cursor-pointer group/media ${getCornerStyleClass(cornerStyle, backplates ? 'none' : theme)}`}
         style={{ 
           borderRadius: `${roundedCorners}px`,
           boxShadow: surfaceBoxShadow,
         }}
-        onClick={onReplace}
+        {...mediaEvents}
         title={replaceTitle}
       >
         <div className={`relative overflow-hidden ${isPhone ? 'h-full' : ''}`} style={mediaCornerStyle}>
@@ -171,8 +183,8 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
 
             {/* Screen Area (Liquid Retina XDR 16:10 Display) */}
             <div 
-              className="relative w-full overflow-hidden bg-black aspect-[16/10] cursor-pointer group rounded-t-[18px]"
-              onClick={onReplace}
+              className="relative w-full overflow-hidden bg-black aspect-[16/10] cursor-pointer group/media rounded-t-[18px]"
+              {...mediaEvents}
               title={replaceTitle}
             >
               <img 
@@ -228,8 +240,8 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
 
             {/* Screen Area (16:9 Studio Retina Glass) */}
             <div 
-              className="relative w-full overflow-hidden bg-black aspect-video cursor-pointer group rounded-[14px]"
-              onClick={onReplace}
+              className="relative w-full overflow-hidden bg-black aspect-video cursor-pointer group/media rounded-[14px]"
+              {...mediaEvents}
               title={replaceTitle}
             >
               <img 
@@ -314,8 +326,8 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
 
               {/* Screen Content Image */}
               <div 
-                className="relative w-full h-full overflow-hidden bg-slate-950 cursor-pointer group"
-                onClick={onReplace}
+                className="relative w-full h-full overflow-hidden bg-slate-950 cursor-pointer group/media"
+                {...mediaEvents}
                 title={replaceTitle}
               >
                 <img 
@@ -350,8 +362,8 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
               <div className="w-1.5 h-1.5 rounded-full bg-slate-700" />
             </div>
             <div 
-              className="relative w-full h-full rounded-[38px] overflow-hidden bg-black cursor-pointer group"
-              onClick={onReplace}
+              className="relative w-full h-full rounded-[38px] overflow-hidden bg-black cursor-pointer group/media"
+              {...mediaEvents}
               title={replaceTitle}
             >
               <img 
@@ -397,9 +409,9 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
           </div>
 
           <div 
-            className="relative group overflow-hidden bg-slate-950/40 cursor-pointer"
+            className="relative group/media overflow-hidden bg-slate-950/40 cursor-pointer"
             style={mediaCornerStyle}
-            onClick={onReplace}
+            {...mediaEvents}
             title={replaceTitle}
           >
             <img 
@@ -439,9 +451,9 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
           )}
 
           <div 
-            className="relative group overflow-hidden bg-slate-950/40 cursor-pointer"
+            className="relative group/media overflow-hidden bg-slate-950/40 cursor-pointer"
             style={mediaCornerStyle}
-            onClick={onReplace}
+            {...mediaEvents}
             title={replaceTitle}
           >
             <img 
