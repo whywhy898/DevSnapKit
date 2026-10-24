@@ -20,6 +20,7 @@ const cases = [
   ['mobile-app', 'Mobile App', 1080, 1920, 'mobile', 'Your next\nchapter.', 'A calmer way to get discovered.'],
   ['code-terminal', 'Code & Terminal', 1920, 1080, 'code', 'Build something clear.', 'Ship the update that matters.'],
 ];
+const sampleTitles = { saas: 'dashboard.analytics — PulseSaaS', mobile: 'WalletApp • iOS', code: 'App.tsx — DevSnapKit' };
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function state(page) { return page.evaluate(() => window.__mockupBaseline.snapshot); }
 async function settle(page) {
@@ -136,6 +137,7 @@ try {
     const page = await open();
     await apply(page, name, id);
     assert.equal((await state(page)).primaryMediaOrigin.sampleId, sampleId);
+    assert.equal((await state(page)).windowTitle, sampleTitles[sampleId], `${id}: built-in sample title`);
     const defaultExport = await png(page, `${id}-default.png`, width, height);
     const file = await page.$('[aria-label="Main screenshot file"]');
     await file.uploadFile(path.join(root, 'tests/fixtures/poster-v1/honey-main.png'));
@@ -166,6 +168,8 @@ try {
   const initial = await state(page);
   for (const [id, name] of [...cases, cases[0]]) {
     await apply(page, name, id);
+    const applied = await state(page);
+    assert.equal(applied.windowTitle, sampleTitles[applied.primaryMediaOrigin.sampleId], 'consecutive template title follows its sample');
     if (process.env.TEMPLATE_SKIP_EXPORTS) console.log('applied', id, await page.evaluate(() => window.__mockupBaseline.history));
   }
   const final = await state(page);

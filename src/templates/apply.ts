@@ -15,13 +15,16 @@ export function buildTemplateSnapshot(before: EditorSnapshot, template: MockupTe
   const sample = MOCKUP_PRESETS.find(item => item.id === template.sampleId);
   if (!sample) throw new Error('Template sample not found');
   const replaceSample = before.primaryMediaOrigin?.kind === 'builtin';
+  // Refresh inherited sample labels, including stale labels from older template
+  // sessions. A custom title (or any user/unknown media title) remains user-owned.
+  const inheritedSampleTitle = MOCKUP_PRESETS.some(preset => preset.title === before.windowTitle);
   return {
     ...before,
     templateContext: { id: template.id, version: template.version, mediaRegion: { ...template.mediaRegion }, textRoles: { ...ids } },
     primaryMediaOrigin: replaceSample ? { kind: 'builtin', sampleId: sample.id } : before.primaryMediaOrigin ?? { kind: 'unknown' },
     imageSrc: replaceSample ? sample.svgDataUri : before.imageSrc,
     imageName: replaceSample ? `${template.id}-sample.svg` : before.imageName,
-    windowTitle: before.windowTitle,
+    windowTitle: replaceSample && inheritedSampleTitle ? sample.title : before.windowTitle,
     selectedPreset: replaceSample ? sample.id : before.selectedPreset,
     textDocument: { version: 1, layers: [
       { ...template.text.headline, id: ids.headline },

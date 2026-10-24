@@ -36,7 +36,7 @@ export const TEMPLATE_CATALOG: readonly MockupTemplate[] = [
     id: 'code-terminal', version: 1, name: 'Code & Terminal', description: 'Share a focused code or terminal update.', badge: 'Developer',
     thumbnail: '/templates/code-terminal-v1.webp', sampleId: 'code',
     canvas: { aspectRatioId: '16-9', width: 1920, height: 1080 },
-    style: { gradientId: 'studio-dark', windowTheme: 'mac-dark', padding: 64, roundedCorners: 12, shadowLevel: 'soft', shadowOpacity: 40 },
+    style: { gradientId: 'atlantic', windowTheme: 'mac-dark', padding: 64, roundedCorners: 12, shadowLevel: 'soft', shadowOpacity: 40 },
     mediaRegion: { x: 0, y: .30, width: 1, height: .68 },
     text: { headline: text('Show the change.', 96, 800, '#FFFFFF', true), description: text('Code, context, and a clearer update.', 36, 400, '#CBD5E1', false) },
   },

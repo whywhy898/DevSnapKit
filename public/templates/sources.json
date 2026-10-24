@@ -5,10 +5,10 @@
       "version": 1,
       "thumbnail": "social-launch-v1.webp",
       "source": "social-launch-default.png",
-      "sourceSHA256": "2e2356dae76d6b8c6cf30ba56dc9dd3229e20d1dbb147f3d6931023368f38beb",
+      "sourceSHA256": "28572ef5b935c19610d5ef1332de04f30498ad3c7d0ca86f635ad1dabae37ec9",
       "width": 480,
       "height": 252,
-      "bytes": 7184,
+      "bytes": 7158,
       "method": "Actual in-app PNG download; proportional resize and WebP encoding only"
     },
     {
@@ -16,10 +16,10 @@
       "version": 1,
       "thumbnail": "saas-dashboard-v1.webp",
       "source": "saas-dashboard-default.png",
-      "sourceSHA256": "82e57afcfa51cea4828cddde5c75566c3220e964850203ff3d99821f9b19f555",
+      "sourceSHA256": "2216e84cab58d9be2e881b7f64858daa2f00d22b458e53cdc5942c4dda826724",
       "width": 480,
       "height": 270,
-      "bytes": 8016,
+      "bytes": 7980,
       "method": "Actual in-app PNG download; proportional resize and WebP encoding only"
     },
     {
@@ -38,10 +38,10 @@
       "version": 1,
       "thumbnail": "code-terminal-v1.webp",
       "source": "code-terminal-default.png",
-      "sourceSHA256": "0cc5014011c1f0f4cac160128ad077bd4c88519828a1b3527a241407108060aa",
+      "sourceSHA256": "7e2d371fdc7528c0a7f71fca8e32258c00a85a68b4815c1409325b372a610d1c",
       "width": 480,
       "height": 270,
-      "bytes": 6652,
+      "bytes": 7566,
       "method": "Actual in-app PNG download; proportional resize and WebP encoding only"
     }
   ]
