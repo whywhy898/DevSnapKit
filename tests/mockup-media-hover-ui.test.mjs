@@ -58,7 +58,7 @@ test('screenshot upload hover coexists with text hit boxes, editing and drag han
     });
     await paint(page);
     await page.hover('[data-text-hit]');
-    await page.waitForFunction(() => +getComputedStyle(document.querySelector('.media-hover-overlay')).opacity < .05);
+    await page.waitForFunction(() => !document.querySelector('.media-hover-overlay') || +getComputedStyle(document.querySelector('.media-hover-overlay')).opacity < .05);
     assert.equal(await chooserDuring(page, () => page.click('[data-text-hit]')), false, 'overlapping text enters editing without chooser');
     await page.waitForSelector('[aria-label="Text content"]', { visible: true });
     assert.equal(await page.$eval('#studio-canvas', node => node.dataset.mediaUploadEnabled), 'false');
@@ -68,6 +68,7 @@ test('screenshot upload hover coexists with text hit boxes, editing and drag han
     await finishTextEditing(page); await paint(page);
     assert.equal(await chooserDuring(page, () => drag(page, '[data-text-gesture="move"]', 20, 15)), false, 'move handle does not upload');
     assert.equal(await chooserDuring(page, () => drag(page, '[data-text-gesture="right"]', 15, 0)), false, 'width handle does not upload');
+    await page.hover('[data-media-surface]');
     assert.equal(await page.$eval('.media-hover-overlay', node => node.dataset.exportIgnore), 'true');
 
     // The actual frozen export artwork mounts without interactive overlays or titles.

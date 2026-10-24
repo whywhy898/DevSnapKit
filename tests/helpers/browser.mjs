@@ -98,6 +98,9 @@ export async function downloadPng(page, directory, filename, trigger) {
   }
   const target = path.join(directory, filename);
   await fs.rename(path.join(downloadDirectory, found), target);
+  const png = await fs.readFile(target);
+  if (png.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a' || png.subarray(-8, -4).toString() !== 'IEND' || !png.readUInt32BE(16) || !png.readUInt32BE(20)) throw new Error('Downloaded PNG is incomplete.');
+  let cleanupWarning;
   // Chrome can briefly retain download bookkeeping after the PNG is moved.
   // Retry only transient cleanup failures; never delete any remaining contents.
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -105,9 +108,17 @@ export async function downloadPng(page, directory, filename, trigger) {
       await fs.rmdir(downloadDirectory);
       break;
     } catch (error) {
-      if (!['ENOTEMPTY', 'EBUSY'].includes(error?.code) || attempt === 19) throw error;
+      if (!['ENOTEMPTY', 'EBUSY'].includes(error?.code)) throw error;
+      if (attempt === 19) {
+        const remaining = await fs.readdir(downloadDirectory);
+        // Chrome on Windows can recreate the completed file's name as an empty
+        // bookkeeping file after rename. Preserve it; the verified PNG succeeded.
+        if (remaining.length !== 1 || remaining[0] !== found || (await fs.stat(path.join(downloadDirectory, found))).size !== 0) throw error;
+        cleanupWarning = { code: error.code, directory: downloadDirectory, emptyBookkeepingFile: found };
+        break;
+      }
       await new Promise(resolve => setTimeout(resolve, 50));
     }
   }
-  return { path: target, milliseconds: Math.round(performance.now() - start) };
+  return { path: target, milliseconds: Math.round(performance.now() - start), ...(cleanupWarning ? { cleanupWarning } : {}) };
 }

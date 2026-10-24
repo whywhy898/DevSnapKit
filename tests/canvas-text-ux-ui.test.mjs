@@ -50,7 +50,7 @@ test('UX text properties live in Inspector and remain usable at desktop and thre
   } finally { await browser.close(); }
 });
 
-test('UX text artwork disables image click upload across frame variants while explicit Replace Image still works', { skip: !url, timeout: 120000 }, async () => {
+test('UX screenshot hover upload works across frame variants with text and explicit Replace Image', { skip: !url, timeout: 120000 }, async () => {
   const browser = await launchBrowser();
   try {
     const page = await preparePage(browser, url);
@@ -67,19 +67,21 @@ test('UX text artwork disables image click upload across frame variants while ex
     for (const theme of ['none', 'mac-dark', 'browser', 'macbook', 'studio-display', 'iphone-17', 'phone-clay']) {
       await page.evaluate(theme => window.__mockupBaseline.apply({ windowTheme: theme }), theme); await paint(page);
       const opened = await chooserDuring(page, pictureClick);
-      assert.equal(opened, false, `${theme}: text artwork must not open image upload on a canvas click`);
+      assert.equal(opened, true, `${theme}: image area remains replaceable with text present`);
+      await new Promise(resolve => setTimeout(resolve, 200));
       const hover = await page.$$eval('#studio-canvas .media-hover-overlay', nodes => nodes.map(node => Number(getComputedStyle(node).opacity)));
-      assert.ok(hover.every(opacity => opacity === 0), `${theme}: text artwork must not dim for upload`);
+      assert.ok(hover.some(opacity => opacity > .9), `${theme}: image hover upload is visible`);
       rows.push({ theme, opened, hover });
     }
     await page.evaluate(() => window.__mockupBaseline.apply({ hideMockup: true })); await paint(page);
-    assert.equal(await chooserDuring(page, pictureClick), false, 'Hidden-frame artwork also protects text from image upload');
+    assert.equal(await chooserDuring(page, pictureClick), true, 'Hidden-frame image remains replaceable');
+    await new Promise(resolve => setTimeout(resolve, 200));
     const hiddenFrameHover = await page.$$eval('#studio-canvas .media-hover-overlay', nodes => nodes.map(node => Number(getComputedStyle(node).opacity)));
-    assert.ok(hiddenFrameHover.every(opacity => opacity === 0));
-    rows.push({ hideMockup: true, opened: false, hover: hiddenFrameHover });
+    assert.ok(hiddenFrameHover.some(opacity => opacity > .9));
+    rows.push({ hideMockup: true, opened: true, hover: hiddenFrameHover });
     await page.evaluate(() => window.__mockupBaseline.apply({ hideMockup: false, layoutMode: 'duo', secondarySrc: window.__mockupBaseline.snapshot.imageSrc, secondaryName: 'UX second screenshot.png' })); await paint(page);
-    assert.equal(await chooserDuring(page, () => pictureClick(2)), false, 'The second screenshot also protects text from image upload');
-    rows.push({ layoutMode: 'duo', slot: 2, opened: false });
+    assert.equal(await chooserDuring(page, () => pictureClick(2)), true, 'Second screenshot has its own upload area');
+    rows.push({ layoutMode: 'duo', slot: 2, opened: true });
     await button(page, 'Frame');
     assert.equal(await chooserDuring(page, () => click(page, 'button[title="Open Media Picker to replace Slot 2"]')), true, 'The explicit second-slot replacement remains available');
     assert.equal(await chooserDuring(page, () => click(page, 'button[title="Upload screenshot from computer"]')), true, 'Explicit Replace Image remains available');
