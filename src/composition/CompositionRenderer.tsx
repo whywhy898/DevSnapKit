@@ -7,6 +7,7 @@ import type { CompositionDocument, ObjectFrame } from './types';
 import { ButtonRenderer } from './ButtonRenderer';
 import { DecorationRenderer } from './DecorationRenderer';
 import { MediaHoverOverlay } from '../MockupUnit';
+import { canUse } from '../../shared/productCapabilities';
 const noop = () => {};
 export const frameStyle = (frame: ObjectFrame): CSSProperties => ({ position: 'absolute', left: `${frame.centerX * 100}%`, top: `${frame.centerY * 100}%`,
   width: `${frame.widthRatio * 100}%`, height: `${frame.heightRatio * 100}%`, transform: `translate(-50%, -50%) rotate(${frame.rotation}deg)`, transformOrigin: 'center' });
@@ -31,8 +32,8 @@ export function CompositionRenderer(props: Props) {
       const text = textDocument.layers.find(node => node.id === id);
       if (text) return <div key={id} data-composition-text={id} style={{ position: 'absolute', inset: 0, zIndex: index + 1, pointerEvents: 'none' }}><CanvasTextLayerRenderer document={{ version: 1, layers: [text] }} size={size} editingId={preview ? editingTextId : null} /></div>;
       if (graphic) return graphic.hidden ? null : <div key={id} data-composition-object={id} style={{ ...frameStyle(graphic.frame), ...(graphic.kind === 'button' && graphic.autoWidth ? { width: 'max-content' } : {}), zIndex: index + 1, opacity: graphic.opacity ?? 1 }} onPointerDown={event => props.onObjectPointerDown?.(id, event)}>
-        {graphic.kind === 'button' ? <ButtonRenderer object={graphic} /> : graphic.shape === 'mark' && props.isProUnlocked && props.logoDataUrl
-          ? <img src={props.logoDataUrl} alt="Brand Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: (props.logoOpacity ?? 100) / 100, pointerEvents: 'none' }} /> : <DecorationRenderer object={graphic} />}
+        {graphic.kind === 'button' ? <ButtonRenderer object={graphic} /> : graphic.shape === 'mark' && canUse('brand_logo', Boolean(props.isProUnlocked)) && props.logoDataUrl
+          ? <img src={props.logoDataUrl} alt="Brand Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: props.logoOpacity ?? 1, pointerEvents: 'none' }} /> : <DecorationRenderer object={graphic} />}
       </div>;
       if (id === 'main') return <div key={id} data-composition-object="main" style={{ ...(doc.mediaLayout === 'legacy' ? { position: 'absolute' as const, inset: 0 } : frameStyle(main)), zIndex: index + 1 }} onPointerDown={event => props.onObjectPointerDown?.(id, event)}>
         <FittedScene width={doc.mediaLayout === 'legacy' ? size.width : main.widthRatio * size.width} height={doc.mediaLayout === 'legacy' ? size.height : main.heightRatio * size.height}

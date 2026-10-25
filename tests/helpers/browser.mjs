@@ -21,6 +21,16 @@ export async function clickButton(page, text) {
   await handle.dispose();
 }
 
+export async function selectElement(page, label) {
+  const expanded = await page.$eval('[aria-label="Elements"]', node => node.getAttribute('aria-expanded') === 'true');
+  if (!expanded) await page.click('[aria-label="Elements"]');
+  await page.click(`[data-element-picker] button[aria-label^="Select ${label}"]`);
+}
+
+export async function openImageAdvanced(page) {
+  await page.$eval('[data-image-advanced]', node => { if (!node.open) node.querySelector('summary').click(); });
+}
+
 // Finish through the shipped Inspector tab, including when Text is already active.
 export async function finishTextEditing(page) {
   await clickButton(page, 'Text');

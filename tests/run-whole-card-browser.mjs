@@ -41,7 +41,7 @@ try{
     assert.equal(await page.evaluate(id=>window.__mockupBaseline.snapshot.textDocument.layers.find(n=>n.id===id).content,id),'Edited '+role);
   }
   results.push({scenario:'real-v1-open-edit-export',...(await exportPng(page,'v1-customized-1x.png',1))});
-  await page.click('[data-composition-controls] summary');await clickButton(page,'Restore layout');await settle(page);
+  await clickButton(page,'Frame');await page.$eval('[data-image-advanced]',n=>{if(!n.open)n.querySelector('summary').click();});page.once('dialog',dialog=>dialog.accept());await clickButton(page,'Restore layout');await settle(page);
   const restored=await page.evaluate(()=>window.__mockupBaseline.snapshot);assert.equal(restored.templateContext.version,1);assert.deepEqual(restored.compositionDocument.placements.secondary,old.compositionDocument.placements.secondary);assert.equal(restored.secondarySrc,old.secondarySrc);
   results.push({scenario:'v1-restore-decomposed-bounds',pass:true});
   // Start with the neutral real v1 state, then use the shipped template action.

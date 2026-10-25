@@ -5,17 +5,21 @@ import { buildTemplateSnapshot, restoreTemplateLayout, releaseTemplateMediaRegio
 import { getTemplate } from './templates/catalog';
 import { equalValues } from './editorHistory';
 import { TemplateMenu } from './templates/TemplateMenu';
-import { buildDesignedSnapshot, restoreDesignedLayout, resetDesignedStyles } from './composition/designedCatalog';
+import { buildDesignedSnapshot, restoreDesignedLayout, resetDesignedStyles, createHoneyComposition } from './composition/designedCatalog';
 import type { CompositionDocument } from './composition/types';
 import { createIndependentComposition, compositionFrame, moveCompositionObject, secondaryRequired, boxOutsideCanvas } from './composition/document';
-import { ObjectControls } from './composition/ObjectControls';
+import { SelectionControls } from './inspector/SelectionControls';
+import { ElementPicker } from './inspector/ElementPicker';
+import { inspectorTabFor } from './inspector/model';
+import { BrandControls } from './inspector/BrandControls';
+import { templateLogo, resizeTemplateLogo, moveTemplateLogo } from './inspector/brandModel';
 import { CompositionOverlay } from './composition/CompositionOverlay';
 import { 
   Download, Copy, Upload, Check, Sliders, SlidersHorizontal,
   Lock, Zap, ShieldCheck, 
-  CheckCircle2, RefreshCw, KeyRound, QrCode,
+  CheckCircle2, RefreshCw, KeyRound,
   Layers, Trash2, Image as ImageIcon, Sparkles, Palette,
-  ChevronDown, AlertCircle, Shuffle, Box, Compass,
+  ChevronDown, Shuffle, Box, Compass,
   Smartphone, Laptop, Monitor, RotateCw, Plus, X,
   Wand2, Sun, Moon, Pipette, Flame, Grid,
   Globe, AppWindow, Square, FileText, Mail, Receipt,
@@ -616,19 +620,22 @@ export default function App() {
   const [vfxGlowColor, setVfxGlowColor] = useState<string>('#6366f1');
   const [vfxGlowOpacity, setVfxGlowOpacity] = useState<number>(30); // 0 to 80%
 
-  // Watermark Settings (Free: 100% clean, Pro: Custom Brand Badge)
+  // Preserve existing text badges as free legacy content in Text.
   const [customBrandWatermark, setCustomBrandWatermark] = useState<string>('');
+  const [editingLegacyBrandText, setEditingLegacyBrandText] = useState(false);
 
-  // Pro Feature 1: Custom Logo State
+  // Free dedicated logo slot.
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
   const [logoPos, setLogoPos] = useState<'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'>('bottom-right');
   const [logoScale, setLogoScale] = useState<number>(7); // % of canvas height (3 to 14)
   const [logoOpacity, setLogoOpacity] = useState<number>(1);
   const [logoError, setLogoError] = useState<string>('');
   const [isProcessingLogo, setIsProcessingLogo] = useState<boolean>(false);
-  const logoInputRef = useRef<HTMLInputElement>(null);
+  const logoUploadRequested = useRef(false);
+  const logoRequestSerial = useRef(0);
+  const brandTransaction = useRef<{ latest: EditorSnapshot } | null>(null);
 
-  // Pro Feature 2: Dynamic QR Code State
+  // Free static QR code slot.
   const [qrUrl, setQrUrl] = useState<string>('');
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrPos, setQrPos] = useState<'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'>('bottom-left');
@@ -759,6 +766,10 @@ export default function App() {
   ]);
 
   const handleRestoreSnapshot = useCallback((snap: EditorSnapshot) => {
+    logoRequestSerial.current++;
+    logoUploadRequested.current = Boolean(snap.logoDataUrl);
+    setLogoError('');
+    setIsProcessingLogo(false);
     for (const key of ['main', 'secondary', 'background', 'logo', 'qr']) artworkTasks.current!.clear(key);
     setTextDocument(snap.textDocument ? { ...snap.textDocument, layers: snap.textDocument.layers.map(layer => validateText(layer)) } : emptyTextDocument());
     setCompositionDocument(snap.compositionDocument ?? null);
@@ -867,11 +878,16 @@ export default function App() {
   const textEditor = useCanvasTextEditor(currentSnapshot, setTextDocument, canvasLogicalSize, { beginTransaction, commitTransaction, cancelTransaction }, canvasRef);
   const selectedCompositionObject = selectedObject || textEditor.activeId;
   const switchInspectorTab = (tab: typeof sidebarTab) => {
+    leaveBrandEdit();
     if (!textEditor.finish()) return;
+    if (tab === 'text') setSelectedObject(null);
+    if (tab === 'style' && selectedCompositionObject && !['main', 'secondary'].includes(selectedCompositionObject)) { textEditor.select(null); setSelectedObject('main'); }
     setSidebarTab(tab);
   };
   const selectObject = (id: string) => {
+    leaveBrandEdit();
     if (!textEditor.finish()) return;
+    setSidebarTab(inspectorTabFor(id, textDocument, compositionDocument));
     if (textDocument.layers.some(layer => layer.id === id)) { setSelectedObject(null); textEditor.select(id); setSidebarTab('text'); }
     else { textEditor.select(null); setSelectedObject(id === 'secondary' && compositionDocument?.mediaLayout === 'legacy' ? 'main' : id); }
   };
@@ -889,17 +905,53 @@ export default function App() {
     const edit = compositionEdit.current; if (!edit) return;
     compositionEdit.current = null; commitTransaction({ ...edit.base, compositionDocument: edit.document });
   };
+  const startBrandEdit = () => {
+    if (brandTransaction.current || exportLock.current || !textEditor.finish()) return;
+    const latest = editorHistory.getLatestSnapshot();
+    beginTransaction(latest); brandTransaction.current = { latest };
+  };
+  const finishBrandEdit = () => {
+    const edit = brandTransaction.current; if (!edit) return;
+    brandTransaction.current = null; commitTransaction(edit.latest);
+  };
+  const leaveBrandEdit = () => {
+    if (!brandTransaction.current) return;
+    // Canvas gestures prevent default focus loss. Commit a numeric draft through
+    // its real blur handler before another tool opens its own history transaction.
+    flushSync(() => {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active.closest('[data-brand-controls], [data-legacy-brand-text]')) active.blur();
+      finishBrandEdit();
+    });
+  };
+  const patchBrandSettings = (patch: Partial<EditorSnapshot>) => {
+    if (exportLock.current || !textEditor.finish()) return;
+    const ownTransaction = !brandTransaction.current;
+    if (ownTransaction) startBrandEdit();
+    const edit = brandTransaction.current; if (!edit) return;
+    edit.latest = { ...edit.latest, ...patch };
+    if ('compositionDocument' in patch) setCompositionDocument(patch.compositionDocument ?? null);
+    if ('logoDataUrl' in patch) setLogoDataUrl(patch.logoDataUrl ?? null);
+    if (patch.logoOpacity !== undefined) setLogoOpacity(patch.logoOpacity);
+    if (patch.logoScale !== undefined) setLogoScale(patch.logoScale);
+    if (patch.logoPos !== undefined) setLogoPos(patch.logoPos as typeof logoPos);
+    if (patch.qrUrl !== undefined) setQrUrl(patch.qrUrl);
+    if (patch.qrScale !== undefined) setQrScale(patch.qrScale);
+    if (patch.qrPos !== undefined) setQrPos(patch.qrPos as typeof qrPos);
+    if (patch.customBrandWatermark !== undefined) setCustomBrandWatermark(patch.customBrandWatermark);
+    if (ownTransaction) finishBrandEdit();
+  };
   const startCompositionGesture = (id: string, event: React.PointerEvent<HTMLElement>, resize = false) => {
     if (event.button !== 0 || !compositionDocument || exportLock.current || !textEditor.finish()) return;
     event.preventDefault(); event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId);
     selectObject(id); const base = editorHistory.getLatestSnapshot(); beginTransaction(base);
-    let document = compositionDocument;
+    let document = base.compositionDocument || compositionDocument;
     const target = document.objects.find(node => node.id === id);
     if (target?.kind === 'button' && target.autoWidth) {
       const node = [...canvasRef.current!.querySelectorAll<HTMLElement>('[data-composition-object]')].find(node => node.dataset.compositionObject === id);
       if (node) document = { ...document, objects: document.objects.map(item => item.id === id ? { ...item, frame: { ...item.frame, widthRatio: node.offsetWidth / canvasLogicalSize.width } } : item) };
     }
-    compositionGesture.current = { id, x: event.clientX, y: event.clientY, scale: canvasRef.current!.getBoundingClientRect().width / canvasLogicalSize.width, resize, base, document, latest: compositionDocument };
+    compositionGesture.current = { id, x: event.clientX, y: event.clientY, scale: canvasRef.current!.getBoundingClientRect().width / canvasLogicalSize.width, resize, base, document, latest: document };
   };
   const moveCompositionGesture = (event: React.PointerEvent<HTMLElement>) => {
     const gesture = compositionGesture.current; if (!gesture) return;
@@ -930,6 +982,7 @@ export default function App() {
   const guardEditorAction = (event: React.SyntheticEvent) => {
     if (exportLock.current) { event.preventDefault(); event.stopPropagation(); return; }
     if (event.type === 'pointerdown') {
+      if (!(event.target as HTMLElement).closest('[data-brand-controls], [data-legacy-brand-text]')) leaveBrandEdit();
       const pointer = event as React.PointerEvent;
       capturedPointers.current.set(pointer.pointerId, event.target as HTMLElement);
     }
@@ -1324,12 +1377,7 @@ export default function App() {
     if (exportLock.current) return;
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (!isProUnlocked) {
-      setShowProModal(true);
-      if (e.target) e.target.value = '';
-      return;
-    }
+    leaveBrandEdit();
 
     setLogoError('');
     setTextError('');
@@ -1349,9 +1397,12 @@ export default function App() {
       return;
     }
 
+    logoUploadRequested.current = true;
+    const requestSerial = ++logoRequestSerial.current;
     setIsProcessingLogo(true);
     trackEvent('upload_logo', { name: file.name, size: file.size });
     void artworkTasks.current!.run('logo', 'Brand logo', async () => {
+      try {
       const source = await readArtworkFile(file), image = await decodeArtworkImage(source);
       if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) return source;
       const ratio = Math.min(1, 600 / Math.max(image.width, image.height)), canvas = document.createElement('canvas');
@@ -1359,7 +1410,11 @@ export default function App() {
       const context = canvas.getContext('2d'); if (!context) throw new Error('logo could not be resized');
       context.imageSmoothingEnabled = true; context.imageSmoothingQuality = 'high'; context.drawImage(image, 0, 0, canvas.width, canvas.height);
       return canvas.toDataURL('image/png', .95);
-    }, setLogoDataUrl).finally(() => setIsProcessingLogo(false));
+      } catch (error) {
+        if (requestSerial === logoRequestSerial.current) setLogoError(error instanceof Error ? error.message : 'Logo could not be prepared. Replace it or remove it and try again.');
+        throw error;
+      }
+    }, setLogoDataUrl).finally(() => { if (requestSerial === logoRequestSerial.current) setIsProcessingLogo(false); });
     if (e.target) e.target.value = '';
   };
 
@@ -1377,7 +1432,8 @@ export default function App() {
     finishCompositionEdit();
     if (compositionGesture.current) { const gesture = compositionGesture.current; compositionGesture.current = null; commitTransaction({ ...gesture.base, compositionDocument: gesture.latest }); }
     finishSizing();
-    flush(currentSnapshot);
+    leaveBrandEdit();
+    flush(editorHistory.getLatestSnapshot());
     const request = { aspect: { ...aspectRatio }, batch: selectedBatchAspects.map(id => ({ ...(aspectOptions.find(option => option.id === id) || ASPECT_RATIOS[0]) })), scale: exportScale, format: exportFormat, parent: canvasRef.current.parentElement };
     exportLock.current = true; setIsExporting(true); setTextError('');
     releaseExportPointers();
@@ -1388,7 +1444,7 @@ export default function App() {
       const requiredAssets = () => {
         const live = latestExportInputs.current!.artwork;
         return ['main', ...(secondaryRequired(live.compositionDocument, live.layoutMode) ? ['secondary'] : []), ...(live.bgType === 'image' ? ['background'] : []),
-          ...(live.isProUnlocked && live.logoDataUrl ? ['logo'] : []), ...(live.isProUnlocked && qrUrl.trim() ? ['qr'] : [])];
+          ...(live.logoDataUrl || logoUploadRequested.current ? ['logo'] : []), ...(qrUrl.trim() ? ['qr'] : [])];
       };
       for (let attempt = 0; attempt < 10; attempt++) {
         const revision = artworkTasks.current!.revision;
@@ -2234,7 +2290,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           <CanvasTextOverlay compositionHitTargets={!!compositionDocument} document={compositionDocument ? { ...textDocument, layers: textDocument.layers.filter(layer => !compositionDocument.hiddenIds.includes(layer.id)) } : textDocument} size={canvasLogicalSize} activeId={textEditor.activeId} editingId={textEditor.editingId}
             onArtworkHit={id => { if (!textEditor.finish()) return; selectObject(id); if (id === 'main' || id === 'secondary') (id === 'main' ? fileInputRef : secondaryFileInputRef).current?.click(); }}
             recoveryMessage={textEditor.session?.error || (textEditor.session?.composing ? textEditor.message : '')}
-            issues={textLayout.issues} onGestureStart={textEditor.beginGesture} onGestureMove={textEditor.moveGesture}
+            issues={textLayout.issues} onGestureStart={(id, kind, scale) => { const token = textEditor.beginGesture(id, kind, scale); if (token !== false) { setSelectedObject(null); setSidebarTab('text'); } return token; }} onGestureMove={textEditor.moveGesture}
             onGestureActive={textEditor.hasGesture}
             draft={textEditor.session?.kind === 'content' ? textEditor.session.value : ''} light={themeMode === 'light'}
             onEdit={id => { setSelectedObject(null); setSidebarTab('text'); textEditor.edit(id); }} onChange={textEditor.change} onDone={textEditor.finish} onCancel={textEditor.cancel} onDeselect={() => textEditor.select(null)} />
@@ -2414,7 +2470,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
         </section>
 
         {/* Middle-Right: Dedicated Shots.so-Style Live 3D Perspective Rail (Desktop & Laptop) */}
-        <aside className="hidden lg:flex flex-col w-[130px] xl:w-[140px] 2xl:w-[155px] shrink-0 lg:my-3 lg:mr-2 lg:rounded-2xl border border-white/[0.08] bg-[#0c0d14]/90 backdrop-blur-2xl p-2.5 space-y-2.5 overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/15 max-h-[calc(100vh-64px-24px)] shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-20">
+        {compositionDocument?.mediaLayout !== 'independent' && (!selectedCompositionObject || selectedCompositionObject === 'main') && <aside className="hidden lg:flex flex-col w-[130px] xl:w-[140px] 2xl:w-[155px] shrink-0 lg:my-3 lg:mr-2 lg:rounded-2xl border border-white/[0.08] bg-[#0c0d14]/90 backdrop-blur-2xl p-2.5 space-y-2.5 overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/15 max-h-[calc(100vh-64px-24px)] shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-20">
           <div className="flex items-center gap-1.5 px-1 pb-1.5 border-b border-white/[0.06]">
             <Compass className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-white/80 whitespace-nowrap">
@@ -2450,7 +2506,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               />
             ))}
           </div>
-        </aside>
+        </aside>}
 
         {/* Right: Customization Controls Panel with Segmented Inspector */}
         <aside className="studio-inspector w-full lg:w-[360px] xl:w-[380px] 2xl:w-[420px] shrink-0 lg:my-3 lg:mr-3 lg:rounded-2xl border-l lg:border border-white/[0.08] bg-[#0c0d14]/90 backdrop-blur-2xl flex flex-col lg:h-[calc(100vh-64px-24px)] p-4 sm:p-5 overflow-y-auto overflow-x-hidden space-y-5 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
@@ -2470,29 +2526,8 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             </button>
           </div>
           <p data-reset-preserves-text className="text-[11px] text-white/50">Reset changes mockup styling. Your canvas text is preserved.</p>
-          <ObjectControls document={compositionDocument} texts={textDocument} selected={selectedObject || textEditor.activeId} size={canvasLogicalSize} customLogo={isProUnlocked && !!logoDataUrl} onSelect={selectObject} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit}
-            onIndependent={() => { if (textEditor.finish()) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), ...(aspectRatio.id === 'auto' ? { aspectRatioId: 'custom', customCanvasSize: { ...canvasLogicalSize } } : {}), compositionDocument: compositionDocument ? { ...compositionDocument, mediaLayout: 'independent' } : createIndependentComposition() }); }}
-            onAddButton={() => { if (!textEditor.finish()) return; const document = compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: layoutMode === 'duo' }; const id = crypto.randomUUID(); changeComposition({ ...document, objects: [...document.objects, { id, name: 'Button', kind: 'button', frame: { centerX: .5, centerY: .8, widthRatio: .25, heightRatio: .07, rotation: 0 }, text: 'Get started', fill: '#272617', color: '#ffffff', fontSize: 20, radius: 8, padding: 16, autoWidth: false, arrow: true }], order: [...document.order, id] }); setSelectedObject(id); }}
-            onResetTemplate={() => {
-              if (!compositionDocument?.templateId || !textEditor.finish() || !window.confirm('Reset all template text, screenshots and design settings to the original demo? You can Undo this change.')) return;
-              const before = editorHistory.getLatestSnapshot();
-              const next = buildDesignedSnapshot({ ...before, imageSrc: '', secondarySrc: null, windowTitle: 'bloomboard.example', logoDataUrl: null, qrUrl: '', customBrandWatermark: '' }, 'editorial-honey', crypto.randomUUID());
-              editorHistory.applyCommand(next); setSelectedObject(null); textEditor.select(null);
-            }}
-            onDuplicateText={id => {
-              if (!textEditor.finish() || textDocument.layers.length >= 20) return;
-              const before = editorHistory.getLatestSnapshot(), layer = before.textDocument.layers.find(item => item.id === id); if (!layer) return;
-              const node = [...(canvasRef.current?.querySelectorAll<HTMLElement>('[data-canvas-text]') || [])].find(item => item.dataset.canvasText === id);
-              const height = node?.offsetHeight || layer.fontSize * (layer.lineHeight ?? 1.25), half = height / canvasLogicalSize.height / 2;
-              const below = layer.centerY + height / canvasLogicalSize.height + 16 / canvasLogicalSize.height;
-              const above = layer.centerY - height / canvasLogicalSize.height - 16 / canvasLogicalSize.height;
-              const copy = validateText({ ...layer, id: crypto.randomUUID(), centerX: Math.max(layer.widthRatio / 2, Math.min(1 - layer.widthRatio / 2, layer.centerX + 24 / canvasLogicalSize.width)), centerY: below + half <= 1 ? below : above - half >= 0 ? above : Math.max(half, Math.min(1 - half, layer.centerY + 24 / canvasLogicalSize.height)) });
-              const composition = before.compositionDocument;
-              flushSync(() => { editorHistory.applyCommand({ ...before, textDocument: { ...before.textDocument, layers: [...before.textDocument.layers, copy] }, compositionDocument: composition ? { ...composition, knownTextIds: [...new Set([...(composition.knownTextIds || []), copy.id])], order: [...composition.order, copy.id] } : composition }); });
-              setSelectedObject(null); textEditor.select(copy.id); setSidebarTab('text');
-            }}
-            onReplace={slot => (slot === 'main' ? fileInputRef : secondaryFileInputRef).current?.click()} onRestore={handleRestoreTemplateLayout}
-            onRemoveDetail={() => { if (textEditor.finish() && compositionDocument) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } }); }} />
+          <ElementPicker document={compositionDocument} texts={textDocument} context={templateContext} selected={selectedCompositionObject} onSelect={selectObject} onChange={changeComposition} />
+
 
           {/* Shared Inspector: keep canvas properties out of the artwork viewport. */}
           <div data-inspector-tabs className="grid grid-cols-5 gap-1 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl">
@@ -2534,11 +2569,6 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>Brand</span>
-              {!isProUnlocked && (
-                <span className="absolute -top-1 -right-1 text-[8px] font-extrabold px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 leading-none">
-                  PRO
-                </span>
-              )}
             </button>
 
             <button
@@ -2554,126 +2584,91 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             </button>
           </div>
 
-          <div hidden={sidebarTab !== 'text'}>
-            <TextControls document={textDocument} editor={textEditor} disabled={isExporting} />
-          </div>
-
-          {/* TAB 1: FRAME & 3D LAYOUT */}
-          {sidebarTab === 'style' && compositionDocument && selectedCompositionObject && selectedCompositionObject !== 'main' && <p className="text-xs text-white/60">Selected object properties are in Objects above. Select Main screenshot to edit its device frame.</p>}
-          {sidebarTab === 'style' && (!compositionDocument || !selectedCompositionObject || selectedCompositionObject === 'main') && (
-            <div className="space-y-5">
-              {/* §5.2 MEDIA 槽位管理区 */}
-              <div className="space-y-2.5 p-3 rounded-2xl bg-white/[0.03] border border-white/10 shadow-sm">
+          <SelectionControls context={templateContext} tab={sidebarTab} layoutMode={layoutMode} imageSrc={imageSrc} secondarySrc={secondarySrc} imageName={imageName} secondaryName={secondaryName} angleControls={<>              {/* 3D Perspective & Angles Selector (Shown in Inspector only on smaller screens where dedicated side rail is hidden) */}
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>MEDIA</span>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
+                    <Compass className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>3D Perspective & Angles</span>
                   </label>
-                  <span className="text-[11px] text-white/40 font-mono">
-                    {compositionDocument?.mediaLayout === 'independent' ? (compositionDocument.detailVisible ? (secondarySrc ? '2/2 Loaded' : '1/2 Loaded') : '1/1 Loaded') : layoutMode === 'duo' ? (secondarySrc ? '2/2 Loaded' : '1/2 Loaded') : '1/1 Loaded'}
+                  <span className="text-[11px] text-white/40 font-mono capitalize">
+                    {LAYOUT_PRESETS.find(p => p.id === layoutPreset)?.name}
                   </span>
                 </div>
 
-                <div className="space-y-2">
-                  {/* Slot 1: Always filled */}
-                  <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-lg overflow-hidden border border-white/20 bg-black/60 shrink-0">
-                        <img src={imageSrc} alt={imageName} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold text-white truncate">Slot 1</div>
-                        <div className="text-[11px] text-white/50 truncate max-w-[150px]">{imageName}</div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold border border-white/15 transition-all cursor-pointer shrink-0"
-                      title="Open Media Picker to replace Slot 1"
-                    >
-                      Replace
-                    </button>
-                  </div>
-
-                  {/* Quick Starter Demos */}
-                  <div className="pt-1.5 border-t border-white/[0.06] flex items-center justify-between gap-1">
-                    <span className="text-[11px] text-white/40 font-medium">Sample image:</span>
-                    <div className="flex items-center gap-1">
-                      {MOCKUP_PRESETS.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => handleApplyPreset(p)}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-all cursor-pointer ${
-                            selectedPreset === p.id && imageSrc === p.svgDataUri
-                              ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 font-semibold'
-                              : 'text-white/50 hover:text-white hover:bg-white/10 border border-transparent'
-                          }`}
-                          title={`Load "${p.name}" sample image`}
-                        >
-                          {p.name.split(' ')[0]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Slot 2: Shown when layoutMode === 'duo' (§5.2) */}
-                  {layoutMode === 'duo' && (
-                    secondarySrc ? (
-                      <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-9 h-9 rounded-lg overflow-hidden border border-white/20 bg-black/60 shrink-0">
-                            <img src={secondarySrc} alt={secondaryName || 'Slot 2'} className="w-full h-full object-cover" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-semibold text-white truncate">Slot 2</div>
-                            <div className="text-[11px] text-white/50 truncate max-w-[130px]">{secondaryName || 'Second Image'}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => secondaryFileInputRef.current?.click()}
-                            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold border border-white/15 transition-all cursor-pointer"
-                            title="Open Media Picker to replace Slot 2"
-                          >
-                            Replace
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSecondarySrc(null);
-                              setSecondaryName('');
-                              setLayoutMode('single');
-                              trackEvent('layout_mode_change', { mode: 'single' });
-                            }}
-                            className="p-1 rounded-lg hover:bg-rose-500/20 text-white/40 hover:text-rose-400 border border-transparent hover:border-rose-500/30 transition-all cursor-pointer"
-                            title="Delete Slot 2 (Return to Single)"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => secondaryFileInputRef.current?.click()}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border-2 border-dashed border-white/20 hover:border-indigo-400/60 bg-white/[0.02] hover:bg-indigo-500/10 text-white/60 hover:text-indigo-200 transition-all cursor-pointer group"
-                        title="Add second screenshot to Slot 2"
-                      >
-                        <div className="w-5 h-5 rounded-full bg-white/10 group-hover:bg-indigo-500/20 flex items-center justify-center text-white/80 group-hover:text-white transition-all">
-                          <Plus className="w-3.5 h-3.5" />
-                        </div>
-                        <span className="text-xs font-semibold">Add Media (Slot 2)</span>
-                      </button>
-                    )
-                  )}
+                <div className="grid grid-cols-2 gap-2.5 w-full min-w-0">
+                  {LAYOUT_PRESETS.map((p) => {
+                    const isActive = layoutPreset === p.id;
+                    return (
+                      <Live3DPerspectiveCard
+                        key={p.id}
+                        presetId={p.id}
+                        name={p.name}
+                        subtitle={p.subtitle}
+                        imageSrc={imageSrc}
+                        secondarySrc={secondarySrc || undefined}
+                        layoutMode={layoutMode}
+                        duoLayout={duoLayout}
+                        bgType={bgType}
+                        gradient={gradient}
+                        solidColor={solidColor}
+                        isCustomGradient={isCustomGradient}
+                        customGradColor1={customGradColor1}
+                        customGradColor2={customGradColor2}
+                        customGradAngle={customGradAngle}
+                        selectedPattern={selectedPattern}
+                        isActive={isActive}
+                        onClick={() => {
+                          setLayoutPreset(p.id);
+                          trackEvent('preset_change', { layout: p.id, type: 'layout' });
+                        }}
+                        layout="inspector"
+                      />
+                    );
+                  })}
                 </div>
               </div>
 
+          <div className="space-y-2"><h4>Quick starter demos</h4><div className="flex flex-wrap gap-2">{MOCKUP_PRESETS.map(preset => <button key={preset.id} type="button" onClick={() => handleApplyPreset(preset)}>{preset.name}</button>)}</div></div>
+</>} document={compositionDocument} texts={textDocument} selected={selectedObject || textEditor.activeId} size={canvasLogicalSize} customLogo={isProUnlocked && !!logoDataUrl} onSelect={selectObject} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit}
+            onIndependent={() => { if (textEditor.finish()) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), ...(aspectRatio.id === 'auto' ? { aspectRatioId: 'custom', customCanvasSize: { ...canvasLogicalSize } } : {}), compositionDocument: compositionDocument ? { ...compositionDocument, mediaLayout: 'independent' } : createIndependentComposition() }); }}
+            onAddButton={() => { if (!textEditor.finish()) return; const document = compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: layoutMode === 'duo' }; const id = crypto.randomUUID(); changeComposition({ ...document, objects: [...document.objects, { id, name: 'Button', kind: 'button', frame: { centerX: .5, centerY: .8, widthRatio: .25, heightRatio: .07, rotation: 0 }, text: 'Get started', fill: '#272617', color: '#ffffff', fontSize: 20, radius: 8, padding: 16, autoWidth: false, arrow: true }], order: [...document.order, id] }); setSelectedObject(id); }}
+            onResetTemplate={() => {
+              if (!compositionDocument?.templateId || !textEditor.finish() || !window.confirm('Reset all template text, screenshots and design settings to the original demo? You can Undo this change.')) return;
+              const before = editorHistory.getLatestSnapshot();
+              const next = buildDesignedSnapshot({ ...before, imageSrc: '', secondarySrc: null, windowTitle: 'bloomboard.example', logoDataUrl: null, qrUrl: '', customBrandWatermark: '' }, 'editorial-honey', crypto.randomUUID());
+              editorHistory.applyCommand(next); setSelectedObject(null); textEditor.select(null);
+            }}
+            onDuplicateText={id => {
+              if (!textEditor.finish() || textDocument.layers.length >= 20) return;
+              const before = editorHistory.getLatestSnapshot(), layer = before.textDocument.layers.find(item => item.id === id); if (!layer) return;
+              const node = [...(canvasRef.current?.querySelectorAll<HTMLElement>('[data-canvas-text]') || [])].find(item => item.dataset.canvasText === id);
+              const height = node?.offsetHeight || layer.fontSize * (layer.lineHeight ?? 1.25), half = height / canvasLogicalSize.height / 2;
+              const below = layer.centerY + height / canvasLogicalSize.height + 16 / canvasLogicalSize.height;
+              const above = layer.centerY - height / canvasLogicalSize.height - 16 / canvasLogicalSize.height;
+              const copy = validateText({ ...layer, id: crypto.randomUUID(), centerX: Math.max(layer.widthRatio / 2, Math.min(1 - layer.widthRatio / 2, layer.centerX + 24 / canvasLogicalSize.width)), centerY: below + half <= 1 ? below : above - half >= 0 ? above : Math.max(half, Math.min(1 - half, layer.centerY + 24 / canvasLogicalSize.height)) });
+              const composition = before.compositionDocument;
+              flushSync(() => { editorHistory.applyCommand({ ...before, textDocument: { ...before.textDocument, layers: [...before.textDocument.layers, copy] }, compositionDocument: composition ? { ...composition, knownTextIds: [...new Set([...(composition.knownTextIds || []), copy.id])], order: [...composition.order, copy.id] } : composition }); });
+              setSelectedObject(null); textEditor.select(copy.id); setSidebarTab('text');
+            }}
+            onReplace={slot => (slot === 'main' ? fileInputRef : secondaryFileInputRef).current?.click()} onRestore={handleRestoreTemplateLayout}
+            onRemoveDetail={() => { if (textEditor.finish() && compositionDocument) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } }); }} />
+          <div hidden={sidebarTab !== 'text'}>
+            <TextControls document={textDocument} editor={textEditor} disabled={isExporting} />
+            {(customBrandWatermark !== '' || editingLegacyBrandText) && <section data-legacy-brand-text className="brand-controls" aria-label="Saved brand text">
+              <h3 className="text-xs font-semibold mb-2">Saved brand text</h3>
+              <input aria-label="Saved brand text" type="text" className="w-full rounded border bg-transparent p-2 text-xs"
+                value={customBrandWatermark} onFocus={() => { startBrandEdit(); setEditingLegacyBrandText(true); }} onBlur={() => { finishBrandEdit(); setEditingLegacyBrandText(false); }}
+                onChange={e => patchBrandSettings({ customBrandWatermark: e.target.value })} />
+              <button type="button" className="brand-remove" onClick={() => patchBrandSettings({ customBrandWatermark: '' })}>Remove saved brand text</button>
+            </section>}
+          </div>
+
+          {/* TAB 1: FRAME & 3D LAYOUT */}
+          {sidebarTab === 'style' && (!compositionDocument || !selectedCompositionObject || selectedCompositionObject === 'main') && (
+            <div className="space-y-5">
               {/* Dual-Image Layout Selector (Only visible in Duo mode) */}
-              {layoutMode === 'duo' && (
+              {layoutMode === 'duo' && compositionDocument?.mediaLayout !== 'independent' && (
                 <div className="space-y-2 p-3 rounded-2xl bg-white/[0.03] border border-white/10 shadow-sm">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
@@ -2723,7 +2718,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 </div>
               )}
 
-              {compositionDocument?.mediaLayout === 'independent' ? <button type="button" className="text-xs text-indigo-300 underline cursor-pointer" onClick={() => { selectObject('main'); const controls = document.querySelector<HTMLDetailsElement>('[data-composition-controls]'); if (controls) controls.open = true; }}>Move and scale Main screenshot in Objects above</button> : <>
+              {compositionDocument?.mediaLayout !== 'independent' && <>
               {/* Mockup Zoom & Position (Shots.so Alignment: Entire Mockup Scaling & Pan) */}
               <div className="space-y-3 p-3 rounded-2xl bg-white/[0.03] border border-white/10 shadow-sm">
                 <div className="flex items-center justify-between">
@@ -2963,8 +2958,9 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 </div>
               )}
 
+              <details data-device-styles className="inspector-device-styles"><summary>Device styles</summary>
               {/* Curated Layout Presets (1-Click Aesthetic Compositions) */}
-              <div className="space-y-2">
+              {compositionDocument?.mediaLayout !== 'independent' && <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
                     <Wand2 className="w-3.5 h-3.5 text-indigo-400" />
@@ -2981,7 +2977,6 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                     return (
                       <button
                         key={p.id}
-                        disabled={!!compositionDocument}
                         onClick={() => {
                           if (templateContext) {
                             if (exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) return;
@@ -3031,52 +3026,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                     );
                   })}
                 </div>
-              </div>
-
-              {/* 3D Perspective & Angles Selector (Shown in Inspector only on smaller screens where dedicated side rail is hidden) */}
-              <div className="lg:hidden space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
-                    <Compass className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>3D Perspective & Angles</span>
-                  </label>
-                  <span className="text-[11px] text-white/40 font-mono capitalize">
-                    {LAYOUT_PRESETS.find(p => p.id === layoutPreset)?.name}
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-2.5 w-full min-w-0">
-                  {LAYOUT_PRESETS.map((p) => {
-                    const isActive = layoutPreset === p.id;
-                    return (
-                      <Live3DPerspectiveCard
-                        key={p.id}
-                        presetId={p.id}
-                        name={p.name}
-                        subtitle={p.subtitle}
-                        imageSrc={imageSrc}
-                        secondarySrc={secondarySrc || undefined}
-                        layoutMode={layoutMode}
-                        duoLayout={duoLayout}
-                        bgType={bgType}
-                        gradient={gradient}
-                        solidColor={solidColor}
-                        isCustomGradient={isCustomGradient}
-                        customGradColor1={customGradColor1}
-                        customGradColor2={customGradColor2}
-                        customGradAngle={customGradAngle}
-                        selectedPattern={selectedPattern}
-                        isActive={isActive}
-                        onClick={() => {
-                          setLayoutPreset(p.id);
-                          trackEvent('preset_change', { layout: p.id, type: 'layout' });
-                        }}
-                        layout="inspector"
-                      />
-                    );
-                  })}
-                </div>
-              </div>
+              </div>}
 
               {/* 12 Corner & Frame Styles Grid */}
               <div className="space-y-2.5">
@@ -3211,6 +3161,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 </div>
               </div>
 
+              </details>
               {/* Window Title or Browser URL Input */}
               {windowTheme !== 'none' && windowTheme !== 'phone-clay' && (
                 <div className="space-y-1.5">
@@ -3998,306 +3949,36 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             </div>
           )}
 
-          {/* TAB 3: BRAND ASSETS & MARKETING ELEMENTS (PRO) */}
-          {sidebarTab === 'brand' && (
-            <div className="space-y-4">
-              {/* Header Value Callout */}
-              <div className="p-3 bg-gradient-to-r from-amber-500/10 via-white/[0.02] to-amber-500/5 rounded-xl border border-amber-500/20 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Brand Authority & Traffic</span>
-                  </span>
-                  <span className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 uppercase tracking-wider">
-                    PRO SUITE
-                  </span>
-                </div>
-                <p className="text-[11px] text-white/60 leading-relaxed">
-                  Free exports are 100% clean with zero forced watermark. Stamp your official brand assets to turn views into clicks and authority.
-                </p>
-              </div>
-
-              {/* A. Custom Brand Logo */}
-              <div className="p-3 bg-white/[0.02] rounded-xl border border-white/[0.06] space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Custom Brand Logo</span>
-                  </span>
-                  {logoDataUrl && (
-                    <button
-                      onClick={() => { artworkTasks.current!.clear('logo'); setLogoDataUrl(null); }}
-                      className="text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
-                      title="Remove custom logo"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>Remove</span>
-                    </button>
-                  )}
-                </div>
-
-                {isProUnlocked ? (
-                  <div className="space-y-2.5">
-                    {logoDataUrl ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 p-2 bg-white/[0.03] rounded-lg border border-white/10">
-                          <img src={logoDataUrl} alt="Logo" className="w-8 h-8 object-contain rounded bg-black/60 p-1" />
-                          <span className="text-xs text-white/80 truncate flex-1 font-medium">Logo active</span>
-                          <button
-                            onClick={() => logoInputRef.current?.click()}
-                            className="text-[11px] text-indigo-300 hover:underline cursor-pointer font-semibold"
-                          >
-                            Change
-                          </button>
-                        </div>
-
-                        {compositionDocument?.objects.some(node => node.kind === 'shape' && node.shape === 'mark') ? <button type="button" className="text-xs underline text-indigo-300 cursor-pointer" onClick={() => { const mark = compositionDocument.objects.find(node => node.kind === 'shape' && node.shape === 'mark'); if (mark) selectObject(mark.id); const controls = document.querySelector<HTMLDetailsElement>('[data-composition-controls]'); if (controls) controls.open = true; }}>Move and size Logo in Objects above</button> : <>
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-white/50">Position</label>
-                          <div className="grid grid-cols-2 gap-1 text-[11px]">
-                            {(['bottom-right', 'bottom-left', 'top-right', 'top-left'] as const).map((pos) => (
-                              <button
-                                key={pos}
-                                onClick={() => setLogoPos(pos)}
-                                className={`py-1 rounded-md border capitalize transition-all cursor-pointer ${
-                                  logoPos === pos
-                                    ? 'bg-white/15 border-white/30 text-white font-medium'
-                                    : 'bg-white/[0.02] border-white/5 text-white/50 hover:text-white'
-                                }`}
-                              >
-                                {pos.replace('-', ' ')}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px] text-white/50">
-                            <span>Scale</span>
-                            <span className="font-mono text-white/80">{logoScale}%</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="3"
-                            max="14"
-                            value={logoScale}
-                            onChange={(e) => setLogoScale(parseInt(e.target.value))}
-                            className="w-full accent-indigo-400 cursor-pointer"
-                          />
-                        </div>
-
-                        </>}
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px] text-white/50">
-                            <span>Opacity</span>
-                            <span className="font-mono text-white/80">{Math.round(logoOpacity * 100)}%</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="50"
-                            max="100"
-                            value={Math.round(logoOpacity * 100)}
-                            onChange={(e) => setLogoOpacity(parseInt(e.target.value) / 100)}
-                            className="w-full accent-indigo-400 cursor-pointer"
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => logoInputRef.current?.click()}
-                        className="w-full py-2.5 px-3 rounded-lg border border-dashed border-white/20 hover:border-white/40 bg-white/[0.02] hover:bg-white/[0.05] text-white/80 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                      >
-                        <Upload className="w-3.5 h-3.5" />
-                        <span>Upload Logo (PNG/SVG)</span>
-                      </button>
-                    )}
-                    {logoError && (
-                      <div className="p-2 bg-rose-500/10 border border-rose-500/30 rounded-lg text-[11px] text-rose-400 flex items-center gap-1.5">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>{logoError}</span>
-                      </div>
-                    )}
-                    {isProcessingLogo && (
-                      <div className="p-2 bg-white/[0.05] border border-white/10 rounded-lg text-[11px] text-white/80 flex items-center gap-1.5 animate-pulse">
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
-                        <span>Optimizing logo dimensions...</span>
-                      </div>
-                    )}
-                    <input
-                      ref={logoInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                      onChange={handleLogoUpload}
-                      className="hidden"
-                    />
-                    <p className="text-[11px] text-white/40">
-                      Recommended: transparent PNG or SVG (Auto-optimized, &le; 5 MB)
-                    </p>
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => setShowProModal(true)}
-                    className="group p-3 bg-white/[0.02] rounded-xl border border-white/[0.06] hover:border-amber-500/30 transition-all cursor-pointer space-y-1.5 active:scale-[0.98]"
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-white/80 font-semibold">Upload Brand Logo (PNG / SVG)</span>
-                      <Lock className="w-3.5 h-3.5 text-amber-400 group-hover:text-amber-300" />
-                    </div>
-                    <p className="text-[11px] text-white/50 leading-normal">
-                      Stamp your high-res logo onto any corner of your screenshots and social cards.
-                    </p>
-                    <span className="text-[11px] text-amber-400 font-bold group-hover:underline flex items-center gap-1">
-                      <span>Unlock in Pro ($1 Lifetime) &rarr;</span>
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* B. Dynamic QR Code */}
-              <div className="p-3 bg-white/[0.02] rounded-xl border border-white/[0.06] space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
-                    <QrCode className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Dynamic QR Code</span>
-                  </span>
-                  {qrUrl && (
-                    <button
-                      onClick={() => { setQrUrl(''); setQrDataUrl(null); }}
-                      className="text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
-                      title="Clear QR code"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>Clear</span>
-                    </button>
-                  )}
-                </div>
-
-                {isProUnlocked ? (
-                  <div className="space-y-2.5">
-                    <input
-                      type="text"
-                      value={qrUrl}
-                      onChange={(e) => setQrUrl(e.target.value)}
-                      placeholder="https://yourproduct.com"
-                      className="w-full bg-white/[0.04] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/30 font-mono"
-                    />
-
-                    {qrDataUrl && (
-                      <div className="space-y-2 pt-1">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-white/50">Position</label>
-                          <div className="grid grid-cols-2 gap-1 text-[11px]">
-                            {(['bottom-left', 'bottom-right', 'top-left', 'top-right'] as const).map((pos) => (
-                              <button
-                                key={pos}
-                                onClick={() => setQrPos(pos)}
-                                className={`py-1 rounded-md border capitalize transition-all cursor-pointer ${
-                                  qrPos === pos
-                                    ? 'bg-white/15 border-white/30 text-white font-medium'
-                                    : 'bg-white/[0.02] border-white/5 text-white/50 hover:text-white'
-                                }`}
-                              >
-                                {pos.replace('-', ' ')}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px] text-white/50">
-                            <span>Scale</span>
-                            <span className="font-mono text-white/80">{qrScale}%</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="5"
-                            max="16"
-                            value={qrScale}
-                            onChange={(e) => setQrScale(parseInt(e.target.value))}
-                            className="w-full accent-indigo-400 cursor-pointer"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    <p className="text-[11px] text-white/40">
-                      Scans take people straight to your product or waitlist.
-                    </p>
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => setShowProModal(true)}
-                    className="group p-3 bg-white/[0.02] rounded-xl border border-white/[0.06] hover:border-amber-500/30 transition-all cursor-pointer space-y-1.5 active:scale-[0.98]"
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-white/80 font-semibold">Embed Dynamic QR Code</span>
-                      <Lock className="w-3.5 h-3.5 text-amber-400 group-hover:text-amber-300" />
-                    </div>
-                    <p className="text-[11px] text-white/50 leading-normal">
-                      Convert passive viewers into direct website traffic, waitlist signups, and app downloads.
-                    </p>
-                    <span className="text-[11px] text-amber-400 font-bold group-hover:underline flex items-center gap-1">
-                      <span>Unlock in Pro ($1 Lifetime) &rarr;</span>
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* C. Text Brand Badge */}
-              <div className="p-3 bg-white/[0.02] rounded-xl border border-white/[0.06] space-y-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-white/50">Text Brand Badge</span>
-                {isProUnlocked ? (
-                  <div className="space-y-1">
-                    <input
-                      type="text"
-                      value={customBrandWatermark}
-                      onChange={(e) => setCustomBrandWatermark(e.target.value)}
-                      placeholder="e.g. @IndieFounder or mysite.com"
-                      className="w-full bg-white/[0.04] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/30"
-                    />
-                    <p className="text-[11px] text-white/40">
-                      Appears in the bottom-right corner.
-                    </p>
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => setShowProModal(true)}
-                    className="group p-3 bg-white/[0.02] rounded-xl border border-white/[0.06] hover:border-amber-500/30 transition-all cursor-pointer space-y-1.5 active:scale-[0.98]"
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-white/80 font-semibold">Custom Text Attribution (@YourHandle)</span>
-                      <Lock className="w-3 h-3 text-amber-400" />
-                    </div>
-                    <p className="text-[11px] text-white/50 leading-normal">
-                      Personalize every graphic with your Twitter handle or domain name.
-                    </p>
-                    <span className="text-[11px] text-amber-400 font-bold group-hover:underline flex items-center gap-1">
-                      <span>Unlock in Pro ($1 Lifetime) &rarr;</span>
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Lifetime Pro Deal Strip (if not pro) */}
-              {!isProUnlocked && (
-                <div className="p-3.5 bg-gradient-to-br from-amber-500/10 via-white/[0.02] to-amber-500/5 border border-amber-500/30 rounded-xl space-y-2 text-center">
-                  <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-amber-300">
-                    <Zap className="w-3.5 h-3.5 fill-amber-300" />
-                    <span>LAUNCH SPECIAL: $1 LIFETIME COMMERCIAL PASS</span>
-                  </div>
-                  <p className="text-[11px] text-white/60 leading-normal">
-                    Unlock Brand Logo + Dynamic QR + 4K Ultra HD + Batch Multi-Platform Export with lifetime commercial rights for social media, client work & product launches.
-                  </p>
-                  <button
-                    onClick={() => setShowProModal(true)}
-                    className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer active:scale-[0.98]"
-                  >
-                    Unlock Commercial Pass ($1)
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+          {/* TAB 3: FREE LOGO AND QR ASSETS */}
+          {sidebarTab === 'brand' && <BrandControls
+            logoDataUrl={logoDataUrl} logoOpacity={logoOpacity}
+            logoScale={templateLogo(compositionDocument)?.frame.heightRatio ? templateLogo(compositionDocument)!.frame.heightRatio * 100 : logoScale}
+            logoPos={logoPos} logoError={logoError} isProcessingLogo={isProcessingLogo}
+            templateFrame={templateLogo(compositionDocument)?.frame}
+            qrUrl={qrUrl} qrDataUrl={qrDataUrl} qrScale={qrScale} qrPos={qrPos} disabled={isExporting}
+            onUploadLogo={handleLogoUpload}
+            onRemoveLogo={() => { artworkTasks.current!.clear('logo'); logoUploadRequested.current = false; logoRequestSerial.current++; setIsProcessingLogo(false); setLogoError(''); setTextError(''); patchBrandSettings({ logoDataUrl: null }); }}
+            onLogoOpacity={value => patchBrandSettings({ logoOpacity: value })}
+            onLogoScale={value => {
+              const doc = brandTransaction.current?.latest.compositionDocument ?? compositionDocument;
+              if (doc && templateLogo(doc)) patchBrandSettings({ compositionDocument: resizeTemplateLogo(doc, value, canvasLogicalSize) });
+              else patchBrandSettings({ logoScale: value });
+            }}
+            onLogoPosition={value => patchBrandSettings({ logoPos: value })}
+            onTemplateLogoMove={patch => {
+              if (compositionDocument) patchBrandSettings({ compositionDocument: moveTemplateLogo(compositionDocument, patch, canvasLogicalSize) });
+            }}
+            onTemplateLogoReset={() => {
+              if (!compositionDocument) return;
+              const original = templateLogo(createHoneyComposition())!;
+              patchBrandSettings({ compositionDocument: moveTemplateLogo(compositionDocument, { centerX: original.frame.centerX, centerY: original.frame.centerY }, canvasLogicalSize) });
+            }}
+            onQrUrl={value => patchBrandSettings({ qrUrl: value })}
+            onQrSize={value => patchBrandSettings({ qrScale: value })}
+            onQrPosition={value => patchBrandSettings({ qrPos: value })}
+            onRemoveQr={() => { artworkTasks.current!.clear('qr'); setQrDataUrl(null); patchBrandSettings({ qrUrl: '' }); }}
+            onStart={startBrandEdit} onFinish={finishBrandEdit}
+          />}
 
           {/* TAB 4: EXPORT RESOLUTION, SIZES & DOWNLOAD */}
           {sidebarTab === 'export' && (

@@ -4,6 +4,7 @@ import type { EditorSnapshot } from './useHistory';
 import type { PresetGradient } from './themes';
 import { CanvasTextLayerRenderer } from './text/CanvasTextLayerRenderer';
 import { CompositionRenderer } from './composition/CompositionRenderer';
+import { canUse } from '../shared/productCapabilities';
 
 export interface MockupArtworkProps extends Pick<EditorSnapshot,
   | 'compositionDocument'
@@ -258,8 +259,8 @@ export function MockupArtwork({
         />
       </FittedScene>}
 
-      {/* Pro Feature: Custom Brand Logo */}
-      {isProUnlocked && logoDataUrl && !compositionDocument?.objects.some(node => node.kind === 'shape' && node.shape === 'mark') && (
+      {/* Free logo slot; a template mark owns its own custom logo placement. */}
+      {canUse('brand_logo', isProUnlocked) && logoDataUrl && !compositionDocument?.objects.some(node => node.kind === 'shape' && node.shape === 'mark') && (
         <img
           src={logoDataUrl}
           alt="Brand Logo"
@@ -274,8 +275,8 @@ export function MockupArtwork({
         />
       )}
 
-      {/* Pro Feature: Dynamic QR Code */}
-      {isProUnlocked && qrDataUrl && (
+      {/* Free static QR code. */}
+      {canUse('qr_code', isProUnlocked) && qrDataUrl && (
         <div
           className="absolute select-none pointer-events-none transition-all z-20 flex items-center justify-center p-1 bg-white/95 backdrop-blur-md rounded-lg shadow-lg border border-white/40"
           style={{
@@ -293,8 +294,8 @@ export function MockupArtwork({
         </div>
       )}
 
-      {/* Pro Feature: Custom Brand Text Badge */}
-      {isProUnlocked && customBrandWatermark.trim() && (
+      {/* Preserve existing saved text badges as free text content. */}
+      {canUse('legacy_brand_badge', isProUnlocked) && customBrandWatermark.trim() && (
         <div 
           className="absolute text-[11px] font-semibold text-white/90 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-md border border-white/20 select-none whitespace-nowrap shrink-0 pointer-events-none tracking-wide z-10 shadow-lg flex items-center gap-1.5"
           style={{

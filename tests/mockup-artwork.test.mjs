@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { createTypeScriptLoader } from './helpers/load-typescript.mjs';
 const require = createRequire(import.meta.url);
+const load = createTypeScriptLoader(fileURLToPath(new URL('../', import.meta.url)));
 
 test('extracted artwork retains its canvas root and original layer order', () => {
   const file = new URL('../src/MockupArtwork.tsx', import.meta.url);
@@ -14,7 +17,8 @@ test('extracted artwork retains its canvas root and original layer order', () =>
   const localRequire = name => name === 'react' ? { ...require('react'), useMemo: factory => factory() } : name === './CanvasLayout' ? {
     FittedScene: function FittedScene() {}, DeviceComposition: function DeviceComposition() {},
   } : name === './text/CanvasTextLayerRenderer' ? { CanvasTextLayerRenderer: function CanvasTextLayerRenderer() {} }
-    : name === './composition/CompositionRenderer' ? { CompositionRenderer: function CompositionRenderer() {} } : require(name);
+    : name === './composition/CompositionRenderer' ? { CompositionRenderer: function CompositionRenderer() {} }
+    : name === '../shared/productCapabilities' ? load('shared/productCapabilities.ts') : require(name);
   new Function('require', 'module', 'exports', transpiled)(localRequire, module, module.exports);
   const root = module.exports.MockupArtwork({
     canvasLogicalSize: { width: 960, height: 720 }, gradient: { className: 'baseline-gradient' },

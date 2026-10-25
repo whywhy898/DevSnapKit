@@ -12,7 +12,7 @@ export const FREE_FEATURES = [
 ] as const;
 
 export const PRO_FEATURES = [
-  // Historical API identifier for 4x output scaling.
+  // Stable historical API identifier for paid high-resolution export presets.
   '4k_export',
   'batch_export',
   'all_gradients',

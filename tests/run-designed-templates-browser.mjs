@@ -58,15 +58,15 @@ try{
   const state=await page.evaluate(()=>window.__mockupBaseline?.snapshot);assert.equal(state?.compositionDocument?.templateId,'editorial-honey');assert.equal(state.textDocument.layers.length,8);
   results.push({scenario:'neutral-honey-1x',...(await exportPng(page,'editorial-honey-neutral-1600x1200.png',1))});
   results.push({scenario:'neutral-honey-2x',...(await exportPng(page,'editorial-honey-neutral-3200x2400.png',2))});
-  await page.click('[data-composition-controls] summary');
-  await page.click('button[aria-label="Select Detail screenshot"]');await settle(page);
+  await clickButton(page,'Frame');
+  await page.click('button[aria-label="Select Image 2"]');await settle(page);
   const beforeMove=await page.evaluate(()=>structuredClone(window.__mockupBaseline.snapshot.compositionDocument.placements.secondary));
   const handle=await page.$('[aria-label="Move selected object"]'),box=await handle.boundingBox();assert.ok(box);
   await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+60,box.y+box.height/2-25,{steps:12});await page.mouse.up();await settle(page);
   const afterMove=await page.evaluate(()=>window.__mockupBaseline.snapshot.compositionDocument.placements.secondary);assert.ok(afterMove.centerX>beforeMove.centerX);assert.ok(afterMove.centerY<beforeMove.centerY);
   await clickButton(page,'Undo');await settle(page);assert.deepEqual(await page.evaluate(()=>window.__mockupBaseline.snapshot.compositionDocument.placements.secondary),beforeMove,'one undo restores detail movement');
-  await page.click('button[aria-label="Select Call to action"]');await page.waitForSelector('[aria-label="Button label"]');
-  await page.$eval('[aria-label="Button label"]',n=>n.focus());await page.keyboard.down('Control');await page.keyboard.press('A');await page.keyboard.up('Control');await page.keyboard.type('Start creating');await page.click('[data-composition-controls] summary');await settle(page);
+  await page.click('[aria-label="Elements"]');await page.click('button[aria-label="Select Call to action"]');await page.waitForSelector('[aria-label="Button label"]');
+  await page.$eval('[aria-label="Button label"]',n=>n.focus());await page.keyboard.down('Control');await page.keyboard.press('A');await page.keyboard.up('Control');await page.keyboard.type('Start creating');await clickButton(page,'Canvas');await settle(page);
   assert.equal(await page.evaluate(()=>window.__mockupBaseline.snapshot.compositionDocument.objects.find(n=>n.id==='cta').text),'Start creating');
   results.push({scenario:'detail-drag-undo-and-cta-edit',pass:true});
   // Internal reference version: actual file upload and editable controls only.
@@ -84,8 +84,8 @@ try{
   // The complete second screenshot already contains the original card heading.
   await editRole(page,'website','honeywerank.com ↗');
   await editRole(page,'disclosure','Product preview · Dashboard contains illustrative sample data');
-  await page.click('[data-composition-controls] summary');await page.click('button[aria-label="Select Call to action"]');
-  await page.focus('[aria-label="Button label"]');await page.keyboard.down('Control');await page.keyboard.press('A');await page.keyboard.up('Control');await page.keyboard.type('Join the waitlist');await page.click('button[aria-label="Select Main screenshot"]');await clickButton(page,'Frame');
+  await page.click('[aria-label="Elements"]');await page.click('button[aria-label="Select Call to action"]');
+  await page.focus('[aria-label="Button label"]');await page.keyboard.down('Control');await page.keyboard.press('A');await page.keyboard.up('Control');await page.keyboard.type('Join the waitlist');await clickButton(page,'Frame');await page.click('button[aria-label="Select Image 1"]');
   // Window title is a shipped editable input, found by its actual default value.
   await page.evaluate(()=>{const input=[...document.querySelectorAll('input')].find(n=>n.value==='bloomboard.example'&&n.getClientRects().length);if(input)input.focus();});
   const titleFocused=await page.evaluate(()=>document.activeElement?.value==='bloomboard.example');
