@@ -1,6 +1,7 @@
 // Cloudflare Pages Function: /api/verify-license
 // Authenticates a license key using HMAC-SHA256 signature verification
 import { ConfigurationError, licenseCheck, requireSecret } from '../lib/security';
+import { CAPABILITY_POLICY_VERSION, FREE_FEATURES, PRO_FEATURES } from '../../shared/productCapabilities';
 
 interface Env {
   DSK_SERVER_SECRET?: string;
@@ -59,7 +60,12 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
         licenseKey: clean,
         tier: 'pro_lifetime',
         serverVerified: true,
-        unlockedFeatures: ['4k_export', 'webp_export', 'all_gradients', 'custom_watermark', 'commercial_rights'],
+        freeFeatures: FREE_FEATURES,
+        proFeatures: PRO_FEATURES,
+        capabilityPolicyVersion: CAPABILITY_POLICY_VERSION,
+        // Legacy clients consume all available features here, including free
+        // features, the old badge alias, and the existing legal entitlement.
+        unlockedFeatures: [...FREE_FEATURES, ...PRO_FEATURES, 'custom_watermark', 'commercial_rights'],
       }),
       { status: 200, headers: corsHeaders }
     );
