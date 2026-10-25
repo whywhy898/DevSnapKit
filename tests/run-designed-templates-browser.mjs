@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import sharp from 'sharp';
 import { launchBrowser,clickButton,downloadPng,finishTextEditing } from './helpers/browser.mjs';
 const require=createRequire(import.meta.url),root=path.resolve(import.meta.dirname,'..');
-const output=process.env.DESIGNED_OUTPUT||path.resolve(root,'../../output/devsnapkit/designed-templates-2026-10-25/browser');
+const output=process.env.DESIGNED_OUTPUT||path.resolve(root,'../../output/devsnapkit/whole-card-free-brand/m1/designed-runs',new Date().toISOString().replace(/[:.]/g,'-'));
 const origin=process.env.DESIGNED_ORIGIN||'http://127.0.0.1:5198';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 let server,browser;const results=[],errors=[];

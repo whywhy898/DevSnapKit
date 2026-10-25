@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import sharp from 'sharp';
 import { launchBrowser,clickButton,downloadPng,finishTextEditing } from './helpers/browser.mjs';
 const require=createRequire(import.meta.url),root=path.resolve(import.meta.dirname,'..');
-const output=process.env.WHOLE_CARD_OUTPUT||path.resolve(root,'../../output/devsnapkit/whole-card-free-brand/m1/task2');
+const output=process.env.WHOLE_CARD_OUTPUT||path.resolve(root,'../../output/devsnapkit/whole-card-free-brand/m1/whole-card-runs',new Date().toISOString().replace(/[:.]/g,'-'));
 const origin=process.env.WHOLE_CARD_ORIGIN||'http://127.0.0.1:5204';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 let server,browser;const results=[],errors=[];
