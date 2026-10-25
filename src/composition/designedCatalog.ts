@@ -8,10 +8,11 @@ export const DESIGNED_TEMPLATES = [{ id: 'editorial-honey' as const, name: 'Edit
   description: 'An editorial launch poster with expressive type, a website mockup and a detail card.' }];
 export const logicalFrame = (x: number, y: number, width: number, height: number, rotation = 0): ObjectFrame => ({ centerX: (x + width / 2) / 1600, centerY: (y + height / 2) / 1200, widthRatio: width / 1600, heightRatio: height / 1200, rotation });
 
-export function createHoneyComposition(): CompositionDocument {
+function createVersionedHoneyComposition(version: 1 | 2): CompositionDocument {
   const doc = createIndependentComposition();
   const shape = (id: string, name: string, kind: ShapeObject['shape'], frame: ObjectFrame, fill: string, stroke?: string, radius?: number): ShapeObject => ({ id, name, kind: 'shape', shape: kind, frame, fill, stroke, radius });
-  return { ...doc, templateId: 'editorial-honey', placements: { main: logicalFrame(560, 275, 980, 780, -3), secondary: logicalFrame(100, 884, 410, 184) }, detailVisible: true,
+  return { ...doc, templateId: 'editorial-honey', placements: { main: logicalFrame(560, 275, 980, 780, -3), secondary: version === 1 ? logicalFrame(100, 884, 410, 184) : logicalFrame(80, 798, 450, 290) }, detailVisible: true,
+    detailRadius: version === 1 ? doc.detailRadius : 0,
     objects: [
       { id: 'cta', name: 'Call to action', kind: 'button', frame: logicalFrame(80, 660, 244, 64), text: 'Find your focus', fontSize: 19, color: '#fffdf0', fill: '#272617', radius: 8, padding: 18, autoWidth: false, arrow: true },
       shape('brand-mark', 'Brand mark', 'mark', logicalFrame(80, 65, 34, 38), '#242313', '#ffdc38'),
@@ -20,12 +21,19 @@ export function createHoneyComposition(): CompositionDocument {
       shape('halo-ring', 'Fine circle', 'ellipse', logicalFrame(790, 230, 720, 720), 'transparent', '#e8d57c'),
       shape('top-rule', 'Header rule', 'line', logicalFrame(80, 139, 1440, 1), '#ddd6b8'),
       shape('bottom-rule', 'Footer rule', 'line', logicalFrame(80, 1099, 1440, 1), '#ddd6b8'),
-      shape('detail-panel', 'Detail panel', 'rect', logicalFrame(80, 798, 450, 290), '#ffffff', '#eae2be', 18),
+      ...(version === 1 ? [shape('detail-panel', 'Detail panel', 'rect', logicalFrame(80, 798, 450, 290), '#ffffff', '#eae2be', 18)] : []),
       shape('badge-outline', 'Header badge outline', 'rect', logicalFrame(1260, 70, 260, 45), 'transparent', '#d9d1ad', 24),
     ], order: ['main', 'secondary', 'brand-mark', 'cta'] };
 }
 
+export function createHoneyComposition(): CompositionDocument { return createVersionedHoneyComposition(2); }
+
 export function buildDesignedSnapshot(before: EditorSnapshot, templateId: 'editorial-honey', prefix: string): EditorSnapshot {
+  return buildVersionedHoneySnapshot(before, templateId, prefix, 2);
+}
+
+// Only new applications use v2. Existing snapshots keep their original editable card.
+function buildVersionedHoneySnapshot(before: EditorSnapshot, templateId: 'editorial-honey', prefix: string, version: 1 | 2): EditorSnapshot {
   if (templateId !== 'editorial-honey') throw new Error('Unknown designed template');
   const id = (role: string) => `${prefix}-${role}`;
   const layer = (role: string, content: string, x: number, y: number, width: number, height: number, fontSize: number, extra: Partial<CanvasTextLayer> = {}): CanvasTextLayer => validateText({
@@ -45,22 +53,22 @@ export function buildDesignedSnapshot(before: EditorSnapshot, templateId: 'edito
     layer('disclosure', 'Product preview · All names and numbers are illustrative', 600, 1060, 910, 20, 13, { color: '#756743', align: 'center' }),
     layer('website', 'bloomboard.example ↗', 80, 1130, 700, 32, 24, { weight: 800, letterSpacing: -.6 }),
     layer('credit', 'Visual crafted with DevSnapKit', 1000, 1134, 520, 22, 16, { color: '#9d9379', align: 'right' }),
-  ];
+  ].filter(layer => version === 1 || !['detail-label', 'detail-status', 'detail-heading'].some(role => layer.id === id(role)));
   const replaceMain = !before.imageSrc || before.primaryMediaOrigin?.kind === 'builtin';
   const replaceDetail = !before.secondarySrc || before.secondaryMediaOrigin?.kind === 'builtin';
-  const compositionDocument = createHoneyComposition();
+  const compositionDocument = createVersionedHoneyComposition(version);
   compositionDocument.knownTextIds = layers.map(text => text.id);
   compositionDocument.order.push(...layers.map(text => text.id));
   return { ...before, compositionDocument,
-    templateContext: { id: templateId, version: 1, mediaRegion: { x: 0, y: 0, width: 1, height: 1 }, textRoles: { headline: id('headline'), description: id('description'), ...Object.fromEntries(layers.map(layer => [layer.id.slice(prefix.length + 1), layer.id])) } },
+    templateContext: { id: templateId, version, mediaRegion: { x: 0, y: 0, width: 1, height: 1 }, textRoles: { headline: id('headline'), description: id('description'), ...Object.fromEntries(layers.map(layer => [layer.id.slice(prefix.length + 1), layer.id])) } },
     textDocument: { version: 1, layers },
     imageSrc: replaceMain ? '/designed/examples/bloom-dashboard.svg' : before.imageSrc,
     imageName: replaceMain ? 'bloom-dashboard.svg' : before.imageName,
     primaryMediaOrigin: replaceMain ? { kind: 'builtin', sampleId: 'bloom-dashboard' } : before.primaryMediaOrigin ?? { kind: 'unknown' },
     windowTitle: replaceMain && (MOCKUP_PRESETS.some(sample => sample.title === before.windowTitle) || before.windowTitle === 'bloomboard.example') ? 'bloomboard.example' : before.windowTitle,
-    secondarySrc: replaceDetail ? '/designed/examples/bloom-workflow.svg' : before.secondarySrc,
-    secondaryName: replaceDetail ? 'bloom-workflow.svg' : before.secondaryName,
-    secondaryMediaOrigin: replaceDetail ? { kind: 'builtin', sampleId: 'bloom-workflow' } : before.secondaryMediaOrigin ?? { kind: 'unknown' },
+    secondarySrc: replaceDetail ? (version === 1 ? '/designed/examples/bloom-workflow.svg' : '/designed/examples/bloom-workflow-card.png') : before.secondarySrc,
+    secondaryName: replaceDetail ? (version === 1 ? 'bloom-workflow.svg' : 'bloom-workflow-card.png') : before.secondaryName,
+    secondaryMediaOrigin: replaceDetail ? { kind: 'builtin', sampleId: version === 1 ? 'bloom-workflow' : 'bloom-workflow-card' } : before.secondaryMediaOrigin ?? { kind: 'unknown' },
     aspectRatioId: 'custom', customCanvasSize: { width: 1600, height: 1200 }, bgType: 'solid', solidColor: '#fbf8eb',
     windowTheme: 'browser', padding: 0, roundedCorners: 14, shadowLevel: 'soft', shadowOpacity: 45, hideMockup: false,
     layoutMode: 'single', duoLayout: 'side', layoutPreset: 'flat', cornerStyle: 'default',
@@ -72,7 +80,7 @@ export function buildDesignedSnapshot(before: EditorSnapshot, templateId: 'edito
 export function restoreDesignedLayout(before: EditorSnapshot): EditorSnapshot {
   const document = before.compositionDocument;
   if (document?.templateId !== 'editorial-honey') return before;
-  const defaults = buildDesignedSnapshot(before, 'editorial-honey', 'geometry');
+  const defaults = buildVersionedHoneySnapshot(before, 'editorial-honey', 'geometry', before.templateContext?.version === 2 ? 2 : 1);
   const target = defaults.compositionDocument!;
   const geometry = <T extends { id: string; frame: ObjectFrame }>(node: T): T => {
     const match = [...target.objects, ...target.decorations].find(candidate => candidate.id === node.id);
@@ -92,7 +100,7 @@ export function restoreDesignedLayout(before: EditorSnapshot): EditorSnapshot {
 export function resetDesignedStyles(before: EditorSnapshot): EditorSnapshot {
   const document = before.compositionDocument;
   if (document?.templateId !== 'editorial-honey') return before;
-  const defaults = buildDesignedSnapshot(before, 'editorial-honey', 'style'), target = defaults.compositionDocument!;
+  const defaults = buildVersionedHoneySnapshot(before, 'editorial-honey', 'style', before.templateContext?.version === 2 ? 2 : 1), target = defaults.compositionDocument!;
   const objects = document.objects.map(node => {
     const style = target.objects.find(item => item.id === node.id && item.kind === node.kind);
     return style ? { ...style, frame: node.frame, hidden: node.hidden, ...(node.kind === 'button' ? { text: node.text } : {}) } : node;
@@ -102,6 +110,6 @@ export function resetDesignedStyles(before: EditorSnapshot): EditorSnapshot {
   });
   return { ...before, bgType: defaults.bgType, solidColor: defaults.solidColor, windowTheme: defaults.windowTheme, roundedCorners: defaults.roundedCorners,
     shadowLevel: defaults.shadowLevel, shadowOpacity: defaults.shadowOpacity, cornerStyle: defaults.cornerStyle, vfxGlow: false, vfxNoise: false, bgImageSrc: null,
-    compositionDocument: { ...document, objects, decorations },
+    compositionDocument: { ...document, detailFit: target.detailFit, detailAlign: target.detailAlign, detailRadius: target.detailRadius, detailBorder: target.detailBorder, detailShadow: target.detailShadow, objects, decorations },
   };
 }

@@ -20,6 +20,19 @@ async function replaceTitleSegment(page,oldText,newText){
   await page.$eval('[aria-label="Text content"]',(n,value)=>{n.focus();const start=n.value.indexOf(value);if(start<0)throw Error('Missing title segment');n.setSelectionRange(start,start+value.length);n.dispatchEvent(new Event('select',{bubbles:true}));},oldText);
   await page.keyboard.type(newText);
 }
+// Input preparation only: original-brand artwork stays in the private output
+// directory and is subsequently uploaded through the real product UI.
+async function prepareInternalReferenceCard(browser,original){
+  const file=path.join(output,'honeywerank-workflow-card-reference.png');
+  const image='data:image/png;base64,'+(await fs.readFile(path.join(original,'honeywerank-publishing.png'))).toString('base64');
+  const input=await browser.newPage();
+  try{
+    await input.setViewport({width:450,height:290,deviceScaleFactor:4});
+    await input.setContent('<!doctype html><html><head><style>*{box-sizing:border-box}html,body{margin:0;width:450px;height:290px}body{background:white;border:1px solid #eae2be;border-radius:18px;font-family:Arial,sans-serif;overflow:hidden}.label{position:absolute;top:22px;font-size:10px;font-weight:600;color:#8c7c45;letter-spacing:1px;text-transform:uppercase}.left{left:20px}.right{right:20px}h1{position:absolute;left:20px;top:48px;margin:0;font-size:17px;font-weight:800;letter-spacing:-.3px;line-height:22px}img{position:absolute;left:20px;top:86px;width:410px;height:184px;object-fit:contain}</style></head><body><span class="label left">How it works</span><span class="label right">Illustrative workflow</span><h1>Publish content. Build authority.</h1><img></body></html>');
+    await input.$eval('img',(node,src)=>{node.src=src;},image);await input.evaluate(async()=>{await document.fonts.ready;await document.querySelector('img').decode();});
+    await input.screenshot({path:file});return file;
+  }finally{await input.close();}
+}
 async function exportPng(page,name,scale){
   await clickButton(page,'Export');await clickButton(page,scale===1?'1x Web':'2x HD');await page.mouse.move(0,0);await settle(page);
   await page.evaluate(()=>{
@@ -42,7 +55,7 @@ try{
   await page.evaluateOnNewDocument(()=>{localStorage.clear();localStorage.setItem('devsnapkit_welcome_seen','1');});page.on('pageerror',e=>errors.push(e.message));
   await page.goto(origin+'/?editor=1',{waitUntil:'domcontentloaded'});await page.waitForSelector('button[aria-label="Templates"]');await settle(page);
   await page.click('button[aria-label="Templates"]');await page.click('button[aria-label="Apply Editorial Honey template"]');await page.waitForSelector('#studio-canvas [data-composition-object="secondary"]');await settle(page);
-  const state=await page.evaluate(()=>window.__mockupBaseline?.snapshot);assert.equal(state?.compositionDocument?.templateId,'editorial-honey');assert.ok(state.textDocument.layers.length>=10);
+  const state=await page.evaluate(()=>window.__mockupBaseline?.snapshot);assert.equal(state?.compositionDocument?.templateId,'editorial-honey');assert.equal(state.textDocument.layers.length,8);
   results.push({scenario:'neutral-honey-1x',...(await exportPng(page,'editorial-honey-neutral-1600x1200.png',1))});
   results.push({scenario:'neutral-honey-2x',...(await exportPng(page,'editorial-honey-neutral-3200x2400.png',2))});
   await page.click('[data-composition-controls] summary');
@@ -59,15 +72,17 @@ try{
   // Internal reference version: actual file upload and editable controls only.
   // Original-brand assets stay outside the public customer build.
   const original=path.resolve(root,'../../output/devsnapkit');
+  const referenceCard=await prepareInternalReferenceCard(browser,original);
   await (await page.$('[aria-label="Main screenshot file"]')).uploadFile(path.join(original,'honeywerank-original.png'));
-  await (await page.$('[aria-label="Second screenshot file"]')).uploadFile(path.join(original,'honeywerank-publishing.png'));
-  await page.waitForFunction(()=>window.__mockupBaseline.snapshot.imageName==='honeywerank-original.png'&&window.__mockupBaseline.snapshot.secondaryName==='honeywerank-publishing.png');await settle(page);
+  await (await page.$('[aria-label="Second screenshot file"]')).uploadFile(referenceCard);
+  await page.waitForFunction(()=>window.__mockupBaseline.snapshot.imageName==='honeywerank-original.png'&&window.__mockupBaseline.snapshot.secondaryName==='honeywerank-workflow-card-reference.png');await settle(page);
   await editRole(page,'brand','HoneyWeRank');await editRole(page,'badge','Join the waitlist');
   const headline=await page.evaluate(()=>window.__mockupBaseline.snapshot.templateContext.textRoles.headline);await page.click(`[data-text-hit="${headline}"]`);await page.waitForSelector('[aria-label="Text content"]');
   await replaceTitleSegment(page,'Make room','Be the');await replaceTitleSegment(page,'for your','brand AI');await replaceTitleSegment(page,'next idea.','recommends.');await finishTextEditing(page);await settle(page);
   const emphasized=await page.evaluate(()=>window.__mockupBaseline.snapshot.textDocument.layers.find(n=>n.id===window.__mockupBaseline.snapshot.templateContext.textRoles.headline).runs);assert.ok(emphasized.some(r=>r.text.includes('recommends.')&&r.font==='gelasio'&&r.italic));
   await editRole(page,'description','Content. Publishing. Backlinks.\nA sweeter way to get discovered.');
-  await editRole(page,'detail-heading','Publish content. Build authority.');await editRole(page,'website','honeywerank.com ↗');
+  // The complete second screenshot already contains the original card heading.
+  await editRole(page,'website','honeywerank.com ↗');
   await editRole(page,'disclosure','Product preview · Dashboard contains illustrative sample data');
   await page.click('[data-composition-controls] summary');await page.click('button[aria-label="Select Call to action"]');
   await page.focus('[aria-label="Button label"]');await page.keyboard.down('Control');await page.keyboard.press('A');await page.keyboard.up('Control');await page.keyboard.type('Join the waitlist');await page.click('button[aria-label="Select Main screenshot"]');await clickButton(page,'Frame');

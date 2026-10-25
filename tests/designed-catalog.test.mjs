@@ -12,7 +12,8 @@ test('Honey descriptor contains a complete neutral composition and preserves bot
   const next=api.buildDesignedSnapshot(user,'editorial-honey','test');
   assert.equal(next.imageSrc,user.imageSrc);assert.equal(next.secondarySrc,user.secondarySrc);assert.equal(next.windowTitle,'My page');
   assert.equal(next.aspectRatioId,'custom');assert.deepEqual(JSON.parse(JSON.stringify(next.customCanvasSize)),{width:1600,height:1200});
-  assert.ok(next.textDocument.layers.length>=10);assert.equal(next.compositionDocument.detailVisible,true);
+  // Three card labels are baked into screenshot 2; eight poster roles remain editable.
+  assert.equal(next.textDocument.layers.length,8);assert.equal(next.compositionDocument.detailVisible,true);
   assert.ok(next.compositionDocument.objects.some(n=>n.kind==='button'));assert.ok(next.compositionDocument.decorations.length>=3);
   assert.match(next.textDocument.layers.find(n=>n.id==='test-brand').content,/Bloom/);
 });
