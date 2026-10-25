@@ -52,7 +52,7 @@ export const getShadowClass = (level: string = 'dramatic') => {
   }
 };
 
-const MediaHoverOverlay: React.FC = () => (
+export const MediaHoverOverlay: React.FC = () => (
   <div 
     data-export-ignore="true"
     className="media-hover-overlay absolute inset-0 bg-black/50 opacity-0 group-hover/media:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-4 text-center z-10 backdrop-blur-[2px] pointer-events-none select-none"

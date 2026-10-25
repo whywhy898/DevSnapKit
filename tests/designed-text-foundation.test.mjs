@@ -179,5 +179,5 @@ test('preview and editor presentation share typography and per-run visual styles
   const { CanvasTextLayerRenderer } = load('text/CanvasTextLayerRenderer');
   const html = renderToStaticMarkup(require('react').createElement(CanvasTextLayerRenderer, { document: { version: 1, layers: [layer] }, size: { width: 1200, height: 900 } }));
   assert.match(html, /letter-spacing:3px/); assert.match(html, /line-height:1.1/); assert.match(html, /text-transform:uppercase/);
-  assert.match(html, /font-family:&quot;Poster Gelasio&quot;/); assert.match(html, /background-color:#FFFFFF/);
+  assert.match(html, /font-family:&quot;Poster Gelasio&quot;/); assert.match(html, /background-image:linear-gradient\(transparent 72%, #FFFFFF 72%/); assert.match(html, /box-decoration-break:clone/);
 });

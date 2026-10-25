@@ -5,6 +5,11 @@ import { buildTemplateSnapshot, restoreTemplateLayout, releaseTemplateMediaRegio
 import { getTemplate } from './templates/catalog';
 import { equalValues } from './editorHistory';
 import { TemplateMenu } from './templates/TemplateMenu';
+import { buildDesignedSnapshot, restoreDesignedLayout, resetDesignedStyles } from './composition/designedCatalog';
+import type { CompositionDocument } from './composition/types';
+import { createIndependentComposition, compositionFrame, moveCompositionObject, secondaryRequired, boxOutsideCanvas } from './composition/document';
+import { ObjectControls } from './composition/ObjectControls';
+import { CompositionOverlay } from './composition/CompositionOverlay';
 import { 
   Download, Copy, Upload, Check, Sliders, SlidersHorizontal,
   Lock, Zap, ShieldCheck, 
@@ -39,7 +44,7 @@ import { exportMockup, freezeArtworkProps, prepareMockupExport, exportTargetLabe
 import { ArtworkTasks, readArtworkFile, decodeArtworkImage } from './export/artworkTasks';
 import { stableArtworkLayout } from './export/prepareArtworkExport';
 import { PosterEditor } from './poster/PosterEditor';
-import { emptyTextDocument } from './text/document';
+import { emptyTextDocument, validateText } from './text/document';
 import { useCanvasTextEditor } from './text/useCanvasTextEditor';
 import { CanvasTextOverlay } from './text/CanvasTextOverlay';
 import { TextControls } from './text/TextControls';
@@ -491,6 +496,11 @@ export default function App() {
   const [imageSrc, setImageSrc] = useState<string>(initialPreset.svgDataUri);
   const [imageName, setImageName] = useState<string>('social-launch.svg');
   const [templateContext, setTemplateContext] = useState<TemplateContext | null>(null);
+  const [compositionDocument, setCompositionDocument] = useState<CompositionDocument | null>(null);
+  const [secondaryMediaOrigin, setSecondaryMediaOrigin] = useState<PrimaryMediaOrigin>({ kind: 'unknown' });
+  const [selectedObject, setSelectedObject] = useState<string | null>(null);
+  const compositionEdit = useRef<{ base: EditorSnapshot; document: CompositionDocument } | null>(null);
+  const compositionGesture = useRef<{ id: string; x: number; y: number; scale: number; resize: boolean; base: EditorSnapshot; document: CompositionDocument; latest: CompositionDocument } | null>(null);
   const [primaryMediaOrigin, setPrimaryMediaOrigin] = useState<PrimaryMediaOrigin>({ kind: 'builtin', sampleId: initialPreset.id });
   const applyingTemplate = useRef(false);
   const [preparingTemplate, setPreparingTemplate] = useState(false);
@@ -683,7 +693,7 @@ export default function App() {
     if (bgType !== 'image') artworkTasks.current!.clear('background');
   }, [bgType]);
   const currentSnapshot: EditorSnapshot = useMemo(() => ({
-    templateContext, primaryMediaOrigin,
+    templateContext, primaryMediaOrigin, compositionDocument, secondaryMediaOrigin,
     textDocument,
     gradientId: gradient.id,
     selectedPreset,
@@ -736,7 +746,7 @@ export default function App() {
     imageOffsetX,
     imageOffsetY,
   }), [
-    templateContext, primaryMediaOrigin,
+    templateContext, primaryMediaOrigin, compositionDocument, secondaryMediaOrigin,
     textDocument, gradient.id, selectedPreset, imageSrc, imageName, windowTheme, windowTitle,
     padding, roundedCorners, shadowLevel, shadowOpacity, activeCuratedLayout,
     cornerStyle, layoutPreset, aspectRatio.id, customCanvasSize, secondarySrc, secondaryName,
@@ -750,7 +760,9 @@ export default function App() {
 
   const handleRestoreSnapshot = useCallback((snap: EditorSnapshot) => {
     for (const key of ['main', 'secondary', 'background', 'logo', 'qr']) artworkTasks.current!.clear(key);
-    setTextDocument(snap.textDocument ?? emptyTextDocument());
+    setTextDocument(snap.textDocument ? { ...snap.textDocument, layers: snap.textDocument.layers.map(layer => validateText(layer)) } : emptyTextDocument());
+    setCompositionDocument(snap.compositionDocument ?? null);
+    setSecondaryMediaOrigin(snap.secondaryMediaOrigin ?? { kind: 'unknown' });
     setTemplateContext(snap.templateContext ?? null);
     setPrimaryMediaOrigin(snap.primaryMediaOrigin ?? { kind: 'unknown' });
     if (snap.gradientId) setGradient(GRADIENTS.find(g => g.id === snap.gradientId) ?? GRADIENTS[0]);
@@ -853,9 +865,54 @@ export default function App() {
   const effectivePaddingX = Math.min(padding, Math.max(0, (canvasLogicalSize.width - 120) / 2));
   const effectivePaddingY = Math.min(padding, Math.max(0, (canvasLogicalSize.height - 120) / 2));
   const textEditor = useCanvasTextEditor(currentSnapshot, setTextDocument, canvasLogicalSize, { beginTransaction, commitTransaction, cancelTransaction }, canvasRef);
+  const selectedCompositionObject = selectedObject || textEditor.activeId;
   const switchInspectorTab = (tab: typeof sidebarTab) => {
     if (!textEditor.finish()) return;
     setSidebarTab(tab);
+  };
+  const selectObject = (id: string) => {
+    if (!textEditor.finish()) return;
+    if (textDocument.layers.some(layer => layer.id === id)) { setSelectedObject(null); textEditor.select(id); setSidebarTab('text'); }
+    else { textEditor.select(null); setSelectedObject(id === 'secondary' && compositionDocument?.mediaLayout === 'legacy' ? 'main' : id); }
+  };
+  const changeComposition = (document: CompositionDocument) => {
+    if (selectedObject && !['main', 'secondary'].includes(selectedObject) && ![...document.objects, ...document.decorations].some(node => node.id === selectedObject)) setSelectedObject(null);
+    if (compositionEdit.current) { compositionEdit.current.document = document; setCompositionDocument(document); }
+    else if (textEditor.finish()) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), compositionDocument: document,
+      ...(document.mediaLayout === 'legacy' ? { layoutMode: document.detailVisible ? 'duo' as const : 'single' as const } : {}) });
+  };
+  const beginCompositionEdit = () => {
+    if (compositionEdit.current || !compositionDocument || !textEditor.finish()) return;
+    const base = editorHistory.getLatestSnapshot(); beginTransaction(base); compositionEdit.current = { base, document: compositionDocument };
+  };
+  const finishCompositionEdit = () => {
+    const edit = compositionEdit.current; if (!edit) return;
+    compositionEdit.current = null; commitTransaction({ ...edit.base, compositionDocument: edit.document });
+  };
+  const startCompositionGesture = (id: string, event: React.PointerEvent<HTMLElement>, resize = false) => {
+    if (event.button !== 0 || !compositionDocument || exportLock.current || !textEditor.finish()) return;
+    event.preventDefault(); event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId);
+    selectObject(id); const base = editorHistory.getLatestSnapshot(); beginTransaction(base);
+    let document = compositionDocument;
+    const target = document.objects.find(node => node.id === id);
+    if (target?.kind === 'button' && target.autoWidth) {
+      const node = [...canvasRef.current!.querySelectorAll<HTMLElement>('[data-composition-object]')].find(node => node.dataset.compositionObject === id);
+      if (node) document = { ...document, objects: document.objects.map(item => item.id === id ? { ...item, frame: { ...item.frame, widthRatio: node.offsetWidth / canvasLogicalSize.width } } : item) };
+    }
+    compositionGesture.current = { id, x: event.clientX, y: event.clientY, scale: canvasRef.current!.getBoundingClientRect().width / canvasLogicalSize.width, resize, base, document, latest: compositionDocument };
+  };
+  const moveCompositionGesture = (event: React.PointerEvent<HTMLElement>) => {
+    const gesture = compositionGesture.current; if (!gesture) return;
+    const frame = compositionFrame(gesture.document, gesture.id), dx = (event.clientX - gesture.x) / gesture.scale, dy = (event.clientY - gesture.y) / gesture.scale;
+    const ratio = Math.max(.1, Math.min(3, 1 + dx / (frame.widthRatio * canvasLogicalSize.width)));
+    const patch = gesture.resize ? { widthRatio: frame.widthRatio * ratio, heightRatio: frame.heightRatio * ratio }
+      : { centerX: frame.centerX + dx / canvasLogicalSize.width, centerY: frame.centerY + dy / canvasLogicalSize.height };
+    gesture.latest = moveCompositionObject(gesture.document, gesture.id, patch, canvasLogicalSize); setCompositionDocument(gesture.latest);
+  };
+  const finishCompositionGesture = (event: React.PointerEvent<HTMLElement>) => {
+    const gesture = compositionGesture.current; if (!gesture) return;
+    compositionGesture.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.type === 'pointercancel') cancelTransaction(); else commitTransaction({ ...gesture.base, compositionDocument: gesture.latest });
   };
   const sizingAction = useRef<CanvasSizingAction | null>(null);
   const textLayout = useTextLayoutValidation(canvasRef, currentSnapshot, canvasLogicalSize, editorHistory, { width: canonicalAutoW, height: canonicalAutoH }, (id, custom) => {
@@ -1150,7 +1207,7 @@ export default function App() {
       setImageSrc(dataUrl); setImageName(fileName); setPrimaryMediaOrigin({ kind: 'user' });
       setImageNaturalSize({ width, height });
       // Auto-detect mobile screenshot: if height exceeds width by 15%, auto-select iPhone 17 frame
-      if (!templateContext && height > width * 1.15) {
+      if (!templateContext && !compositionDocument && height > width * 1.15) {
         setWindowTheme('iphone-17');
       }
     });
@@ -1162,7 +1219,7 @@ export default function App() {
     void artworkTasks.current!.run('secondary', 'Second screenshot', async () => {
       const source = await readArtworkFile(file); await decodeArtworkImage(source); return source;
     }, source => {
-      setSecondarySrc(source); setSecondaryName(fileName);
+      setSecondarySrc(source); setSecondaryName(fileName); setSecondaryMediaOrigin({ kind: 'user' });
       trackEvent(initial ? 'media_slot_add' : 'media_slot_replace', { slot: 2, size: file.size, type: file.type });
     });
   };
@@ -1317,6 +1374,8 @@ export default function App() {
     exportAdmissionError.current = '';
     if (exportLock.current || !canvasRef.current?.parentElement) return null;
     if (!textEditor.finish()) return null;
+    finishCompositionEdit();
+    if (compositionGesture.current) { const gesture = compositionGesture.current; compositionGesture.current = null; commitTransaction({ ...gesture.base, compositionDocument: gesture.latest }); }
     finishSizing();
     flush(currentSnapshot);
     const request = { aspect: { ...aspectRatio }, batch: selectedBatchAspects.map(id => ({ ...(aspectOptions.find(option => option.id === id) || ASPECT_RATIOS[0]) })), scale: exportScale, format: exportFormat, parent: canvasRef.current.parentElement };
@@ -1328,7 +1387,7 @@ export default function App() {
       let settled = false;
       const requiredAssets = () => {
         const live = latestExportInputs.current!.artwork;
-        return ['main', ...(live.layoutMode === 'duo' ? ['secondary'] : []), ...(live.bgType === 'image' ? ['background'] : []),
+        return ['main', ...(secondaryRequired(live.compositionDocument, live.layoutMode) ? ['secondary'] : []), ...(live.bgType === 'image' ? ['background'] : []),
           ...(live.isProUnlocked && live.logoDataUrl ? ['logo'] : []), ...(live.isProUnlocked && qrUrl.trim() ? ['qr'] : [])];
       };
       for (let attempt = 0; attempt < 10; attempt++) {
@@ -1342,6 +1401,12 @@ export default function App() {
       }
       if (!settled || !latestExportInputs.current) throw new Error('Artwork is still preparing. Please try again.');
       const latest = latestExportInputs.current;
+      if (latest.artwork.compositionDocument && canvasRef.current) {
+        const canvasBounds = canvasRef.current.getBoundingClientRect();
+        const outside = [...canvasRef.current.querySelectorAll<HTMLElement>('[data-composition-object="main"], [data-composition-object="secondary"]')].some(node => boxOutsideCanvas(node.getBoundingClientRect(), canvasBounds));
+        if (outside && !latest.artwork.compositionDocument.allowBleed) throw new Error('A screenshot extends outside the canvas. Move or resize it inside before exporting.');
+        if (outside && !window.confirm('Screenshot content outside the canvas will be clipped. Export this crop?')) { finishExport(); return null; }
+      }
       flush(latest.snapshot);
       frozenArtwork.current = freezeArtworkProps(latest.artwork);
       return { ...request, artwork: frozenArtwork.current, auto: { ...latest.auto }, custom: { ...latest.custom } };
@@ -1555,6 +1620,10 @@ export default function App() {
 
   // Handle Reset to Default Studio Styling
   const handleReset = () => {
+    if (compositionDocument?.templateId === 'editorial-honey') {
+      let valid = false; flushSync(() => { valid = textEditor.finish(); });
+      if (valid && !editorHistory.isInTransaction()) editorHistory.applyCommand(resetDesignedStyles(editorHistory.getLatestSnapshot())); return;
+    }
     setTemplateContext(null);
     for (const key of ['main', 'secondary', 'background', 'logo', 'qr']) artworkTasks.current!.clear(key);
     setPadding(88);
@@ -1578,10 +1647,7 @@ export default function App() {
     setVfxGlowOpacity(30);
     setExportScale(2);
     setExportFormat('png');
-    setSecondarySrc(null);
-    setSecondaryName('');
-    setLayoutMode('single');
-    setDuoLayout('side');
+    if (!compositionDocument) { setSecondarySrc(null); setSecondaryName(''); setLayoutMode('single'); setDuoLayout('side'); }
     // New states sync (Rule 7 §1)
     setHideMockup(false);
     setBgImageSrc(null);
@@ -1607,7 +1673,8 @@ export default function App() {
       if (isEditable(e.target) || e.isComposing) return;
 
       if (e.key === 'Escape') {
-        if (textEditor.session || textEditor.hasGesture()) textEditor.cancel();
+        if (compositionGesture.current) { compositionGesture.current = null; cancelTransaction(); releaseExportPointers(); }
+        else if (textEditor.session || textEditor.hasGesture()) textEditor.cancel();
         else textEditor.select(null);
         setShowShortcutsModal(false);
         setShowExportMenu(false);
@@ -1616,6 +1683,9 @@ export default function App() {
       }
 
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (compositionGesture.current && isCmdOrCtrl && ['z', 'y'].includes(e.key.toLowerCase())) {
+        e.preventDefault(); compositionGesture.current = null; cancelTransaction(); releaseExportPointers(); return;
+      }
       if (!isCmdOrCtrl && e.key.startsWith('Arrow') && textEditor.activeId) { e.preventDefault(); textEditor.nudge(e.key, e.shiftKey); return; }
       const changesTool = isCmdOrCtrl ? ['z', 'y', 's'].includes(e.key.toLowerCase())
         : ['1', '2', 'Delete', 'Backspace', '?'].includes(e.key) || (e.key === '/' && e.shiftKey);
@@ -1642,16 +1712,24 @@ export default function App() {
       } else {
         if (e.key === '1') {
           setLayoutMode('single');
+          setCompositionDocument(doc => doc ? { ...doc, mediaLayout: 'legacy', detailVisible: false } : null);
           trackEvent('layout_mode_change', { mode: 'single', trigger: 'shortcut' });
           return;
         }
         if (e.key === '2') {
           setLayoutMode('duo');
+          setCompositionDocument(doc => doc ? { ...doc, mediaLayout: 'legacy', detailVisible: true } : null);
           trackEvent('layout_mode_change', { mode: 'duo', trigger: 'shortcut' });
           return;
         }
         if (e.key === 'Delete' || e.key === 'Backspace') {
           if (textEditor.activeId) { e.preventDefault(); textEditor.remove(); return; }
+          if (compositionDocument) {
+            e.preventDefault();
+            if (selectedObject === 'secondary') editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } });
+            else if (selectedObject && compositionDocument.objects.some(node => node.id === selectedObject && !(node.kind === 'shape' && node.shape === 'mark'))) changeComposition({ ...compositionDocument, objects: compositionDocument.objects.filter(node => node.id !== selectedObject), order: compositionDocument.order.filter(id => id !== selectedObject) });
+            return;
+          }
           if (layoutMode === 'duo') {
             setSecondarySrc(null);
             setSecondaryName('');
@@ -1672,10 +1750,10 @@ export default function App() {
     };
 
     const keyup = (event: KeyboardEvent) => { if (event.key.startsWith('Arrow')) textEditor.endKeyboard(); };
-    const blur = () => { if (textEditor.hasGesture()) textEditor.cancel(); };
+    const blur = () => { if (compositionGesture.current) { compositionGesture.current = null; cancelTransaction(); releaseExportPointers(); } if (textEditor.hasGesture()) textEditor.cancel(); };
     window.addEventListener('keydown', handleKeyDown); window.addEventListener('keyup', keyup); window.addEventListener('blur', blur);
     return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', keyup); window.removeEventListener('blur', blur); };
-  }, [undo, redo, handleDownload, layoutMode, secondarySrc, showExportMenu, showDemoTemplatesMenu, studioMode, textEditor]);
+  }, [undo, redo, handleDownload, layoutMode, secondarySrc, showExportMenu, showDemoTemplatesMenu, studioMode, textEditor, compositionDocument, selectedObject]);
 
   // Handle Starter Preset Template Application
   const handleApplyPreset = (preset: typeof MOCKUP_PRESETS[0]) => {
@@ -1687,6 +1765,20 @@ export default function App() {
       setImageNaturalSize({ width: image.naturalWidth, height: image.naturalHeight });
     });
     trackEvent('preset_change', { preset: preset.id, name: preset.name });
+  };
+
+  const handleApplyDesignedTemplate = async (id: 'editorial-honey') => {
+    if (applyingTemplate.current || exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) return;
+    applyingTemplate.current = true; setPreparingTemplate(true); setTextError('');
+    try {
+      await Promise.all([decodeArtworkImage('/designed/examples/bloom-dashboard.svg'), decodeArtworkImage('/designed/examples/bloom-workflow.svg')]);
+      if (exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) return;
+      let valid = false; flushSync(() => { valid = textEditor.finish(); });
+      if (!valid || editorHistory.isInTransaction()) return;
+      const next = buildDesignedSnapshot(editorHistory.getLatestSnapshot(), id, crypto.randomUUID());
+      if (editorHistory.applyCommand(next)) { textEditor.select(null); setSelectedObject(null); setSidebarTab('style'); setShowDemoTemplatesMenu(false); }
+    } catch (error) { setTextError(error instanceof Error ? error.message : 'Could not prepare designed template.'); }
+    finally { applyingTemplate.current = false; setPreparingTemplate(false); }
   };
 
   const handleApplyTemplate = async (template: MockupTemplate) => {
@@ -1728,6 +1820,9 @@ export default function App() {
     flushSync(() => { valid = textEditor.finish(); });
     if (!valid || editorHistory.isInTransaction()) return;
     const before = editorHistory.getLatestSnapshot();
+    if (before.compositionDocument?.templateId === 'editorial-honey') {
+      editorHistory.applyCommand(restoreDesignedLayout(before)); return;
+    }
     const template = before.templateContext && getTemplate(before.templateContext.id);
     if (template) editorHistory.applyCommand(restoreTemplateLayout(before, template));
   };
@@ -2132,13 +2227,14 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             {textLayout.recovery && <button type="button" data-text-size-recovery className="rounded bg-indigo-600 text-white px-3 py-2" onClick={textLayout.recovery.restore}>{textLayout.recovery.label}</button>}
           </div>}
           <CanvasStage width={canvasLogicalSize.width} height={canvasLogicalSize.height} freezePreviewWhileEditing={!!textEditor.editingId || textEditor.gesturing} onDeselect={() => textEditor.select(null)}>
-          <MockupArtwork {...artworkProps()} editingTextId={textEditor.editingId} />
-          <CanvasTextOverlay document={textDocument} size={canvasLogicalSize} activeId={textEditor.activeId} editingId={textEditor.editingId}
+          <MockupArtwork {...artworkProps()} editingTextId={textEditor.editingId} onObjectPointerDown={id => selectObject(id)} />
+          {compositionDocument && <CompositionOverlay document={compositionDocument} selected={selectedObject} size={canvasLogicalSize} onStart={startCompositionGesture} onMove={moveCompositionGesture} onEnd={finishCompositionGesture} />}
+          <CanvasTextOverlay compositionHitTargets={!!compositionDocument} document={compositionDocument ? { ...textDocument, layers: textDocument.layers.filter(layer => !compositionDocument.hiddenIds.includes(layer.id)) } : textDocument} size={canvasLogicalSize} activeId={textEditor.activeId} editingId={textEditor.editingId}
             recoveryMessage={textEditor.session?.error || (textEditor.session?.composing ? textEditor.message : '')}
             issues={textLayout.issues} onGestureStart={textEditor.beginGesture} onGestureMove={textEditor.moveGesture}
             onGestureActive={textEditor.hasGesture}
             draft={textEditor.session?.kind === 'content' ? textEditor.session.value : ''} light={themeMode === 'light'}
-            onEdit={id => { setSidebarTab('text'); textEditor.edit(id); }} onChange={textEditor.change} onDone={textEditor.finish} onCancel={textEditor.cancel} onDeselect={() => textEditor.select(null)} />
+            onEdit={id => { setSelectedObject(null); setSidebarTab('text'); textEditor.edit(id); }} onChange={textEditor.change} onDone={textEditor.finish} onCancel={textEditor.cancel} onDeselect={() => textEditor.select(null)} />
 
           {/* Floating Bottom Studio Dock */}
           </CanvasStage>
@@ -2149,6 +2245,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 type="button"
                 onClick={() => {
                   setLayoutMode('single');
+                  setCompositionDocument(doc => doc ? { ...doc, mediaLayout: 'legacy', detailVisible: false } : null);
                   trackEvent('layout_mode_change', { mode: 'single' });
                 }}
                 className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
@@ -2165,6 +2262,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 type="button"
                 onClick={() => {
                   setLayoutMode('duo');
+                  setCompositionDocument(doc => doc ? { ...doc, mediaLayout: 'legacy', detailVisible: true } : null);
                   trackEvent('layout_mode_change', { mode: 'duo' });
                 }}
                 className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
@@ -2208,7 +2306,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               {showDemoTemplatesMenu && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowDemoTemplatesMenu(false)} />
-                  <TemplateMenu onApply={handleApplyTemplate} disabled={isExporting || preparingTemplate || assetBusy} busy={preparingTemplate || assetBusy} />
+                  <TemplateMenu onApply={handleApplyTemplate} onDesignedApply={handleApplyDesignedTemplate} disabled={isExporting || preparingTemplate || assetBusy} busy={preparingTemplate || assetBusy} />
                 </>
               )}
             </div>
@@ -2338,6 +2436,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 selectedPattern={selectedPattern}
                 isActive={layoutPreset === p.id}
                 onClick={() => {
+                  if (compositionDocument && selectedCompositionObject && selectedCompositionObject !== 'main') return;
                   setLayoutPreset(p.id);
                   trackEvent('preset_change', { layout: p.id, type: 'layout' });
                 }}
@@ -2365,6 +2464,29 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             </button>
           </div>
           <p data-reset-preserves-text className="text-[11px] text-white/50">Reset changes mockup styling. Your canvas text is preserved.</p>
+          <ObjectControls document={compositionDocument} texts={textDocument} selected={selectedObject || textEditor.activeId} size={canvasLogicalSize} customLogo={isProUnlocked && !!logoDataUrl} onSelect={selectObject} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit}
+            onIndependent={() => { if (textEditor.finish()) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), ...(aspectRatio.id === 'auto' ? { aspectRatioId: 'custom', customCanvasSize: { ...canvasLogicalSize } } : {}), compositionDocument: compositionDocument ? { ...compositionDocument, mediaLayout: 'independent' } : createIndependentComposition() }); }}
+            onAddButton={() => { if (!textEditor.finish()) return; const document = compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: layoutMode === 'duo' }; const id = crypto.randomUUID(); changeComposition({ ...document, objects: [...document.objects, { id, name: 'Button', kind: 'button', frame: { centerX: .5, centerY: .8, widthRatio: .25, heightRatio: .07, rotation: 0 }, text: 'Get started', fill: '#272617', color: '#ffffff', fontSize: 20, radius: 8, padding: 16, autoWidth: false, arrow: true }], order: [...document.order, id] }); setSelectedObject(id); }}
+            onResetTemplate={() => {
+              if (!compositionDocument?.templateId || !textEditor.finish() || !window.confirm('Reset all template text, screenshots and design settings to the original demo? You can Undo this change.')) return;
+              const before = editorHistory.getLatestSnapshot();
+              const next = buildDesignedSnapshot({ ...before, imageSrc: '', secondarySrc: null, windowTitle: 'bloomboard.example', logoDataUrl: null, qrUrl: '', customBrandWatermark: '' }, 'editorial-honey', crypto.randomUUID());
+              editorHistory.applyCommand(next); setSelectedObject(null); textEditor.select(null);
+            }}
+            onDuplicateText={id => {
+              if (!textEditor.finish() || textDocument.layers.length >= 20) return;
+              const before = editorHistory.getLatestSnapshot(), layer = before.textDocument.layers.find(item => item.id === id); if (!layer) return;
+              const node = [...(canvasRef.current?.querySelectorAll<HTMLElement>('[data-canvas-text]') || [])].find(item => item.dataset.canvasText === id);
+              const height = node?.offsetHeight || layer.fontSize * (layer.lineHeight ?? 1.25), half = height / canvasLogicalSize.height / 2;
+              const below = layer.centerY + height / canvasLogicalSize.height + 16 / canvasLogicalSize.height;
+              const above = layer.centerY - height / canvasLogicalSize.height - 16 / canvasLogicalSize.height;
+              const copy = validateText({ ...layer, id: crypto.randomUUID(), centerX: Math.max(layer.widthRatio / 2, Math.min(1 - layer.widthRatio / 2, layer.centerX + 24 / canvasLogicalSize.width)), centerY: below + half <= 1 ? below : above - half >= 0 ? above : Math.max(half, Math.min(1 - half, layer.centerY + 24 / canvasLogicalSize.height)) });
+              const composition = before.compositionDocument;
+              flushSync(() => { editorHistory.applyCommand({ ...before, textDocument: { ...before.textDocument, layers: [...before.textDocument.layers, copy] }, compositionDocument: composition ? { ...composition, knownTextIds: [...new Set([...(composition.knownTextIds || []), copy.id])], order: [...composition.order, copy.id] } : composition }); });
+              setSelectedObject(null); textEditor.select(copy.id); setSidebarTab('text');
+            }}
+            onReplace={slot => (slot === 'main' ? fileInputRef : secondaryFileInputRef).current?.click()} onRestore={handleRestoreTemplateLayout}
+            onRemoveDetail={() => { if (textEditor.finish() && compositionDocument) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } }); }} />
 
           {/* Shared Inspector: keep canvas properties out of the artwork viewport. */}
           <div data-inspector-tabs className="grid grid-cols-5 gap-1 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl">
@@ -2431,7 +2553,8 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           </div>
 
           {/* TAB 1: FRAME & 3D LAYOUT */}
-          {sidebarTab === 'style' && (
+          {sidebarTab === 'style' && compositionDocument && selectedCompositionObject && selectedCompositionObject !== 'main' && <p className="text-xs text-white/60">Selected object properties are in Objects above. Select Main screenshot to edit its device frame.</p>}
+          {sidebarTab === 'style' && (!compositionDocument || !selectedCompositionObject || selectedCompositionObject === 'main') && (
             <div className="space-y-5">
               {/* §5.2 MEDIA 槽位管理区 */}
               <div className="space-y-2.5 p-3 rounded-2xl bg-white/[0.03] border border-white/10 shadow-sm">
@@ -2441,7 +2564,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                     <span>MEDIA</span>
                   </label>
                   <span className="text-[11px] text-white/40 font-mono">
-                    {layoutMode === 'duo' ? (secondarySrc ? '2/2 Loaded' : '1/2 Loaded') : '1/1 Loaded'}
+                    {compositionDocument?.mediaLayout === 'independent' ? (compositionDocument.detailVisible ? (secondarySrc ? '2/2 Loaded' : '1/2 Loaded') : '1/1 Loaded') : layoutMode === 'duo' ? (secondarySrc ? '2/2 Loaded' : '1/2 Loaded') : '1/1 Loaded'}
                   </span>
                 </div>
 
@@ -2594,6 +2717,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 </div>
               )}
 
+              {compositionDocument?.mediaLayout === 'independent' ? <button type="button" className="text-xs text-indigo-300 underline cursor-pointer" onClick={() => { selectObject('main'); const controls = document.querySelector<HTMLDetailsElement>('[data-composition-controls]'); if (controls) controls.open = true; }}>Move and scale Main screenshot in Objects above</button> : <>
               {/* Mockup Zoom & Position (Shots.so Alignment: Entire Mockup Scaling & Pan) */}
               <div className="space-y-3 p-3 rounded-2xl bg-white/[0.03] border border-white/10 shadow-sm">
                 <div className="flex items-center justify-between">
@@ -2713,6 +2837,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 </div>
               </div>
 
+              </>}
               {/* In-Frame Image Fit & Position (Slot 1 Crop & Screen Focus) - Hidden from Studio Inspector per v1.0 spec */}
               {false && (
                 <div className="space-y-3 p-3 rounded-2xl bg-white/[0.03] border border-white/10 shadow-sm">
@@ -2850,6 +2975,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                     return (
                       <button
                         key={p.id}
+                        disabled={!!compositionDocument}
                         onClick={() => {
                           if (templateContext) {
                             if (exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) return;
@@ -3919,6 +4045,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                           </button>
                         </div>
 
+                        {compositionDocument?.objects.some(node => node.kind === 'shape' && node.shape === 'mark') ? <button type="button" className="text-xs underline text-indigo-300 cursor-pointer" onClick={() => { const mark = compositionDocument.objects.find(node => node.kind === 'shape' && node.shape === 'mark'); if (mark) selectObject(mark.id); const controls = document.querySelector<HTMLDetailsElement>('[data-composition-controls]'); if (controls) controls.open = true; }}>Move and size Logo in Objects above</button> : <>
                         <div className="space-y-1">
                           <label className="text-[11px] font-medium text-white/50">Position</label>
                           <div className="grid grid-cols-2 gap-1 text-[11px]">
@@ -3953,6 +4080,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                           />
                         </div>
 
+                        </>}
                         <div className="space-y-1">
                           <div className="flex items-center justify-between text-[11px] text-white/50">
                             <span>Opacity</span>

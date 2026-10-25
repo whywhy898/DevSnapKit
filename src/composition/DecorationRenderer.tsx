@@ -1,6 +1,6 @@
 import type { ShapeObject } from './types';
 export function DecorationRenderer({ object }: { object: ShapeObject }) {
-  if (object.shape === 'mark') return <svg width="100%" height="100%" viewBox="0 0 44 44" fill="none" aria-hidden="true"><path d="M22 2 40 12v20L22 42 4 32V12Z" fill={object.fill}/><path d="M14 13v17l16-9v10M14 23l16-9" stroke={object.stroke || '#ffdc38'} strokeWidth="4" strokeLinejoin="round" /></svg>;
+  if (object.shape === 'mark') return <svg width="100%" height="100%" viewBox="0 0 44 44" fill="none" aria-hidden="true"><rect x="3" y="3" width="38" height="38" rx="10" fill={object.fill}/><path d="M16 11v21h8a6 6 0 0 0 0-12h-8m0 0h8" stroke={object.stroke || '#ffdc38'} strokeWidth="4" strokeLinejoin="round" /></svg>;
   return <div style={{ position: 'absolute', inset: 0, borderRadius: object.shape === 'ellipse' || object.shape === 'halo' ? '50%' : object.radius || 0,
     border: object.stroke ? `${object.strokeWidth ?? 1}px solid ${object.stroke}` : undefined, boxShadow: object.shadow,
     background: object.shape === 'halo' ? `radial-gradient(ellipse, ${object.fill}, transparent 70%)` : object.shape === 'grid'

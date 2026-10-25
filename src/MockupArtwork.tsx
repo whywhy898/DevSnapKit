@@ -231,7 +231,8 @@ export function MockupArtwork({
         windowTheme={windowTheme} windowTitle={windowTitle} shadowLevel={shadowLevel} shadowOpacity={shadowOpacity}
         cornerStyle={cornerStyle} roundedCorners={roundedCorners} hideMockup={hideMockup} layoutPreset={layoutPreset}
         preview={preview} editingTextId={editingTextId} onReplace={onReplace} onReplaceSecondary={onReplaceSecondary} onObjectPointerDown={onObjectPointerDown}
-        legacy={{ effectivePaddingX, effectivePaddingY, layoutMode, duoLayout, mockupZoom, mockupOffsetX, mockupOffsetY, isPhoneTheme, zoomStyle }}
+        legacy={{ effectivePaddingX, effectivePaddingY, layoutMode, duoLayout, mockupZoom, mockupOffsetX, mockupOffsetY, isPhoneTheme, zoomStyle, handleNaturalSceneSize }}
+        isProUnlocked={isProUnlocked} logoDataUrl={logoDataUrl} logoOpacity={logoOpacity}
       /> : <FittedScene
         mediaRegion={templateContext?.mediaRegion}
         measurementKey={sceneMeasurementKey}
@@ -258,7 +259,7 @@ export function MockupArtwork({
       </FittedScene>}
 
       {/* Pro Feature: Custom Brand Logo */}
-      {isProUnlocked && logoDataUrl && (
+      {isProUnlocked && logoDataUrl && !compositionDocument?.objects.some(node => node.kind === 'shape' && node.shape === 'mark') && (
         <img
           src={logoDataUrl}
           alt="Brand Logo"

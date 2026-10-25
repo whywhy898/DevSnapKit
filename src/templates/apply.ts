@@ -20,6 +20,7 @@ export function buildTemplateSnapshot(before: EditorSnapshot, template: MockupTe
   const inheritedSampleTitle = MOCKUP_PRESETS.some(preset => preset.title === before.windowTitle);
   return {
     ...before,
+    compositionDocument: null,
     templateContext: { id: template.id, version: template.version, mediaRegion: { ...template.mediaRegion }, textRoles: { ...ids } },
     primaryMediaOrigin: replaceSample ? { kind: 'builtin', sampleId: sample.id } : before.primaryMediaOrigin ?? { kind: 'unknown' },
     imageSrc: replaceSample ? sample.svgDataUri : before.imageSrc,

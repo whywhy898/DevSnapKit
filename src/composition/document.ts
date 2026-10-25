@@ -27,7 +27,8 @@ export function compositionFrame(doc: CompositionDocument, id: string): ObjectFr
 export function moveCompositionObject(doc: CompositionDocument, id: string, patch: Partial<ObjectFrame>, size: Size): CompositionDocument {
   const frame = { ...compositionFrame(doc, id), ...patch };
   if (!Object.values(frame).every(Number.isFinite) || frame.widthRatio <= 0 || frame.heightRatio <= 0) throw new Error('Invalid placement geometry');
-  if (!doc.allowBleed) {
+  const decoration = doc.decorations.some(node => node.id === id), image = id === 'main' || id === 'secondary';
+  if (!decoration && !(doc.allowBleed && image)) {
     const raw = placementBounds(frame, size), fit = Math.min(1, size.width / raw.width, size.height / raw.height);
     frame.widthRatio *= fit; frame.heightRatio *= fit;
     const b = placementBounds(frame, size), halfX = b.width / size.width / 2, halfY = b.height / size.height / 2;
@@ -52,8 +53,12 @@ export function reorderCompositionObject(doc: CompositionDocument, id: string, d
 export function duplicateCompositionObject(doc: CompositionDocument, id: string, nextId: string): CompositionDocument {
   if (id === 'main' || id === 'secondary' || id === 'brand') throw new Error('Fixed screenshot slots cannot be duplicated');
   const node = doc.objects.find(node => node.id === id); if (!node) throw new Error('Unknown composition object');
+  if (node.kind === 'shape' && node.shape === 'mark') throw new Error('Fixed brand slot cannot be duplicated');
   if (doc.order.includes(nextId) || doc.objects.some(node => node.id === nextId)) throw new Error('Duplicate object identity');
-  const copy = { ...structuredClone(node), id: nextId, name: `${node.name} copy`, frame: { ...node.frame, centerX: Math.min(.9, node.frame.centerX + .03), centerY: Math.min(.9, node.frame.centerY + .03) } };
+  const below = node.frame.centerY + node.frame.heightRatio + .015;
+  const above = node.frame.centerY - node.frame.heightRatio - .015;
+  const centerY = below + node.frame.heightRatio / 2 <= 1 ? below : above - node.frame.heightRatio / 2 >= 0 ? above : Math.min(.9, node.frame.centerY + .03);
+  const copy = { ...structuredClone(node), id: nextId, name: `${node.name} copy`, frame: { ...node.frame, centerX: Math.min(1 - node.frame.widthRatio / 2, node.frame.centerX + .015), centerY } };
   return { ...doc, objects: [...doc.objects, copy], order: [...doc.order, nextId] };
 }
 

@@ -76,3 +76,11 @@ test('graphic and text objects cannot share an identity in the global drawing or
   assert.throws(()=>api.validateComposition(d,['title']),/identity|collision/i);
   assert.throws(()=>api.validateComposition(api.createIndependentComposition(),['main']),/identity|collision/i);
 });
+
+test('background decorations may bleed while foreground objects stay contained even with image bleed enabled',()=>{
+  const d=api.createIndependentComposition();d.allowBleed=true;
+  d.decorations=[{id:'halo',kind:'shape',name:'Halo',shape:'halo',fill:'#fff',frame:d.placements.main}];
+  d.objects=[{id:'cta',kind:'button',name:'CTA',frame:d.placements.secondary,text:'Join',color:'#fff',fill:'#111',fontSize:20,radius:8,padding:12,autoWidth:false,arrow:true}];d.order.push('cta');
+  assert.equal(api.moveCompositionObject(d,'halo',{centerX:2},{width:1600,height:1200}).decorations[0].frame.centerX,2);
+  const cta=api.moveCompositionObject(d,'cta',{centerX:2},{width:1600,height:1200}).objects[0];assert.ok(cta.frame.centerX<1);
+});

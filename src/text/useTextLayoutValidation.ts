@@ -28,6 +28,7 @@ export function useTextLayoutValidation(root: React.RefObject<HTMLDivElement>, s
     const previewScale = root.current.getBoundingClientRect().width / root.current.offsetWidth;
     const next: { [id: string]: string } = {};
     for (const layer of snapshot.textDocument.layers) {
+      if (snapshot.compositionDocument?.hiddenIds.includes(layer.id)) continue;
       const node = nodes.get(layer.id);
       const issue = textBoxIssue(layer, size, node ? Math.max(node.offsetHeight, node.scrollHeight) : 0, node?.offsetHeight ?? 0,
         node && layer.content.trim() ? textHorizontalExtent(node, previewScale) : undefined);

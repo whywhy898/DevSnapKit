@@ -19,6 +19,6 @@ export interface TemplateContext {
   id: string;
   version: number;
   mediaRegion: MediaRegion;
-  textRoles: { headline: string; description: string };
+  textRoles: { headline: string; description: string; [role: string]: string };
 }
 export type PrimaryMediaOrigin = { kind: 'builtin'; sampleId: string } | { kind: 'user' } | { kind: 'unknown' };

@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { CanvasTextDocument, CanvasTextLayer, TextCanvasSize, TextReplacementRange } from './types';
 import { textLayoutStyle, TextRunContent } from './textPresentation';
 import { replaceTextContent } from './document';
@@ -11,6 +12,7 @@ interface Props {
   onDone: () => boolean; onCancel: () => void; onDeselect: () => void;
   issues: Record<string, string>;
   recoveryMessage?: string;
+  compositionHitTargets?: boolean;
   onGestureStart: (id: string, kind: 'move' | 'left' | 'right', scale: number) => number | false;
   onGestureMove: (x: number, y: number) => void;
   onGestureActive: (token: number) => boolean;
@@ -29,15 +31,7 @@ export function CanvasTextOverlay(props: Props) {
   }, [recoveryMessage]);
   return <div data-export-ignore="true" data-text-editor-ui style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 50 }}>
     <div data-text-logical-overlay style={{ position: 'absolute', width: size.width, height: size.height, transform: 'scale(var(--canvas-preview-scale, 1))', transformOrigin: 'top left', pointerEvents: 'none' }}>
-      {document.layers.map(layer => <div key={layer.id}>{editingId === layer.id ? <InlineText {...props} layer={layer} /> : <button type="button" aria-label={`Edit text ${document.layers.indexOf(layer) + 1}`}
-        data-text-hit={layer.id} onClick={() => props.onEdit(layer.id)}
-        aria-invalid={!!props.issues[layer.id]} title={props.issues[layer.id]}
-        style={{ ...textLayoutStyle(layer), position: 'absolute', left: layer.centerX * size.width, top: layer.centerY * size.height,
-          width: layer.widthRatio * size.width, transform: 'translate(-50%, -50%)', minHeight: layer.fontSize * (layer.lineHeight ?? 1.25),
-          background: 'transparent', color: 'transparent', cursor: 'text', pointerEvents: 'auto',
-          outline: props.issues[layer.id] ? '3px solid #F87171' : activeId === layer.id ? '2px solid #FFFFFF' : 'none', boxShadow: activeId === layer.id ? '0 0 0 4px #111827' : undefined, textDecoration: 'none' }}>
-        <span style={{ visibility: 'hidden' }}><TextRunContent layer={layer} marker /></span>
-      </button>}
+      {document.layers.map(layer => <div key={layer.id}>{editingId === layer.id ? <InlineText {...props} layer={layer} /> : <TextHit {...props} layer={layer} index={document.layers.indexOf(layer)} />}
       {activeId === layer.id && <TextHandles {...props} layer={layer} />}
       </div>)}
     </div>
@@ -48,17 +42,34 @@ export function CanvasTextOverlay(props: Props) {
     </div>}
   </div>;
 }
+function TextHit(props: Props & { layer: CanvasTextLayer; index: number }) {
+  const { layer, size, activeId, compositionHitTargets } = props;
+  const onEdit = useRef(props.onEdit); onEdit.current = props.onEdit;
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => { setTarget(compositionHitTargets ? window.document.querySelector<HTMLElement>(`[data-composition-text="${CSS.escape(layer.id)}"]`) : null); }, [compositionHitTargets, layer.id]);
+  const issue = props.issues[layer.id], selected = activeId === layer.id;
+  const hit = useMemo(() => <button type="button" aria-label={`Edit text ${props.index + 1}`} data-export-ignore="true" data-text-editor-ui data-text-hit={layer.id} onClick={() => onEdit.current(layer.id)}
+    aria-invalid={!!props.issues[layer.id]} title={props.issues[layer.id]} style={{ ...textLayoutStyle(layer), position: 'absolute', left: layer.centerX * size.width, top: layer.centerY * size.height,
+      width: layer.widthRatio * size.width, transform: 'translate(-50%, -50%)', minHeight: layer.fontSize * (layer.lineHeight ?? 1.25), background: 'transparent', color: 'transparent', cursor: 'text', pointerEvents: 'auto', zIndex: 41,
+      outline: props.issues[layer.id] ? '3px solid #F87171' : activeId === layer.id ? '2px solid #FFFFFF' : 'none', boxShadow: activeId === layer.id ? '0 0 0 4px #111827' : undefined, textDecoration: 'none' }}>
+      <span style={{ visibility: 'hidden' }}><TextRunContent layer={layer} marker /></span></button>, [layer, size.width, size.height, props.index, issue, selected]);
+  // Keep hit testing in the same stacking context as the artwork it edits.
+  // Covered text remains accessible through Objects, without blocking media.
+  return compositionHitTargets ? target && createPortal(hit, target) : hit;
+}
 function TextHandles(props: Props & { layer: CanvasTextLayer }) {
   const start = useRef<{ x: number; y: number; pointerId: number; token: number } | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const { layer, size } = props;
+  const runMetrics = JSON.stringify(layer.runs);
   const [boxHeight, setBoxHeight] = useState(layer.fontSize * (layer.lineHeight ?? 1.25));
   useLayoutEffect(() => {
-    const box = container.current?.parentElement?.querySelector<HTMLElement>('[data-text-edit-layout], [data-text-hit]');
+    const box = container.current?.parentElement?.querySelector<HTMLElement>('[data-text-edit-layout], [data-text-hit]')
+      || window.document.querySelector<HTMLElement>(`#studio-canvas [data-text-hit="${CSS.escape(layer.id)}"]`);
     if (!box) return;
     const update = () => setBoxHeight(box.offsetHeight);
     update(); const observer = new ResizeObserver(update); observer.observe(box); return () => observer.disconnect();
-  }, [layer, props.editingId]);
+  }, [layer.id, layer.content, runMetrics, layer.widthRatio, layer.font, layer.fontSize, layer.weight, layer.italic, layer.lineHeight, layer.letterSpacing, layer.textTransform, size.width, props.editingId]);
   const handle = (kind: 'move' | 'left' | 'right', label: string, left: number, top: string) => <button type="button" data-text-gesture={kind}
     aria-label={label} title={kind === 'move' ? 'Drag to move. Arrow keys move 1 logical px; Shift moves 10 px.' : 'Drag to reflow text. Use Text width and Text x inputs for keyboard control.'}
     style={{ position: 'absolute', left, top, transform: 'translate(-50%, -50%)', minWidth: 36, minHeight: 36, padding: '4px 8px', border: '2px solid white', borderRadius: 6, background: '#312E81', color: 'white', font: '16px sans-serif', cursor: kind === 'move' ? 'move' : 'ew-resize', touchAction: 'none', pointerEvents: 'auto' }}

@@ -14,6 +14,7 @@ export function TextRunContent({ layer, marker = false }: { layer: CanvasTextLay
   return <>{layer.runs ? layer.runs.map((run, index) => <span key={index} data-text-run style={{
     fontFamily: run.font ? `"${textFontFamily(run.font)}"` : undefined,
     fontWeight: run.weight, fontStyle: run.italic === undefined ? undefined : run.italic ? 'italic' : 'normal',
-    color: run.color, backgroundColor: run.highlightColor, boxDecorationBreak: run.highlightColor ? 'clone' : undefined,
+    color: run.color, backgroundImage: run.highlightColor ? `linear-gradient(transparent 72%, ${run.highlightColor} 72%, ${run.highlightColor} 94%, transparent 94%)` : undefined,
+    boxDecorationBreak: run.highlightColor ? 'clone' : undefined, WebkitBoxDecorationBreak: run.highlightColor ? 'clone' : undefined,
   }}>{run.text}</span>) : layer.content}{marker && (layer.content.endsWith('\n') || !layer.content) ? '\u200b' : null}</>;
 }

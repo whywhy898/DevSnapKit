@@ -23,3 +23,20 @@ test('empty/builtin slots load neutral examples, unknown second-image provenance
   const unknown=api.buildDesignedSnapshot({...user,secondaryMediaOrigin:undefined},'editorial-honey','b');assert.equal(unknown.secondarySrc,user.secondarySrc);
   assert.doesNotMatch(JSON.stringify(empty),/HoneyWeRank|honeywerank|Spotfight|spotfight/);
 });
+test('designed template preserves a custom or deliberately empty title even when replacing a builtin sample',()=>{
+  for(const title of ['My own title',''])assert.equal(api.buildDesignedSnapshot({...user,primaryMediaOrigin:{kind:'builtin',sampleId:'saas'},windowTitle:title},'editorial-honey','t').windowTitle,title);
+});
+test('reset styling and restore layout preserve user content, user objects and deleted template objects',()=>{
+  assert.equal(typeof api.resetDesignedStyles,'function','designed styling reset is not implemented');
+  assert.equal(typeof api.restoreDesignedLayout,'function','designed layout restore is not implemented');
+  const d=api.buildDesignedSnapshot(user,'editorial-honey','t');d.compositionDocument.objects=d.compositionDocument.objects.filter(n=>n.id!=='brand-mark');
+  const cta=d.compositionDocument.objects.find(n=>n.id==='cta');cta.fill='#ff0000';cta.text='My label';cta.frame.centerX=.4;
+  d.compositionDocument.placements.main.centerX=.7;
+  const reset=api.resetDesignedStyles(d);assert.equal(reset.compositionDocument.objects.find(n=>n.id==='cta').text,'My label');assert.equal(reset.compositionDocument.objects.find(n=>n.id==='cta').fill,'#272617');assert.equal(reset.compositionDocument.objects.find(n=>n.id==='cta').frame.centerX,.4);assert.equal(reset.compositionDocument.objects.some(n=>n.id==='brand-mark'),false);
+  assert.deepEqual(JSON.parse(JSON.stringify(reset.textDocument)),JSON.parse(JSON.stringify(d.textDocument)));
+  d.compositionDocument.mediaLayout='legacy';
+  d.textDocument.layers.push({...d.textDocument.layers[0],id:'user-added-brand',centerX:.9});
+  const restored=api.restoreDesignedLayout(d);assert.equal(restored.compositionDocument.mediaLayout,'independent');assert.equal(restored.compositionDocument.objects.find(n=>n.id==='cta').fill,'#ff0000');assert.equal(restored.compositionDocument.objects.find(n=>n.id==='cta').text,'My label');assert.equal(restored.imageSrc,user.imageSrc);assert.equal(restored.compositionDocument.objects.some(n=>n.id==='brand-mark'),false);
+  assert.equal(restored.textDocument.layers.find(n=>n.id==='user-added-brand').centerX,.9,'user-added object with a similar suffix is not a template role');
+  assert.equal(d.compositionDocument.placements.main.centerX,.7,'restore does not mutate before');assert.notEqual(restored.compositionDocument.placements.main.centerX,.7);
+});

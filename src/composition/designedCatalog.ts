@@ -1,6 +1,7 @@
 import type { EditorSnapshot } from '../useHistory';
 import type { CanvasTextLayer } from '../text/types';
 import { validateText } from '../text/document';
+import { MOCKUP_PRESETS } from '../templates';
 import { createIndependentComposition } from './document';
 import type { CompositionDocument, ObjectFrame, ShapeObject } from './types';
 export const DESIGNED_TEMPLATES = [{ id: 'editorial-honey' as const, name: 'Editorial Honey', width: 1600, height: 1200,
@@ -51,12 +52,12 @@ export function buildDesignedSnapshot(before: EditorSnapshot, templateId: 'edito
   compositionDocument.knownTextIds = layers.map(text => text.id);
   compositionDocument.order.push(...layers.map(text => text.id));
   return { ...before, compositionDocument,
-    templateContext: { id: templateId, version: 1, mediaRegion: { x: 0, y: 0, width: 1, height: 1 }, textRoles: { headline: id('headline'), description: id('description') } },
+    templateContext: { id: templateId, version: 1, mediaRegion: { x: 0, y: 0, width: 1, height: 1 }, textRoles: { headline: id('headline'), description: id('description'), ...Object.fromEntries(layers.map(layer => [layer.id.slice(prefix.length + 1), layer.id])) } },
     textDocument: { version: 1, layers },
     imageSrc: replaceMain ? '/designed/examples/bloom-dashboard.svg' : before.imageSrc,
     imageName: replaceMain ? 'bloom-dashboard.svg' : before.imageName,
     primaryMediaOrigin: replaceMain ? { kind: 'builtin', sampleId: 'bloom-dashboard' } : before.primaryMediaOrigin ?? { kind: 'unknown' },
-    windowTitle: replaceMain ? 'bloomboard.example' : before.windowTitle,
+    windowTitle: replaceMain && (MOCKUP_PRESETS.some(sample => sample.title === before.windowTitle) || before.windowTitle === 'bloomboard.example') ? 'bloomboard.example' : before.windowTitle,
     secondarySrc: replaceDetail ? '/designed/examples/bloom-workflow.svg' : before.secondarySrc,
     secondaryName: replaceDetail ? 'bloom-workflow.svg' : before.secondaryName,
     secondaryMediaOrigin: replaceDetail ? { kind: 'builtin', sampleId: 'bloom-workflow' } : before.secondaryMediaOrigin ?? { kind: 'unknown' },
@@ -65,5 +66,42 @@ export function buildDesignedSnapshot(before: EditorSnapshot, templateId: 'edito
     layoutMode: 'single', duoLayout: 'side', layoutPreset: 'flat', cornerStyle: 'default',
     mockupZoom: 100, mockupOffsetX: 0, mockupOffsetY: 0, imageZoom: 100, imageOffsetX: 0, imageOffsetY: 0,
     vfxGlow: false, vfxNoise: false, bgImageSrc: null,
+  };
+}
+
+export function restoreDesignedLayout(before: EditorSnapshot): EditorSnapshot {
+  const document = before.compositionDocument;
+  if (document?.templateId !== 'editorial-honey') return before;
+  const defaults = buildDesignedSnapshot(before, 'editorial-honey', 'geometry');
+  const target = defaults.compositionDocument!;
+  const geometry = <T extends { id: string; frame: ObjectFrame }>(node: T): T => {
+    const match = [...target.objects, ...target.decorations].find(candidate => candidate.id === node.id);
+    return match ? { ...node, frame: { ...match.frame } } : node;
+  };
+  const byId = new Map(defaults.textDocument.layers.map(layer => [layer.id, layer]));
+  const roles: Record<string, string> = before.templateContext?.textRoles ?? {};
+  return { ...before, aspectRatioId: 'custom', customCanvasSize: { width: 1600, height: 1200 }, layoutPreset: 'flat', mockupZoom: 100, mockupOffsetX: 0, mockupOffsetY: 0,
+    compositionDocument: { ...document, mediaLayout: 'independent', placements: structuredClone(target.placements), objects: document.objects.map(geometry), decorations: document.decorations.map(geometry) },
+    textDocument: { ...before.textDocument, layers: before.textDocument.layers.map(layer => {
+      const role = Object.keys(roles).find(key => roles[key] === layer.id), match = role ? byId.get(defaults.templateContext!.textRoles[role]) : undefined;
+      return match ? validateText({ ...layer, centerX: match.centerX, centerY: match.centerY, widthRatio: match.widthRatio }) : layer;
+    }) },
+  };
+}
+
+export function resetDesignedStyles(before: EditorSnapshot): EditorSnapshot {
+  const document = before.compositionDocument;
+  if (document?.templateId !== 'editorial-honey') return before;
+  const defaults = buildDesignedSnapshot(before, 'editorial-honey', 'style'), target = defaults.compositionDocument!;
+  const objects = document.objects.map(node => {
+    const style = target.objects.find(item => item.id === node.id && item.kind === node.kind);
+    return style ? { ...style, frame: node.frame, hidden: node.hidden, ...(node.kind === 'button' ? { text: node.text } : {}) } : node;
+  });
+  const decorations = document.decorations.map(node => {
+    const style = target.decorations.find(item => item.id === node.id); return style ? { ...style, frame: node.frame, hidden: node.hidden } : node;
+  });
+  return { ...before, bgType: defaults.bgType, solidColor: defaults.solidColor, windowTheme: defaults.windowTheme, roundedCorners: defaults.roundedCorners,
+    shadowLevel: defaults.shadowLevel, shadowOpacity: defaults.shadowOpacity, cornerStyle: defaults.cornerStyle, vfxGlow: false, vfxNoise: false, bgImageSrc: null,
+    compositionDocument: { ...document, objects, decorations },
   };
 }
