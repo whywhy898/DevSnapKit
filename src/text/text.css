@@ -5,6 +5,8 @@
 [data-canvas-text][data-trailing-newline="true"]::after{content:'\200b'}
 [data-text-hit]{--text-hit-size:32px}
 @media (pointer:coarse){[data-text-hit]{--text-hit-size:44px}}
+.theme-light [data-independent-media-status]{color:#334155;background-color:#fff;border-color:#cbd5e1}
+.theme-light [data-independent-media-status] button{color:#4338ca;background-color:#eef2ff}
 [data-text-editor-ui] textarea[data-text-rich-input]::selection{background:transparent;color:transparent}
 .canvas-text-delete{background-color:#dc2626;border-color:#b91c1c;color:#fff;cursor:pointer}
 .canvas-text-delete:hover{background-color:#b91c1c}

@@ -16,6 +16,7 @@ try{
     const sizes=await page.$$eval('[data-text-hit]',nodes=>nodes.map(n=>({id:n.dataset.textHit,width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height,coarse:matchMedia('(pointer: coarse)').matches})));
     results.push({width,touch,sizes});for(const size of sizes){assert.ok(size.height>=(touch?44:32)-.1,`${width}px ${size.id} target height ${size.height}`);assert.ok(size.width>=(touch?44:32)-.1,`${width}px target width`);}
     assert.ok(await page.$('[data-independent-media-status]'),'independent media status is explicit');assert.equal(await page.$('button[title="Single shot (1 image)"]'),null,'Single/Duo does not mislabel independent slots');
+    const colors=await page.$eval('[data-independent-media-status]',n=>({foreground:getComputedStyle(n.querySelector('span')).color,background:getComputedStyle(n).backgroundColor}));assert.notEqual(colors.foreground,colors.background,'layout label must remain readable in light theme');results.at(-1).statusColors=colors;
     const main=await page.$('[data-composition-object="main"] [data-media-surface]');await main.evaluate(n=>n.scrollIntoView({block:'center'}));await pause(200);const mb=await main.boundingBox(),mainChooser=page.waitForFileChooser();if(touch)await page.touchscreen.tap(mb.x+mb.width/2,mb.y+mb.height/2);else await page.mouse.click(mb.x+mb.width/2,mb.y+mb.height/2);await(await mainChooser).cancel();
     const roles=await page.$$eval('[data-canvas-text]',nodes=>nodes.map(n=>({id:n.dataset.canvasText,text:n.textContent})));
     for(const role of roles){
