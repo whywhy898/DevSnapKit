@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { EditorSnapshot } from '../useHistory';
-import type { CanvasTextDocument, CanvasTextLayer, TextCanvasSize, TextFont } from './types';
-import { addText, changeTextFont, deleteText, initialTextColor, updateText } from './document';
+import type { CanvasTextDocument, CanvasTextLayer, TextCanvasSize, TextFont, TextRunStyle, TextReplacementRange } from './types';
+import { addText, changeTextFont, deleteText, initialTextColor, updateText, emphasizeTextRange } from './document';
 import { clampTextPosition, geometryPatch, moveTextByScreenDelta, resizeTextByScreenDelta, textHorizontalExtent, type GeometryField, type TextMovementLayout } from './geometry';
 
 type History = {
@@ -9,7 +9,7 @@ type History = {
   commitTransaction: (snapshot?: EditorSnapshot) => void;
   cancelTransaction: () => void;
 };
-type Field = 'fontSize' | 'color' | GeometryField;
+type Field = 'fontSize' | 'color' | 'lineHeight' | 'letterSpacing' | GeometryField;
 type Session = { id: string; kind: 'content' | Field; value: string; composing: boolean; error: string };
 type Gesture = { token: number; id: string; kind: 'move' | 'left' | 'right' | 'keyboard'; layer: CanvasTextLayer; size: TextCanvasSize; scale: number; layout: TextMovementLayout };
 
@@ -23,6 +23,10 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
   const [gesturing, setGesturing] = useState(false);
   const latest = useRef(snapshot); latest.current = snapshot;
   const liveSession = useRef(session);
+  const compositionRange = useRef<TextReplacementRange>();
+  // Native textarea undo groups input on its own. Retain observed run snapshots
+  // so a native history event can restore styles that no surviving glyph owns.
+  const contentHistory = useRef<{ entries: CanvasTextLayer[]; index: number }>();
   const saveSession = (next: Session | null) => { liveSession.current = next; setSession(next); };
   const active = snapshot.textDocument.layers.find(layer => layer.id === activeId);
   useEffect(() => {
@@ -34,24 +38,47 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
     const current = liveSession.current;
     if (!current) return true;
     if (current.composing || current.error) { setMessage(current.composing ? 'Finish composing text before continuing.' : current.error); return false; }
-    history.commitTransaction(latest.current); saveSession(null); setMessage(''); return true;
+    history.commitTransaction(latest.current); compositionRange.current = undefined; contentHistory.current = undefined; saveSession(null); setMessage(''); return true;
   };
-  const cancel = () => { if (!liveSession.current && !gesture.current) return; gesture.current = null; setGesturing(false); saveSession(null); history.cancelTransaction(); setMessage(''); };
+  const cancel = () => { if (!liveSession.current && !gesture.current) return; gesture.current = null; compositionRange.current = undefined; contentHistory.current = undefined; setGesturing(false); saveSession(null); history.cancelTransaction(); setMessage(''); };
   const edit = (id: string) => {
     if (liveSession.current?.id === id && liveSession.current.kind === 'content') return;
     if (!finish()) return;
     const layer = latest.current.textDocument.layers.find(layer => layer.id === id); if (!layer) return;
     setActiveId(id); history.beginTransaction(latest.current);
+    contentHistory.current = { entries: [layer], index: 0 };
     saveSession({ id, kind: 'content', value: layer.content, composing: false, error: '' }); setMessage('');
   };
-  const change = (value: string, composing = liveSession.current?.composing ?? false) => {
+  const change = (value: string, composing = liveSession.current?.composing ?? false, replacement?: TextReplacementRange, inputType?: string) => {
     const current = liveSession.current; if (!current) return;
     let error = '';
     try {
       if (current.kind === 'content') {
-        if (!composing) applyDocument(updateText(latest.current.textDocument, current.id, { content: value }));
+        if (composing && !current.composing) compositionRange.current = replacement;
+        if (!composing) {
+          const before = latest.current.textDocument.layers.find(layer => layer.id === current.id);
+          const journal = contentHistory.current;
+          let target = -1;
+          if (before && journal) {
+            journal.entries[journal.index] = before;
+            const direction = inputType === 'historyUndo' ? -1 : inputType === 'historyRedo' ? 1 : 0;
+            if (direction) for (let index = journal.index + direction; index >= 0 && index < journal.entries.length; index += direction) {
+              if (journal.entries[index].content === value) { target = index; break; }
+            }
+          }
+          const restored = target >= 0 ? journal!.entries[target] : undefined;
+          const patch = restored && (before?.runs || restored.runs) ? { runs: restored.runs ?? [{ text: restored.content }] } : { content: value };
+          const next = updateText(latest.current.textDocument, current.id, patch, current.composing ? compositionRange.current ?? replacement : replacement);
+          if (journal && target >= 0) journal.index = target;
+          else if (journal && next !== latest.current.textDocument) {
+            journal.entries.splice(journal.index + 1);
+            journal.entries.push(next.layers.find(layer => layer.id === current.id)!); journal.index++;
+          }
+          if (next !== latest.current.textDocument) applyDocument(next);
+          compositionRange.current = undefined;
+        }
       } else if (!composing) {
-        const patch = current.kind === 'fontSize' ? { fontSize: value.trim() === '' ? NaN : Number(value) } : current.kind === 'color' ? { color: value } : geometryPatch(current.kind, value, size);
+        const patch = ['fontSize', 'lineHeight', 'letterSpacing'].includes(current.kind) ? { [current.kind]: value.trim() === '' ? NaN : Number(value) } : current.kind === 'color' ? { color: value } : geometryPatch(current.kind as GeometryField, value, size);
         applyDocument(updateText(latest.current.textDocument, current.id, patch));
       }
     } catch (e) { error = (e as Error).message; }
@@ -83,7 +110,7 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
     if (!finish() || !activeId) return false;
     const layer = latest.current.textDocument.layers.find(layer => layer.id === activeId); if (!layer) return false;
     history.beginTransaction(latest.current);
-    const value = kind === 'x' ? layer.centerX * size.width : kind === 'y' ? layer.centerY * size.height : kind === 'width' ? layer.widthRatio * size.width : layer[kind];
+    const value = kind === 'x' ? layer.centerX * size.width : kind === 'y' ? layer.centerY * size.height : kind === 'width' ? layer.widthRatio * size.width : kind === 'lineHeight' ? layer.lineHeight ?? 1.25 : kind === 'letterSpacing' ? layer.letterSpacing ?? 0 : layer[kind];
     saveSession({ id: activeId, kind, value: String(value), composing: false, error: '' });
     return true;
   };
@@ -99,9 +126,10 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
     if (layer.content.trim() && (!node || !node.offsetWidth)) { setMessage('Text layout is not ready. Try moving it again.'); return false; }
     const canvas = root.current;
     const previewScale = canvas && canvas.offsetWidth ? canvas.getBoundingClientRect().width / canvas.offsetWidth : scale;
-    const positionedHeight = node ? node.getBoundingClientRect().height / previewScale : layer.fontSize * 1.25;
+    const minimumHeight = layer.fontSize * (layer.lineHeight ?? 1.25);
+    const positionedHeight = node ? node.getBoundingClientRect().height / previewScale : minimumHeight;
     const layout = node ? { height: Math.max(positionedHeight, node.offsetHeight, node.scrollHeight), positionedHeight, horizontal: textHorizontalExtent(node, previewScale) }
-      : { height: layer.fontSize * 1.25, positionedHeight: layer.fontSize * 1.25, horizontal: { left: 0, right: layer.widthRatio * size.width } };
+      : { height: minimumHeight, positionedHeight: minimumHeight, horizontal: { left: 0, right: layer.widthRatio * size.width } };
     setActiveId(id); history.beginTransaction(latest.current);
     const token = ++nextGestureToken.current;
     gesture.current = { token, id, kind, layer, scale, size, layout }; setGesturing(true); setMessage(''); return token;
@@ -130,9 +158,26 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
   const style = (patch: Partial<CanvasTextLayer> | TextFont) => {
     if (!finish() || !activeId) return;
     const layer = latest.current.textDocument.layers.find(layer => layer.id === activeId); if (!layer) return;
-    const next = typeof patch === 'string' ? changeTextFont(layer, patch) : { ...layer, ...patch };
-    history.beginTransaction(latest.current); applyDocument(updateText(latest.current.textDocument, activeId, next)); history.commitTransaction(latest.current);
-    setMessage(typeof patch === 'string' && (next.weight !== layer.weight || next.italic !== layer.italic) ? 'Font adjusted: Gelasio supports up to 700; Manrope uses normal style.' : '');
+    try {
+      const next = typeof patch === 'string' ? changeTextFont(layer, patch) : { ...layer, ...patch };
+      const doc = updateText(latest.current.textDocument, activeId, next);
+      history.beginTransaction(latest.current); applyDocument(doc); history.commitTransaction(latest.current);
+      setMessage(typeof patch === 'string' && (next.weight !== layer.weight || next.italic !== layer.italic) ? 'Font adjusted: Gelasio supports up to 700; Manrope uses normal style.' : '');
+    } catch (error) { setMessage((error as Error).message); }
+  };
+  const emphasize = (style: TextRunStyle) => {
+    const current = liveSession.current;
+    if (!current || current.kind !== 'content') { setMessage('Edit text and select a range to emphasize.'); return; }
+    if (current.composing || current.error) { setMessage(current.error || 'Finish composing text before applying emphasis.'); return; }
+    // The overlay is a sibling of the export artwork, deliberately outside its root.
+    const selector = 'textarea[aria-label="Text content"]';
+    const input = root.current?.parentElement?.querySelector<HTMLTextAreaElement>(selector) ?? root.current?.querySelector<HTMLTextAreaElement>(selector);
+    if (!input || input.selectionStart === input.selectionEnd) { setMessage('Select the text to emphasize first.'); return; }
+    try {
+      const next = emphasizeTextRange(latest.current.textDocument, current.id, input.selectionStart, input.selectionEnd, style);
+      if (next !== latest.current.textDocument) applyDocument(next);
+      input.focus({ preventScroll: true }); setMessage('');
+    } catch (error) { setMessage((error as Error).message); }
   };
   const guard = (event: React.SyntheticEvent) => {
     const target = event.target as HTMLElement;
@@ -147,5 +192,5 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
   }, [snapshot.textDocument]);
   return { activeId, active, session, message, setMessage, size, gesturing, editingId: session?.kind === 'content' ? session.id : null,
     beginGesture, moveGesture, nudge, endKeyboard, hasGesture: (token?: number) => token === undefined ? !!gesture.current : gesture.current?.token === token,
-    edit, add, remove, select, finish, cancel, change, styleStart, changeStyle, finishStyle, style, guard };
+    edit, add, remove, select, finish, cancel, change, styleStart, changeStyle, finishStyle, style, emphasize, guard };
 }

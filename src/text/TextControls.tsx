@@ -6,9 +6,9 @@ const field = 'canvas-text-field min-w-0 rounded-lg border border-white/10 bg-wh
 const button = field + ' text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
 export function TextControls({ document, editor, disabled, exportError }: { document: CanvasTextDocument; editor: Editor; disabled: boolean; exportError?: string }) {
   const { active, session } = editor;
-  const numericOrColor = (kind: 'fontSize' | 'color' | 'x' | 'y' | 'width', label: string) => <label className="flex min-w-0 flex-col gap-1.5 text-xs text-white/60">{label}
+  const numericOrColor = (kind: 'fontSize' | 'color' | 'lineHeight' | 'letterSpacing' | 'x' | 'y' | 'width', label: string) => <label className="flex min-w-0 flex-col gap-1.5 text-xs text-white/60">{label}
     <input aria-label={kind === 'fontSize' ? 'Text size' : kind === 'color' ? 'Text color' : `Text ${kind}`} type="text" inputMode={kind === 'color' ? 'text' : 'decimal'}
-      className={field + ' w-full'} value={session?.kind === kind ? session.value : active ? kind === 'x' ? Math.round(active.centerX * editor.size.width * 100) / 100 : kind === 'y' ? Math.round(active.centerY * editor.size.height * 100) / 100 : kind === 'width' ? Math.round(active.widthRatio * editor.size.width * 100) / 100 : active[kind] : ''}
+      className={field + ' w-full'} value={session?.kind === kind ? session.value : active ? kind === 'x' ? Math.round(active.centerX * editor.size.width * 100) / 100 : kind === 'y' ? Math.round(active.centerY * editor.size.height * 100) / 100 : kind === 'width' ? Math.round(active.widthRatio * editor.size.width * 100) / 100 : kind === 'lineHeight' ? active.lineHeight ?? 1.25 : kind === 'letterSpacing' ? active.letterSpacing ?? 0 : active[kind] : ''}
       aria-invalid={session?.kind === kind && !!session.error} onFocus={() => editor.styleStart(kind)}
       onChange={event => editor.changeStyle(kind, event.target.value)} onBlur={event => { if (!(event.relatedTarget as HTMLElement | null)?.closest('[data-text-cancel]')) editor.finishStyle(kind); }}
       onCompositionStart={event => { if (editor.styleStart(kind)) editor.change(event.currentTarget.value, true); }}
@@ -45,7 +45,25 @@ export function TextControls({ document, editor, disabled, exportError }: { docu
         const Icon = align === 'left' ? AlignLeft : align === 'center' ? AlignCenter : AlignRight;
         return <button type="button" aria-label={`Align ${align}`} title={`Align ${align}`} aria-pressed={active.align === align} key={align} onClick={() => editor.style({ align })} className={button + ' inline-flex min-h-10 min-w-10 items-center justify-center' + (active.align === align ? ' bg-white/15 border-indigo-400' : '')}><Icon size={18} aria-hidden="true" /></button>;
       })}</div>
-      </div></fieldset>
+      </div>
+      <div className="grid grid-cols-2 gap-3">{numericOrColor('lineHeight', 'Line height')}{numericOrColor('letterSpacing', 'Tracking (px)')}</div>
+      <label className="flex flex-col gap-1.5 text-xs text-white/60">Case
+      <select aria-label="Text case" className={field + ' w-full'} value={active.textTransform ?? 'none'} onChange={event => editor.style({ textTransform: event.target.value as 'none' | 'uppercase' })}>
+        <option value="none">As typed</option><option value="uppercase">Uppercase</option>
+      </select></label>
+      </fieldset>
+      <fieldset className="space-y-3" data-text-emphasis><legend className="mb-3 text-[11px] font-bold uppercase tracking-wider text-white/50">Selected words</legend>
+        <p className="text-xs leading-relaxed text-white/50">Select words while editing, then apply emphasis.</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" aria-label="Emphasize selection" disabled={editor.editingId !== active.id} className={button} onPointerDown={event => event.preventDefault()} onClick={() => editor.emphasize({ weight: 700 })}>Bold</button>
+          <button type="button" aria-label="Italicize selection" disabled={editor.editingId !== active.id} className={button + ' italic'} onPointerDown={event => event.preventDefault()} onClick={() => editor.emphasize({ font: 'gelasio', weight: 600, italic: true })}>Serif italic</button>
+          <button type="button" aria-label="Clear selection emphasis" disabled={editor.editingId !== active.id} className={button} onPointerDown={event => event.preventDefault()} onClick={() => editor.emphasize({ font: undefined, weight: undefined, italic: undefined, color: undefined, highlightColor: undefined })}>Clear</button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1.5 text-xs text-white/60">Word color<input type="color" aria-label="Selection color" disabled={editor.editingId !== active.id} value={active.color} className={field + ' h-10 w-full'} onChange={event => editor.emphasize({ color: event.target.value })} /></label>
+          <label className="flex flex-col gap-1.5 text-xs text-white/60">Highlight<input type="color" aria-label="Selection highlight" disabled={editor.editingId !== active.id} defaultValue="#FFE08A" className={field + ' h-10 w-full'} onChange={event => editor.emphasize({ highlightColor: event.target.value })} /></label>
+        </div>
+      </fieldset>
       <fieldset className="space-y-3"><legend className="mb-3 text-[11px] font-bold uppercase tracking-wider text-white/50">Color</legend>
       <label data-text-color-control className="canvas-text-color-control relative flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-400">
         <span aria-hidden="true" className="h-8 w-8 shrink-0 rounded-lg border-2 border-slate-400" style={{ backgroundColor: active.color }} />

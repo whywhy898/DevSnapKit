@@ -1,7 +1,8 @@
 import type { CanvasTextDocument, TextCanvasSize } from './types';
 import './text.css';
+import { textLayoutStyle, TextRunContent } from './textPresentation';
 
-export const textFontFamily = (font: 'manrope' | 'gelasio') => font === 'manrope' ? 'Poster Manrope' : 'Poster Gelasio';
+export { textFontFamily } from './textPresentation';
 
 /** Plain DOM text in logical canvas pixels. Its height is intrinsic, never stored. */
 export function CanvasTextLayerRenderer({ document, size, editingId }: { document: CanvasTextDocument; size: TextCanvasSize; editingId?: string | null }) {
@@ -9,12 +10,9 @@ export function CanvasTextLayerRenderer({ document, size, editingId }: { documen
     {document.layers.filter(layer => layer.content.trim()).map(layer => <div key={layer.id}
       data-canvas-text={layer.id}
       data-trailing-newline={layer.content.endsWith('\n') ? 'true' : undefined}
-      style={{ position: 'absolute', left: layer.centerX * size.width, top: layer.centerY * size.height,
+      style={{ ...textLayoutStyle(layer), position: 'absolute', left: layer.centerX * size.width, top: layer.centerY * size.height,
         width: layer.widthRatio * size.width, transform: 'translate(-50%, -50%)',
-        fontFamily: `"${textFontFamily(layer.font)}"`, fontSize: layer.fontSize, fontWeight: layer.weight,
-        fontStyle: layer.italic ? 'italic' : 'normal', fontSynthesis: 'none', lineHeight: 1.25,
-        color: layer.color, textAlign: layer.align, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
-        letterSpacing: 'normal', padding: 0, margin: 0, border: 0, visibility: layer.id === editingId ? 'hidden' : 'visible',
-      }}>{layer.content}</div>)}
+        visibility: layer.id === editingId ? 'hidden' : 'visible',
+      }}><TextRunContent layer={layer} /></div>)}
   </div>;
 }

@@ -1,22 +1,19 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { CanvasTextDocument, CanvasTextLayer, TextCanvasSize } from './types';
-import { textFontFamily } from './CanvasTextLayerRenderer';
+import type { CanvasTextDocument, CanvasTextLayer, TextCanvasSize, TextReplacementRange } from './types';
+import { textLayoutStyle, TextRunContent } from './textPresentation';
+import { replaceTextContent } from './document';
+import { useRichTextSelection } from './useRichTextSelection';
+export { textLayoutStyle } from './textPresentation';
 
 interface Props {
   document: CanvasTextDocument; size: TextCanvasSize; activeId: string | null; editingId: string | null;
-  draft: string; light: boolean; onEdit: (id: string) => void; onChange: (value: string, composing?: boolean) => void;
+  draft: string; light: boolean; onEdit: (id: string) => void; onChange: (value: string, composing?: boolean, replacement?: TextReplacementRange, inputType?: string) => void;
   onDone: () => boolean; onCancel: () => void; onDeselect: () => void;
   issues: Record<string, string>;
   recoveryMessage?: string;
   onGestureStart: (id: string, kind: 'move' | 'left' | 'right', scale: number) => number | false;
   onGestureMove: (x: number, y: number) => void;
   onGestureActive: (token: number) => boolean;
-}
-export function textLayoutStyle(layer: CanvasTextLayer): React.CSSProperties {
-  return { fontFamily: `"${textFontFamily(layer.font)}"`, fontSize: layer.fontSize, fontWeight: layer.weight,
-    fontStyle: layer.italic ? 'italic' : 'normal', fontSynthesis: 'none', lineHeight: 1.25, color: layer.color,
-    textAlign: layer.align, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'normal',
-    letterSpacing: 'normal', padding: 0, margin: 0, border: 0, boxSizing: 'border-box' };
 }
 export function CanvasTextOverlay(props: Props) {
   const { document, size, editingId, activeId, recoveryMessage } = props;
@@ -36,10 +33,10 @@ export function CanvasTextOverlay(props: Props) {
         data-text-hit={layer.id} onClick={() => props.onEdit(layer.id)}
         aria-invalid={!!props.issues[layer.id]} title={props.issues[layer.id]}
         style={{ ...textLayoutStyle(layer), position: 'absolute', left: layer.centerX * size.width, top: layer.centerY * size.height,
-          width: layer.widthRatio * size.width, transform: 'translate(-50%, -50%)', minHeight: layer.fontSize * 1.25,
+          width: layer.widthRatio * size.width, transform: 'translate(-50%, -50%)', minHeight: layer.fontSize * (layer.lineHeight ?? 1.25),
           background: 'transparent', color: 'transparent', cursor: 'text', pointerEvents: 'auto',
           outline: props.issues[layer.id] ? '3px solid #F87171' : activeId === layer.id ? '2px solid #FFFFFF' : 'none', boxShadow: activeId === layer.id ? '0 0 0 4px #111827' : undefined, textDecoration: 'none' }}>
-        {layer.content.trim() ? layer.content + (layer.content.endsWith('\n') ? '\u200b' : '') : '\u200b'}
+        <span style={{ visibility: 'hidden' }}><TextRunContent layer={layer} marker /></span>
       </button>}
       {activeId === layer.id && <TextHandles {...props} layer={layer} />}
       </div>)}
@@ -55,13 +52,13 @@ function TextHandles(props: Props & { layer: CanvasTextLayer }) {
   const start = useRef<{ x: number; y: number; pointerId: number; token: number } | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const { layer, size } = props;
-  const [boxHeight, setBoxHeight] = useState(layer.fontSize * 1.25);
+  const [boxHeight, setBoxHeight] = useState(layer.fontSize * (layer.lineHeight ?? 1.25));
   useLayoutEffect(() => {
     const box = container.current?.parentElement?.querySelector<HTMLElement>('[data-text-edit-layout], [data-text-hit]');
     if (!box) return;
     const update = () => setBoxHeight(box.offsetHeight);
     update(); const observer = new ResizeObserver(update); observer.observe(box); return () => observer.disconnect();
-  }, [layer.content, layer.fontSize, layer.widthRatio, layer.font, layer.weight, layer.italic, props.editingId]);
+  }, [layer, props.editingId]);
   const handle = (kind: 'move' | 'left' | 'right', label: string, left: number, top: string) => <button type="button" data-text-gesture={kind}
     aria-label={label} title={kind === 'move' ? 'Drag to move. Arrow keys move 1 logical px; Shift moves 10 px.' : 'Drag to reflow text. Use Text width and Text x inputs for keyboard control.'}
     style={{ position: 'absolute', left, top, transform: 'translate(-50%, -50%)', minWidth: 36, minHeight: 36, padding: '4px 8px', border: '2px solid white', borderRadius: 6, background: '#312E81', color: 'white', font: '16px sans-serif', cursor: kind === 'move' ? 'move' : 'ew-resize', touchAction: 'none', pointerEvents: 'auto' }}
@@ -90,28 +87,67 @@ function TextHandles(props: Props & { layer: CanvasTextLayer }) {
 }
 function InlineText({ layer, size, draft, light, onChange, onDone, onCancel }: Props & { layer: CanvasTextLayer }) {
   const input = useRef<HTMLTextAreaElement>(null), measure = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState(layer.fontSize * 1.25);
-  const [layoutHeight, setLayoutHeight] = useState(layer.fontSize * 1.25);
+  const pendingInput = useRef<{ value: string; start: number; end: number; inputType: string }>();
+  const composition = useRef<TextReplacementRange>();
+  const visualReplacement = useRef<TextReplacementRange>();
+  const capture = (node: HTMLTextAreaElement, inputType: string) => { pendingInput.current = { value: node.value, start: node.selectionStart, end: node.selectionEnd, inputType }; };
+  useLayoutEffect(() => {
+    const node = input.current; if (!node) return;
+    // React's before-input polyfill omits some deletion events; use the native event.
+    const before = (event: Event) => capture(node, (event as InputEvent).inputType);
+    node.addEventListener('beforeinput', before); return () => node.removeEventListener('beforeinput', before);
+  }, []);
+  const changed = (value: string, nativeInputType?: string) => {
+    let replacement = composition.current;
+    const pending = pendingInput.current; pendingInput.current = undefined;
+    const inputType = nativeInputType || pending?.inputType;
+    // An invalid draft may differ from the saved document. Its DOM offsets are
+    // not replacement offsets in that document, so use the deterministic diff.
+    if (!replacement && pending && pending.value === layer.content && !pending.inputType.startsWith('history')) {
+      let { start, end } = pending;
+      if (start === end && pending.inputType.startsWith('delete')) {
+        const removed = Math.max(0, pending.value.length - value.length);
+        if (pending.inputType.endsWith('Backward')) start -= removed; else end += removed;
+      }
+      const prefix = pending.value.slice(0, start), suffix = pending.value.slice(end);
+      if (start >= 0 && end <= pending.value.length && value.length >= prefix.length + suffix.length && value.startsWith(prefix) && value.endsWith(suffix)) replacement = { start, end };
+    }
+    visualReplacement.current = replacement; onChange(value, undefined, replacement, inputType);
+  };
+  const minimum = layer.fontSize * (layer.lineHeight ?? 1.25);
+  const [height, setHeight] = useState(minimum);
+  const [layoutHeight, setLayoutHeight] = useState(minimum);
+  const rich = layer.runs !== undefined;
+  const visual = rich ? { ...layer, content: draft, runs: draft === layer.content ? layer.runs : replaceTextContent(layer, draft, composition.current ?? visualReplacement.current) } : { ...layer, content: draft };
+  const selection = useRichTextSelection(input, measure, rich, draft, layer);
   useLayoutEffect(() => { input.current?.focus({ preventScroll: true }); input.current?.select(); }, [layer.id]);
   useLayoutEffect(() => {
     const node = measure.current; if (!node) return;
     const update = () => {
-      setLayoutHeight(Math.max(layer.fontSize * 1.25, node.offsetHeight));
-      setHeight(Math.max(layer.fontSize * 1.25, node.offsetHeight, node.scrollHeight));
+      setLayoutHeight(Math.max(minimum, node.offsetHeight));
+      setHeight(Math.max(minimum, node.offsetHeight, node.scrollHeight));
     };
     update(); const observer = new ResizeObserver(update); observer.observe(node); return () => observer.disconnect();
   }, [draft, layer]);
   const style = textLayoutStyle(layer);
   return <div data-text-edit-layout style={{ position: 'absolute', left: layer.centerX * size.width, top: layer.centerY * size.height, width: layer.widthRatio * size.width,
-    height: layoutHeight, transform: 'translate(-50%, -50%)', pointerEvents: 'auto' }}>
-    <div ref={measure} aria-hidden style={{ ...style, visibility: 'hidden', width: '100%', position: 'absolute', pointerEvents: 'none' }}>{draft + (draft.endsWith('\n') || !draft ? '\u200b' : '')}</div>
-    <textarea ref={input} aria-label="Text content" value={draft} rows={1} spellCheck={false}
+    height: layoutHeight, transform: 'translate(-50%, -50%)', pointerEvents: 'auto' }}
+    onPointerDown={selection.onPointerDown} onPointerMove={selection.onPointerMove} onPointerUp={selection.onPointerUp} onPointerCancel={selection.onPointerUp}>
+    <div ref={measure} aria-hidden data-text-rich-mirror={rich ? '' : undefined} style={{ ...style, visibility: rich ? 'visible' : 'hidden', width: '100%', position: 'absolute', pointerEvents: rich ? 'auto' : 'none', userSelect: 'none' }}><TextRunContent layer={visual} marker /></div>
+    {rich && selection.selection.map((box, index) => <div key={index} data-text-rich-selection style={{ position: 'absolute', ...box, pointerEvents: 'none', background: '#6366f1', opacity: .35 }} />)}
+    {rich && selection.caret && <div data-text-rich-caret style={{ position: 'absolute', ...selection.caret, width: 1.5, minHeight: layer.fontSize, background: layer.color, pointerEvents: 'none' }} />}
+    <textarea ref={input} aria-label="Text content" data-text-rich-input={rich ? '' : undefined} value={draft} rows={1} spellCheck={false}
       style={{ ...style, display: 'block', width: '100%', height, resize: 'none', overflow: 'hidden', borderRadius: 0,
-        background: light ? 'rgba(255,255,255,.55)' : 'rgba(15,23,42,.55)', outline: '2px solid #FFFFFF', boxShadow: '0 0 0 4px #111827', caretColor: layer.color, appearance: 'none' }}
-      onChange={event => onChange(event.target.value)}
-      onCompositionStart={event => onChange(event.currentTarget.value, true)}
-      onCompositionEnd={event => onChange(event.currentTarget.value, false)}
+        background: rich ? 'transparent' : light ? 'rgba(255,255,255,.55)' : 'rgba(15,23,42,.55)', outline: '2px solid #FFFFFF', boxShadow: '0 0 0 4px #111827', caretColor: rich ? 'transparent' : layer.color, color: rich ? 'transparent' : style.color, pointerEvents: rich ? 'none' : 'auto', appearance: 'none' }}
+      onSelect={selection.sync}
+      onChange={event => changed(event.target.value, (event.nativeEvent as InputEvent).inputType)}
+      onCompositionStart={event => { composition.current = event.currentTarget.value === layer.content ? { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd } : undefined; onChange(event.currentTarget.value, true, composition.current); }}
+      onCompositionEnd={event => { const replacement = composition.current; composition.current = undefined; pendingInput.current = undefined; visualReplacement.current = replacement; onChange(event.currentTarget.value, false, replacement); }}
       onBlur={event => { if (!(event.relatedTarget as HTMLElement | null)?.closest('[data-text-editor-ui]')) onDone(); }}
-      onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape' && !event.nativeEvent.isComposing) { event.preventDefault(); onCancel(); } }} />
+      onKeyDown={event => {
+        event.stopPropagation(); selection.onKeyDown(event);
+        if (!event.nativeEvent.isComposing && !event.defaultPrevented && (event.key === 'Backspace' || event.key === 'Delete' || event.key === 'Enter' || event.key.length === 1)) capture(event.currentTarget, event.key === 'Backspace' ? 'deleteContentBackward' : event.key === 'Delete' ? 'deleteContentForward' : 'insertText');
+        if (event.key === 'Escape' && !event.nativeEvent.isComposing) { event.preventDefault(); onCancel(); }
+      }} />
   </div>;
 }
