@@ -5,6 +5,7 @@ import { MockupArtwork, type MockupArtworkProps } from '../MockupArtwork';
 import { textBoxIssue, textHorizontalExtent } from '../text/geometry';
 import { validateText } from '../text/document';
 import { artworkFontCSS, createArtworkPreparationStats, prepareArtworkImages, stableArtworkLayout } from './prepareArtworkExport';
+import { validateComposition, secondaryRequired, boxOutsideCanvas } from '../composition/document';
 
 export interface MockupExportTarget {
   width: number; height: number; outputWidth: number; outputHeight: number;
@@ -14,9 +15,10 @@ const noop = () => {};
 
 /** Copy artwork inputs independently of selection and editing UI. */
 export function freezeArtworkProps(props: MockupArtworkProps): MockupArtworkProps {
-  return { ...props, templateContext: props.templateContext ? structuredClone(props.templateContext) : null, textDocument: structuredClone(props.textDocument), canvasLogicalSize: { ...props.canvasLogicalSize },
+  return { ...props, compositionDocument: props.compositionDocument ? structuredClone(validateComposition(props.compositionDocument, props.textDocument.layers.map(layer => layer.id))) : null,
+    templateContext: props.templateContext ? structuredClone(props.templateContext) : null, textDocument: { ...props.textDocument, layers: props.textDocument.layers.map(layer => validateText(structuredClone(layer))) }, canvasLogicalSize: { ...props.canvasLogicalSize },
     gradient: { ...props.gradient }, zoomStyle: { ...props.zoomStyle }, canvasRef: null, emptySlot: null, editingTextId: null,
-    onReplace: noop, onReplaceSecondary: noop, handleNaturalSceneSize: noop, preview: false };
+    onReplace: noop, onReplaceSecondary: noop, onObjectPointerDown: undefined, handleNaturalSceneSize: noop, preview: false };
 }
 
 export function exportTargetLabel(target: MockupExportTarget) {
@@ -34,7 +36,7 @@ export async function prepareMockupExport(input: MockupArtworkProps, requested: 
     if (![target.width, target.height, target.outputWidth, target.outputHeight].every(x => Number.isFinite(x) && x > 0)) throw new Error(`${exportTargetLabel(target)}: export dimensions are invalid.`);
   }
   if (!props.imageSrc) throw new Error('Main screenshot is required. Upload a screenshot and try again.');
-  if (props.layoutMode === 'duo' && !props.secondarySrc) throw new Error('Second screenshot is required. Upload it or switch to Single.');
+  if (secondaryRequired(props.compositionDocument, props.layoutMode) && !props.secondarySrc) throw new Error('Second screenshot is required. Upload it or hide the detail image.');
   const host = document.createElement('div');
   // Only the host is offset; artwork roots retain their normal local origin.
   Object.assign(host.style, { position: 'absolute', left: '-100000px', top: '0', pointerEvents: 'none', '--canvas-preview-scale': '1' });
@@ -60,6 +62,7 @@ export async function prepareMockupExport(input: MockupArtworkProps, requested: 
       await stableArtworkLayout(artwork);
       for (let layerIndex = 0; layerIndex < props.textDocument.layers.length; layerIndex++) {
         const layer = props.textDocument.layers[layerIndex];
+        if (props.compositionDocument?.hiddenIds.includes(layer.id)) continue;
         let issue = '';
         try { validateText(layer); } catch (error) { issue = (error as Error).message; }
         if (!issue && layer.content.trim()) {
@@ -67,6 +70,10 @@ export async function prepareMockupExport(input: MockupArtworkProps, requested: 
           issue = node ? textBoxIssue(layer, target, Math.max(node.offsetHeight, node.scrollHeight), node.offsetHeight, textHorizontalExtent(node, 1)) ?? '' : 'Text layout is missing.';
         }
         if (issue) issues.push(`${exportTargetLabel(target)} — Text ${layerIndex + 1} “${layer.content.slice(0, 32) || layer.id}”: ${issue}`);
+      }
+      for (const node of artwork.querySelectorAll<HTMLElement>('[data-composition-text]')) {
+        const label = node.querySelector<HTMLElement>('[data-composition-label]');
+        if (label && (!label.textContent?.trim() || label.scrollWidth > label.clientWidth + 1 || node.offsetHeight > node.parentElement!.clientHeight + 1 || boxOutsideCanvas(node.getBoundingClientRect(), artwork.getBoundingClientRect()))) issues.push(`${exportTargetLabel(target)} — ${node.dataset.compositionText}: button text is empty or overflows its layout/canvas.`);
       }
       metrics.targets[index].layoutMs = performance.now() - start;
     }

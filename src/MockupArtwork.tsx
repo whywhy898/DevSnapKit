@@ -3,8 +3,10 @@ import { DeviceComposition, FittedScene, SceneSize } from './CanvasLayout';
 import type { EditorSnapshot } from './useHistory';
 import type { PresetGradient } from './themes';
 import { CanvasTextLayerRenderer } from './text/CanvasTextLayerRenderer';
+import { CompositionRenderer } from './composition/CompositionRenderer';
 
 export interface MockupArtworkProps extends Pick<EditorSnapshot,
+  | 'compositionDocument'
   | 'textDocument'
   | 'templateContext'
   | 'bgType'
@@ -64,10 +66,13 @@ export interface MockupArtworkProps extends Pick<EditorSnapshot,
   qrDataUrl: string | null;
   preview?: boolean;
   editingTextId?: string | null;
+  onObjectPointerDown?: (id: string, event: React.PointerEvent<HTMLDivElement>) => void;
 }
 
 /** Original artwork tree; App retains the stage, state, history and export ownership. */
 export function MockupArtwork({
+  compositionDocument,
+  onObjectPointerDown,
   textDocument,
   templateContext,
   preview = true,
@@ -221,7 +226,13 @@ export function MockupArtwork({
         />
       )}
 
-      <FittedScene
+      {compositionDocument ? <CompositionRenderer document={compositionDocument} size={canvasLogicalSize} textDocument={textDocument}
+        imageSrc={imageSrc} imageName={imageName} secondarySrc={secondarySrc} secondaryName={secondaryName}
+        windowTheme={windowTheme} windowTitle={windowTitle} shadowLevel={shadowLevel} shadowOpacity={shadowOpacity}
+        cornerStyle={cornerStyle} roundedCorners={roundedCorners} hideMockup={hideMockup} layoutPreset={layoutPreset}
+        preview={preview} editingTextId={editingTextId} onReplace={onReplace} onReplaceSecondary={onReplaceSecondary} onObjectPointerDown={onObjectPointerDown}
+        legacy={{ effectivePaddingX, effectivePaddingY, layoutMode, duoLayout, mockupZoom, mockupOffsetX, mockupOffsetY, isPhoneTheme, zoomStyle }}
+      /> : <FittedScene
         mediaRegion={templateContext?.mediaRegion}
         measurementKey={sceneMeasurementKey}
         width={canvasLogicalSize.width} height={canvasLogicalSize.height}
@@ -244,7 +255,7 @@ export function MockupArtwork({
           onReplaceSecondary={onReplaceSecondary}
           emptySlot={emptySlot}
         />
-      </FittedScene>
+      </FittedScene>}
 
       {/* Pro Feature: Custom Brand Logo */}
       {isProUnlocked && logoDataUrl && (
@@ -295,7 +306,7 @@ export function MockupArtwork({
         </div>
       )}
 
-      <CanvasTextLayerRenderer document={textDocument} size={canvasLogicalSize} editingId={preview ? editingTextId : null} />
+      {!compositionDocument && <CanvasTextLayerRenderer document={textDocument} size={canvasLogicalSize} editingId={preview ? editingTextId : null} />}
     </div>
   );
 }

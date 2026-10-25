@@ -107,7 +107,7 @@ export function FittedScene({ width, height, paddingX, paddingY, basisWidth, zoo
     const measure = () => {
       // Read natural geometry without ancestor preview/fit/camera transforms. Restored
       // synchronously before paint; avoids subpixel viewport rounding changing Auto exports.
-      const scaledAncestors = ['[data-scene-fit]', '[data-scene-camera]', '[data-canvas-root]']
+      const scaledAncestors = ['[data-scene-fit]', '[data-scene-camera]', '[data-composition-object]', '[data-canvas-root]']
         .map(selector => el.closest<HTMLElement>(selector)).filter((node): node is HTMLElement => !!node);
       const savedTransforms = scaledAncestors.map(node => node.style.transform);
       scaledAncestors.forEach(node => { node.style.transform = 'none'; });

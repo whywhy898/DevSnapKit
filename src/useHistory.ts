@@ -5,8 +5,11 @@ import { WindowTheme } from './MockupUnit';
 import { CornerStyle, LayoutPreset } from './stylePresets';
 import { DuoLayoutType } from './DuoThumbnail';
 import type { PrimaryMediaOrigin, TemplateContext } from './templates/types';
+import type { CompositionDocument } from './composition/types';
 
 export interface EditorSnapshot {
+  compositionDocument?: CompositionDocument | null;
+  secondaryMediaOrigin?: PrimaryMediaOrigin;
   templateContext?: TemplateContext | null;
   primaryMediaOrigin?: PrimaryMediaOrigin;
   textDocument: CanvasTextDocument;

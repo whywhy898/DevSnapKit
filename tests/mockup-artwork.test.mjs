@@ -13,7 +13,8 @@ test('extracted artwork retains its canvas root and original layer order', () =>
   // Structural element-tree check; browser/export suites run the real renderer.
   const localRequire = name => name === 'react' ? { ...require('react'), useMemo: factory => factory() } : name === './CanvasLayout' ? {
     FittedScene: function FittedScene() {}, DeviceComposition: function DeviceComposition() {},
-  } : name === './text/CanvasTextLayerRenderer' ? { CanvasTextLayerRenderer: function CanvasTextLayerRenderer() {} } : require(name);
+  } : name === './text/CanvasTextLayerRenderer' ? { CanvasTextLayerRenderer: function CanvasTextLayerRenderer() {} }
+    : name === './composition/CompositionRenderer' ? { CompositionRenderer: function CompositionRenderer() {} } : require(name);
   new Function('require', 'module', 'exports', transpiled)(localRequire, module, module.exports);
   const root = module.exports.MockupArtwork({
     canvasLogicalSize: { width: 960, height: 720 }, gradient: { className: 'baseline-gradient' },
