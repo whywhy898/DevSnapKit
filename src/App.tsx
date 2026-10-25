@@ -1711,12 +1711,14 @@ export default function App() {
         }
       } else {
         if (e.key === '1') {
+          if (compositionDocument?.mediaLayout === 'independent') { changeComposition({ ...compositionDocument, detailVisible: false }); return; }
           setLayoutMode('single');
           setCompositionDocument(doc => doc ? { ...doc, mediaLayout: 'legacy', detailVisible: false } : null);
           trackEvent('layout_mode_change', { mode: 'single', trigger: 'shortcut' });
           return;
         }
         if (e.key === '2') {
+          if (compositionDocument?.mediaLayout === 'independent') { changeComposition({ ...compositionDocument, detailVisible: true, hiddenIds: compositionDocument.hiddenIds.filter(id => id !== 'secondary') }); return; }
           setLayoutMode('duo');
           setCompositionDocument(doc => doc ? { ...doc, mediaLayout: 'legacy', detailVisible: true } : null);
           trackEvent('layout_mode_change', { mode: 'duo', trigger: 'shortcut' });
@@ -2230,6 +2232,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           <MockupArtwork {...artworkProps()} editingTextId={textEditor.editingId} onObjectPointerDown={id => selectObject(id)} />
           {compositionDocument && <CompositionOverlay document={compositionDocument} selected={selectedObject} size={canvasLogicalSize} onStart={startCompositionGesture} onMove={moveCompositionGesture} onEnd={finishCompositionGesture} />}
           <CanvasTextOverlay compositionHitTargets={!!compositionDocument} document={compositionDocument ? { ...textDocument, layers: textDocument.layers.filter(layer => !compositionDocument.hiddenIds.includes(layer.id)) } : textDocument} size={canvasLogicalSize} activeId={textEditor.activeId} editingId={textEditor.editingId}
+            onArtworkHit={id => { if (!textEditor.finish()) return; selectObject(id); if (id === 'main' || id === 'secondary') (id === 'main' ? fileInputRef : secondaryFileInputRef).current?.click(); }}
             recoveryMessage={textEditor.session?.error || (textEditor.session?.composing ? textEditor.message : '')}
             issues={textLayout.issues} onGestureStart={textEditor.beginGesture} onGestureMove={textEditor.moveGesture}
             onGestureActive={textEditor.hasGesture}
@@ -2239,8 +2242,11 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           {/* Floating Bottom Studio Dock */}
           </CanvasStage>
           <div className="mt-2 flex flex-nowrap items-center justify-center gap-2 z-20 shrink-0 max-w-full" style={{ flexWrap: 'wrap' }}>
-            {/* 1-Image / 2-Image Mode Toggle (§5.1) */}
-            <div className="flex items-center bg-black/40 border border-white/10 p-0.5 rounded-xl backdrop-blur-md shrink-0 h-9">
+            {/* Independent slots are not the legacy paired-device layouts. */}
+            {compositionDocument?.mediaLayout === 'independent' ? <div data-independent-media-status className="flex items-center gap-2 rounded-xl border border-white/15 bg-black/40 px-2 h-9 text-xs text-white">
+              <span>{compositionDocument.detailVisible && !compositionDocument.hiddenIds.includes('secondary') ? 'Main + detail' : 'Main only'}</span>
+              <button type="button" className="rounded bg-white/10 px-2 py-1 cursor-pointer hover:bg-white/20" onClick={() => changeComposition({ ...compositionDocument, detailVisible: !(compositionDocument.detailVisible && !compositionDocument.hiddenIds.includes('secondary')), hiddenIds: compositionDocument.hiddenIds.filter(id => id !== 'secondary') })}>{compositionDocument.detailVisible && !compositionDocument.hiddenIds.includes('secondary') ? 'Hide detail image' : 'Show detail image'}</button>
+            </div> : <div className="flex items-center bg-black/40 border border-white/10 p-0.5 rounded-xl backdrop-blur-md shrink-0 h-9">
               <button
                 type="button"
                 onClick={() => {
@@ -2278,7 +2284,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 </div>
                 <span className="hidden sm:inline">Duo</span>
               </button>
-            </div>
+            </div>}
 
             {/* Replace Image & Starter Demo Picker */}
             <div className="relative flex items-center shrink-0 h-9">

@@ -128,7 +128,7 @@ export const MockupUnit: React.FC<MockupUnitProps> = ({
   const mediaEvents = {
     'data-media-surface': true,
     onPointerEnter: () => setMediaHovered(true),
-    onPointerLeave: () => { setMediaHovered(false); pointerStart.current = null; },
+    onPointerLeave: (event: React.PointerEvent<HTMLDivElement>) => { setMediaHovered(false); if (event.buttons) pointerStart.current = null; },
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
       pointerStart.current = event.button === 0 && onReplace ? { x: event.clientX, y: event.clientY } : null;
     },

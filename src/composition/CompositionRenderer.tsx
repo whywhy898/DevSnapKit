@@ -57,7 +57,7 @@ function DetailMedia({ props, zIndex }: { props: Props; zIndex: number }) {
   const interactive = props.preview && !props.editingTextId, doc = props.document;
   return <div className="group/media" data-composition-object="secondary" data-media-surface style={{ ...frameStyle(doc.placements.secondary), zIndex,
     borderRadius: doc.detailRadius, border: doc.detailBorder, boxShadow: doc.detailShadow, overflow: 'hidden', cursor: interactive ? 'pointer' : undefined }}
-    onPointerEnter={() => setHovered(true)} onPointerLeave={() => { setHovered(false); pointer.current = null; }}
+    onPointerEnter={() => setHovered(true)} onPointerLeave={event => { setHovered(false); if (event.buttons) pointer.current = null; }} onPointerCancel={() => { pointer.current = null; }}
     onPointerDown={event => { pointer.current = interactive && event.button === 0 ? { x: event.clientX, y: event.clientY } : null; props.onObjectPointerDown?.('secondary', event); }}
     onClick={event => { const start = pointer.current; pointer.current = null; if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) < 4) props.onReplaceSecondary?.(); }}>
     <img src={props.secondarySrc!} alt={props.secondaryName || 'Detail screenshot'} style={{ display: 'block', width: '100%', height: '100%', objectFit: doc.detailFit, objectPosition: doc.detailAlign, pointerEvents: 'none' }} />

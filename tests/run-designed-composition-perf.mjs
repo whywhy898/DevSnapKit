@@ -11,7 +11,7 @@ import { launchBrowser, preparePage, clickButton, finishTextEditing } from './he
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 const origin = 'http://127.0.0.1:5196';
-const output = path.resolve(root, '../../output/devsnapkit/designed-templates-2026-10-25/performance');
+const output = path.resolve(process.env.DESIGNED_PERF_OUTPUT || path.join(root, '../../output/devsnapkit/designed-templates-2026-10-25/performance'));
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const paint = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 const p95 = values => values.length ? [...values].sort((a,b) => a-b)[Math.ceil(values.length*.95)-1] : null;

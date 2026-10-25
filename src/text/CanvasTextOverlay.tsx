@@ -4,6 +4,7 @@ import type { CanvasTextDocument, CanvasTextLayer, TextCanvasSize, TextReplaceme
 import { textLayoutStyle, TextRunContent } from './textPresentation';
 import { replaceTextContent } from './document';
 import { useRichTextSelection } from './useRichTextSelection';
+import { nearestTextHit } from './hitTesting';
 export { textLayoutStyle } from './textPresentation';
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
   issues: Record<string, string>;
   recoveryMessage?: string;
   compositionHitTargets?: boolean;
+  onArtworkHit?: (id: string) => void;
   onGestureStart: (id: string, kind: 'move' | 'left' | 'right', scale: number) => number | false;
   onGestureMove: (x: number, y: number) => void;
   onGestureActive: (token: number) => boolean;
@@ -45,14 +47,39 @@ export function CanvasTextOverlay(props: Props) {
 function TextHit(props: Props & { layer: CanvasTextLayer; index: number }) {
   const { layer, size, activeId, compositionHitTargets } = props;
   const onEdit = useRef(props.onEdit); onEdit.current = props.onEdit;
+  const onArtworkHit = useRef(props.onArtworkHit); onArtworkHit.current = props.onArtworkHit;
   const [target, setTarget] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => { setTarget(compositionHitTargets ? window.document.querySelector<HTMLElement>(`[data-composition-text="${CSS.escape(layer.id)}"]`) : null); }, [compositionHitTargets, layer.id]);
   const issue = props.issues[layer.id], selected = activeId === layer.id;
-  const hit = useMemo(() => <button type="button" aria-label={`Edit text ${props.index + 1}`} data-export-ignore="true" data-text-editor-ui data-text-hit={layer.id} onClick={() => onEdit.current(layer.id)}
-    aria-invalid={!!props.issues[layer.id]} title={props.issues[layer.id]} style={{ ...textLayoutStyle(layer), position: 'absolute', left: layer.centerX * size.width, top: layer.centerY * size.height,
-      width: layer.widthRatio * size.width, transform: 'translate(-50%, -50%)', minHeight: layer.fontSize * (layer.lineHeight ?? 1.25), background: 'transparent', color: 'transparent', cursor: 'text', pointerEvents: 'auto', zIndex: 41,
+  const hit = useMemo(() => <button type="button" aria-label={`Edit text ${props.index + 1}`} data-export-ignore="true" data-text-editor-ui data-text-hit={layer.id} onClick={event => {
+      if (!event.detail) { onEdit.current(layer.id); return; }
+      const stage = event.currentTarget.closest('[data-canvas-stage]'), candidates = [], seen = new Set<string>();
+      const elements = window.document.elementsFromPoint(event.clientX, event.clientY);
+      for (const node of elements) {
+        const button = node.closest<HTMLElement>('[data-text-hit]'), id = button?.dataset.textHit;
+        if (id && stage?.contains(button!)) {
+          const glyph = stage.querySelector<HTMLElement>(`[data-canvas-text="${CSS.escape(id)}"]`) || button!.querySelector<HTMLElement>('span');
+          if (glyph && !seen.has(id)) { seen.add(id); candidates.push({ id, rect: glyph.getBoundingClientRect() }); }
+        } else if (node.closest('[data-composition-object]')) break;
+      }
+      const text = nearestTextHit(candidates, event.clientX, event.clientY), actual = candidates.find(item => item.id === text)?.rect;
+      const onGlyph = actual && event.clientX >= actual.left && event.clientX <= actual.right && event.clientY >= actual.top && event.clientY <= actual.bottom;
+      if (!onGlyph && onArtworkHit.current) {
+        // Padded targets must not steal clicks from a visible image or CTA.
+        for (const node of elements) {
+          const media = node.closest('[data-media-surface]'), object = node.closest<HTMLElement>('[data-composition-object]');
+          const id = media ? (media.closest<HTMLElement>('[data-scene-slot]')?.dataset.sceneSlot === '2' ? 'secondary' : object?.dataset.compositionObject || 'main') : object?.dataset.compositionObject;
+          if (id && (media || !['main', 'secondary'].includes(id))) { onArtworkHit.current(id); return; }
+        }
+      }
+      onEdit.current(text || layer.id);
+    }}
+    aria-invalid={!!props.issues[layer.id]} title={props.issues[layer.id]} style={{ ...textLayoutStyle(layer), position: 'absolute',
+      left: `clamp(calc(var(--text-hit-size) / var(--canvas-preview-scale, 1) / 2), ${layer.centerX * size.width}px, calc(${size.width}px - var(--text-hit-size) / var(--canvas-preview-scale, 1) / 2))`,
+      top: `clamp(calc(var(--text-hit-size) / var(--canvas-preview-scale, 1) / 2), ${layer.centerY * size.height}px, calc(${size.height}px - var(--text-hit-size) / var(--canvas-preview-scale, 1) / 2))`,
+      width: layer.widthRatio * size.width, minWidth: 'calc(var(--text-hit-size) / var(--canvas-preview-scale, 1))', transform: 'translate(-50%, -50%)', minHeight: `max(${layer.fontSize * Math.max(1.25, layer.lineHeight ?? 1.25)}px, calc(var(--text-hit-size) / var(--canvas-preview-scale, 1)))`, background: 'transparent', color: 'transparent', cursor: 'text', pointerEvents: 'auto', zIndex: 41,
       outline: props.issues[layer.id] ? '3px solid #F87171' : activeId === layer.id ? '2px solid #FFFFFF' : 'none', boxShadow: activeId === layer.id ? '0 0 0 4px #111827' : undefined, textDecoration: 'none' }}>
-      <span style={{ visibility: 'hidden' }}><TextRunContent layer={layer} marker /></span></button>, [layer, size.width, size.height, props.index, issue, selected]);
+      <span style={{ visibility: 'hidden', display: 'block', width: layer.widthRatio * size.width }}><TextRunContent layer={layer} marker /></span></button>, [layer, size.width, size.height, props.index, issue, selected]);
   // Keep hit testing in the same stacking context as the artwork it edits.
   // Covered text remains accessible through Objects, without blocking media.
   return compositionHitTargets ? target && createPortal(hit, target) : hit;
@@ -64,8 +91,8 @@ function TextHandles(props: Props & { layer: CanvasTextLayer }) {
   const runMetrics = JSON.stringify(layer.runs);
   const [boxHeight, setBoxHeight] = useState(layer.fontSize * (layer.lineHeight ?? 1.25));
   useLayoutEffect(() => {
-    const box = container.current?.parentElement?.querySelector<HTMLElement>('[data-text-edit-layout], [data-text-hit]')
-      || window.document.querySelector<HTMLElement>(`#studio-canvas [data-text-hit="${CSS.escape(layer.id)}"]`);
+    const box = container.current?.parentElement?.querySelector<HTMLElement>('[data-text-edit-layout]')
+      || window.document.querySelector<HTMLElement>(`#studio-canvas [data-canvas-text="${CSS.escape(layer.id)}"]`);
     if (!box) return;
     const update = () => setBoxHeight(box.offsetHeight);
     update(); const observer = new ResizeObserver(update); observer.observe(box); return () => observer.disconnect();
