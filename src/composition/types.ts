@@ -24,6 +24,7 @@ export interface CompositionDocument {
   /** Absent in legacy documents, which retain their original media rendering. */
   mediaPresentation?: Partial<Record<MediaSlot, SlotPresentation>>;
   adaptiveMediaLayout?: 'auto' | 'manual';
+  singlePlacement?: ObjectFrame;
   placements: Record<MediaSlot, ObjectFrame>;
   detailVisible: boolean; detailFit: 'contain' | 'cover'; detailAlign: 'center' | 'top' | 'bottom' | 'left' | 'right';
   detailRadius: number; detailBorder: string; detailShadow: string;

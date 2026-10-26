@@ -4,10 +4,12 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';
 import ts from 'typescript';
+import { createTypeScriptLoader } from './helpers/load-typescript.mjs';
+import { fileURLToPath } from 'node:url';
 const file=new URL('../src/composition/document.ts',import.meta.url);
 const source=fs.existsSync(file)?fs.readFileSync(file,'utf8'):'';
 const module={exports:{}};
-if(source)vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module,exports:module.exports,structuredClone,Math,Number,Set,JSON});
+if(source)vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module,exports:module.exports,require:name=>createTypeScriptLoader(fileURLToPath(new URL('../src/composition/',import.meta.url)))(name),structuredClone,Math,Number,Set,JSON});
 const api=module.exports;
 const plain=x=>JSON.parse(JSON.stringify(x));
 test('independent layout has exactly two role placements and no duplicate image sources',()=>{

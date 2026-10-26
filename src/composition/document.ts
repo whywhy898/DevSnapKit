@@ -1,4 +1,5 @@
 import type { CompositionDocument, ObjectFrame } from './types';
+import { materializeMediaPlacements, resolveMediaPlacements } from '../templates/collection/mediaLayout';
 type Size = { width: number; height: number };
 
 export function createIndependentComposition(): CompositionDocument {
@@ -18,13 +19,14 @@ export function placementBounds(frame: ObjectFrame, size: Size) {
 }
 
 export function compositionFrame(doc: CompositionDocument, id: string): ObjectFrame {
-  if (id === 'main' || id === 'secondary') return doc.placements[id];
+  if (id === 'main' || id === 'secondary') return resolveMediaPlacements(doc)[id];
   const node = [...doc.objects, ...doc.decorations].find(node => node.id === id);
   if (!node) throw new Error('Unknown composition object');
   return node.frame;
 }
 
 export function moveCompositionObject(doc: CompositionDocument, id: string, patch: Partial<ObjectFrame>, size: Size): CompositionDocument {
+  if (id === 'main' || id === 'secondary') doc = materializeMediaPlacements(doc);
   const frame = { ...compositionFrame(doc, id), ...patch };
   if (!Object.values(frame).every(Number.isFinite) || frame.widthRatio <= 0 || frame.heightRatio <= 0) throw new Error('Invalid placement geometry');
   const decoration = doc.decorations.some(node => node.id === id), image = id === 'main' || id === 'secondary';
@@ -84,7 +86,7 @@ export function validateComposition(doc: CompositionDocument, textIds: readonly 
   // they never resurrect content. Unknown references remain invalid.
   const known = new Set(['main', 'secondary', 'brand', ...ids, ...textIds, ...(doc.knownTextIds ?? [])]);
   if (doc.order.some(id => !known.has(id))) throw new Error('Unknown object order reference');
-  for (const frame of [...Object.values(doc.placements), ...nodes.map(node => node.frame)]) {
+  for (const frame of [...Object.values(doc.placements), ...(doc.singlePlacement ? [doc.singlePlacement] : []), ...nodes.map(node => node.frame)]) {
     if (!frame || !(['centerX', 'centerY', 'widthRatio', 'heightRatio', 'rotation'] as const).every(key => Number.isFinite(frame[key])) || frame.widthRatio <= 0 || frame.heightRatio <= 0 || Math.abs(frame.rotation) > 180) throw new Error('Invalid placement geometry');
   }
   for (const node of nodes) {

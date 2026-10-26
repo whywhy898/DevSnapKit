@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CompositionDocument, MediaSlot } from '../composition/types';
-import { moveCompositionObject } from '../composition/document';
+import { compositionFrame, moveCompositionObject } from '../composition/document';
 
 export function GeometryInput({ label, value, disabled = false, onCommit }: { label: string; value: number; disabled?: boolean; onCommit: (value: number) => void }) {
   const [draft, setDraft] = useState(String(value));
@@ -16,7 +16,8 @@ export function ImageControls({ document: doc, selected, size, onChange, onStart
   document: CompositionDocument; selected: MediaSlot; size: { width: number; height: number }; onChange: (doc: CompositionDocument) => void;
   onStart: () => void; onFinish: () => void; onRestore: () => void; onResetTemplate: () => void; onIndependent: () => void; children?: React.ReactNode;
 }) {
-  const frame = doc.placements[selected], label = selected === 'main' ? 'Image 1' : 'Image 2';
+  const frame = compositionFrame(doc, selected), label = selected === 'main' ? 'Image 1' : 'Image 2';
+  const presentation = doc.mediaPresentation?.[selected];
   const independent = doc.mediaLayout === 'independent';
   const patch = (values: Partial<typeof frame>) => onChange(moveCompositionObject(doc, selected, values, size));
   const end = (event: React.FocusEvent<HTMLElement>) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) onFinish(); };
@@ -28,7 +29,11 @@ export function ImageControls({ document: doc, selected, size, onChange, onStart
       <button type="button" onClick={() => patch({ centerX: .5, centerY: .5 })}>Reset position</button>
     </fieldset>}
     {!independent && <p className="inspector-hint">Image group uses the selected layout. Frame and camera settings apply to the whole group.</p>}
-    {selected === 'secondary' && independent && <fieldset onFocusCapture={onStart} onBlurCapture={end} className="inspector-two-column">
+    {independent && presentation && <fieldset onFocusCapture={onStart} onBlurCapture={end} className="inspector-two-column">
+      <label>Fit<select aria-label={`${label} fit`} value={presentation.fit} onChange={event => onChange({ ...doc, mediaPresentation: { ...doc.mediaPresentation, [selected]: { ...presentation, fit: event.target.value as 'contain' | 'cover' } } })}><option>contain</option><option>cover</option></select></label>
+      <label>Focus<select aria-label={`${label} focus`} value={presentation.align} onChange={event => onChange({ ...doc, mediaPresentation: { ...doc.mediaPresentation, [selected]: { ...presentation, align: event.target.value as CompositionDocument['detailAlign'] } } })}>{['center','top','bottom','left','right'].map(value => <option key={value}>{value}</option>)}</select></label>
+    </fieldset>}
+    {selected === 'secondary' && independent && !presentation && <fieldset onFocusCapture={onStart} onBlurCapture={end} className="inspector-two-column">
       <label>Fit<select aria-label="Detail fit" value={doc.detailFit} onChange={event => onChange({ ...doc, detailFit: event.target.value as 'contain' | 'cover' })}><option>contain</option><option>cover</option></select></label>
       <label>Focus<select aria-label="Detail focus" value={doc.detailAlign} onChange={event => onChange({ ...doc, detailAlign: event.target.value as CompositionDocument['detailAlign'] })}>{['center','top','bottom','left','right'].map(value => <option key={value}>{value}</option>)}</select></label>
       <label>Corner radius<GeometryInput label="Detail radius" value={doc.detailRadius} onCommit={value => { if (value >= 0 && value <= 100) onChange({ ...doc, detailRadius: value }); }} /></label>

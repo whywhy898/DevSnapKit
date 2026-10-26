@@ -8,6 +8,8 @@ import { ButtonRenderer } from './ButtonRenderer';
 import { DecorationRenderer } from './DecorationRenderer';
 import { MediaHoverOverlay } from '../MockupUnit';
 import { canUse } from '../../shared/productCapabilities';
+import { compositionFrame } from './document';
+import { MediaShell } from './MediaShell';
 const noop = () => {};
 export const frameStyle = (frame: ObjectFrame): CSSProperties => ({ position: 'absolute', left: `${frame.centerX * 100}%`, top: `${frame.centerY * 100}%`,
   width: `${frame.widthRatio * 100}%`, height: `${frame.heightRatio * 100}%`, transform: `translate(-50%, -50%) rotate(${frame.rotation}deg)`, transformOrigin: 'center' });
@@ -23,13 +25,17 @@ type Props = Pick<MockupArtworkProps, 'imageSrc' | 'imageName' | 'secondarySrc' 
 export function CompositionRenderer(props: Props) {
   const { document: doc, size, preview, textDocument, editingTextId } = props;
   const key = useMemo(() => ({}), [props.imageSrc, props.windowTheme, props.windowTitle, props.cornerStyle, props.roundedCorners, props.layoutPreset, props.hideMockup, props.legacy?.layoutMode, props.legacy?.duoLayout, props.secondarySrc]);
-  const main = doc.placements.main;
+  const main = compositionFrame(doc, 'main');
   const order = [...doc.order, ...textDocument.layers.map(layer => layer.id).filter(id => !doc.order.includes(id))];
   return <>
     {doc.decorations.filter(node => !node.hidden && !doc.hiddenIds.includes(node.id)).map(node => <div key={node.id} data-composition-decoration={node.id} style={{ ...frameStyle(node.frame), opacity: node.opacity ?? 1, pointerEvents: 'none' }}><DecorationRenderer object={node}/></div>)}
     {order.filter(id => !doc.hiddenIds.includes(id) && (id !== 'secondary' || (doc.mediaLayout === 'independent' && doc.detailVisible))).map((id, index) => {
       const graphic = doc.objects.find(node => node.id === id);
       const text = textDocument.layers.find(node => node.id === id);
+      if ((id === 'main' || id === 'secondary') && doc.mediaLayout === 'independent' && doc.mediaPresentation?.[id]) {
+        const src = id === 'main' ? props.imageSrc : props.secondarySrc;
+        return src ? <PresentedMedia key={id} props={props} slot={id} src={src} zIndex={index + 1} /> : null;
+      }
       if (text) return <div key={id} data-composition-text={id} style={{ position: 'absolute', inset: 0, zIndex: index + 1, pointerEvents: 'none' }}><CanvasTextLayerRenderer document={{ version: 1, layers: [text] }} size={size} editingId={preview ? editingTextId : null} /></div>;
       if (graphic) return graphic.hidden ? null : <div key={id} data-composition-object={id} style={{ ...frameStyle(graphic.frame), ...(graphic.kind === 'button' && graphic.autoWidth ? { width: 'max-content' } : {}), zIndex: index + 1, opacity: graphic.opacity ?? 1 }} onPointerDown={event => props.onObjectPointerDown?.(id, event)}>
         {graphic.kind === 'button' ? <ButtonRenderer object={graphic} /> : graphic.shape === 'mark' && canUse('brand_logo', Boolean(props.isProUnlocked)) && props.logoDataUrl
@@ -51,6 +57,19 @@ export function CompositionRenderer(props: Props) {
       return null;
     })}
   </>;
+}
+
+function PresentedMedia({ props, slot, src, zIndex }: { props: Props; slot: 'main' | 'secondary'; src: string; zIndex: number }) {
+  const [hovered, setHovered] = useState(false), pointer = useRef<{ x: number; y: number } | null>(null);
+  const interactive = Boolean(props.preview && !props.editingTextId);
+  const replace = slot === 'main' ? props.onReplace : props.onReplaceSecondary;
+  return <div className="group/media" data-composition-object={slot} data-media-surface style={{ ...frameStyle(compositionFrame(props.document, slot)), zIndex, cursor: interactive ? 'pointer' : undefined }}
+    onPointerEnter={() => setHovered(true)} onPointerLeave={event => { setHovered(false); if (event.buttons) pointer.current = null; }} onPointerCancel={() => { pointer.current = null; }}
+    onPointerDown={event => { pointer.current = interactive && event.button === 0 ? { x: event.clientX, y: event.clientY } : null; props.onObjectPointerDown?.(slot, event); }}
+    onClick={event => { const start = pointer.current; pointer.current = null; if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) < 4) replace?.(); }}>
+    <MediaShell src={src} name={slot === 'main' ? props.imageName : props.secondaryName} presentation={props.document.mediaPresentation![slot]!} />
+    {interactive && hovered && <MediaHoverOverlay />}
+  </div>;
 }
 
 function DetailMedia({ props, zIndex }: { props: Props; zIndex: number }) {
