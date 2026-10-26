@@ -1,4 +1,13 @@
+import type { CuratedTemplateId } from '../templates/collection/types';
+
 export type MediaSlot = 'main' | 'secondary';
+export type SlotFrame = 'plain' | 'browser-light' | 'browser-dark' | 'phone-light' | 'phone-dark';
+export interface SlotPresentation {
+  frame: SlotFrame;
+  fit: 'contain' | 'cover';
+  align: 'center' | 'top' | 'bottom' | 'left' | 'right';
+  title?: string;
+}
 export interface ObjectFrame { centerX: number; centerY: number; widthRatio: number; heightRatio: number; rotation: number }
 export interface GraphicBase { id: string; name: string; frame: ObjectFrame; hidden?: boolean; opacity?: number }
 export interface ButtonObject extends GraphicBase {
@@ -11,7 +20,10 @@ export interface ShapeObject extends GraphicBase {
 }
 export type GraphicObject = ButtonObject | ShapeObject;
 export interface CompositionDocument {
-  version: 1; mediaLayout: 'independent' | 'legacy'; templateId?: 'editorial-honey' | 'spotlight-launch';
+  version: 1; mediaLayout: 'independent' | 'legacy'; templateId?: CuratedTemplateId | 'spotlight-launch';
+  /** Absent in legacy documents, which retain their original media rendering. */
+  mediaPresentation?: Partial<Record<MediaSlot, SlotPresentation>>;
+  adaptiveMediaLayout?: 'auto' | 'manual';
   placements: Record<MediaSlot, ObjectFrame>;
   detailVisible: boolean; detailFit: 'contain' | 'cover'; detailAlign: 'center' | 'top' | 'bottom' | 'left' | 'right';
   detailRadius: number; detailBorder: string; detailShadow: string;
