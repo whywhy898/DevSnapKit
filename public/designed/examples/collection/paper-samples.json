@@ -1,0 +1,23 @@
+{
+  "generator": "scripts/build-paper-samples.mjs",
+  "provenance": "Self-authored SVG illustration of fictional UI; no website capture or third-party photography",
+  "font": {
+    "source": "public/poster/fonts/manrope-latin.woff2",
+    "license": "Manrope-OFL.txt",
+    "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+  },
+  "records": [
+    {
+      "file": "folio-workspace.svg",
+      "width": 1000,
+      "height": 668,
+      "sha256": "f59160337c968cde379e0278545fa7239d9bc2cb09b75d6d40932ad4a560c7de"
+    },
+    {
+      "file": "folio-task-detail.svg",
+      "width": 480,
+      "height": 318,
+      "sha256": "f0dd94760f22793c6b6ff9e958508bd0a8139573a7a8a97691a4410e088f2e3c"
+    }
+  ]
+}

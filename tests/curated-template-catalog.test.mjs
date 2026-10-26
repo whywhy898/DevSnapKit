@@ -45,7 +45,9 @@ test('Honey dispatcher retains v2 applications and versioned v1 restores; unknow
 test('published catalog contains only implemented free Honey and Paper and exposes an accessible Apply action',()=>{
  build();const {CURATED_TEMPLATE_CATALOG:catalog,getCuratedTemplate}=load('templates/collection/catalog.ts');assert.deepEqual(json(catalog.map(t=>t.id)),['editorial-honey','paper-launch-duo']);assert.ok(catalog.every(t=>t.tier==='free'));assert.equal(getCuratedTemplate('night-signal-duo'),undefined);
  const {TemplateMenu}=load('templates/TemplateMenu.tsx');const html=renderToStaticMarkup(createElement(TemplateMenu,{onApply:()=>{},onDesignedApply:()=>{},disabled:false,busy:false}));
- assert.match(html,/aria-label="Apply Paper Launch Duo template"/);assert.match(html,/1200/);assert.doesNotMatch(html,/night-signal-duo|pocket-flow-duo|paper-launch-duo\.webp/);
+ assert.match(html,/aria-label="Apply Paper Launch Duo template"/);assert.match(html,/1200/);assert.doesNotMatch(html,/night-signal-duo|pocket-flow-duo/);
+ const provenance=JSON.parse(fs.readFileSync(new URL('../public/designed/collection/paper-launch-provenance.json',import.meta.url)));
+ assert.match(html,/paper-launch-duo\.webp/);assert.match(provenance.method,/actual browser-triggered editor PNG/);assert.equal(provenance.records.find(r=>r.file==='paper-launch-duo.webp').width,480);
 });
 test('a Paper snapshot is one history command and Undo returns the complete prior document',()=>{
  const {EditorHistory}=load('editorHistory.ts');const history=new EditorHistory(base);const next=build();history.flush(next);assert.equal(history.count,2);assert.deepEqual(json(history.undo(next)),json(base));assert.deepEqual(json(history.redo()),json(next));

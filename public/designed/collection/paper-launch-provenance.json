@@ -1,0 +1,45 @@
+{
+  "templateId": "paper-launch-duo",
+  "method": "Resized from actual browser-triggered editor PNG downloads; not imagegen output",
+  "sourceCommit": "2c5d4c0bc29425054cb82e2aa91cbac73abba701",
+  "sampleSources": [
+    {
+      "file": "folio-workspace.svg",
+      "width": 1000,
+      "height": 668,
+      "sha256": "f59160337c968cde379e0278545fa7239d9bc2cb09b75d6d40932ad4a560c7de"
+    },
+    {
+      "file": "folio-task-detail.svg",
+      "width": 480,
+      "height": 318,
+      "sha256": "f0dd94760f22793c6b6ff9e958508bd0a8139573a7a8a97691a4410e088f2e3c"
+    }
+  ],
+  "records": [
+    {
+      "file": "paper-launch-duo.webp",
+      "width": 480,
+      "height": 252,
+      "sourcePng": "paper-default-duo-1x.png",
+      "sourceSha256": "af502dde9ba62224d2b904c1ebc128f0fc2292a0fa900b9fb4114391affb13d8",
+      "sha256": "4a331794be12f125b9ae86829870283621591a7ae5ec4ae397ba9c536cb0bb2d"
+    },
+    {
+      "file": "paper-launch-duo-preview.webp",
+      "width": 1200,
+      "height": 630,
+      "sourcePng": "paper-default-duo-1x.png",
+      "sourceSha256": "af502dde9ba62224d2b904c1ebc128f0fc2292a0fa900b9fb4114391affb13d8",
+      "sha256": "04fcce36a015bfcac83918952e4b8069c8325369d561cd5f50db46a9a7f9e242"
+    },
+    {
+      "file": "paper-launch-single-preview.webp",
+      "width": 1200,
+      "height": 630,
+      "sourcePng": "paper-default-single-1x.png",
+      "sourceSha256": "552093e4414d76ef015d411c6ec5ea27b2c6c65fa2fea7bd84a499d26b609186",
+      "sha256": "a02543584ae2843e83c3cfe897b1573ece2aadfd0be7b085be26a9854ea3867f"
+    }
+  ]
+}
