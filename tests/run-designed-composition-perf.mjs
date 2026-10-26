@@ -10,7 +10,7 @@ import { launchBrowser, preparePage, clickButton, finishTextEditing } from './he
 
 const root = path.resolve(process.env.DESIGNED_PERF_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
 const templateId = process.env.DESIGNED_PERF_TEMPLATE || 'editorial-honey';
-if (!['editorial-honey', 'night-signal-duo'].includes(templateId)) throw new Error('Unsupported performance template');
+if (!['editorial-honey', 'night-signal-duo', 'pocket-flow-duo'].includes(templateId)) throw new Error('Unsupported performance template');
 const require = createRequire(import.meta.url);
 const origin = 'http://127.0.0.1:5196';
 const output = path.resolve(process.env.DESIGNED_PERF_OUTPUT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../output/devsnapkit/whole-card-free-brand/m2/performance',new Date().toISOString().replace(/[:.]/g,'-')));
@@ -49,15 +49,15 @@ try {
   await page.waitForFunction(()=>Boolean(window.__mockupBaseline));
   // Performance fixtures may set Pro through the test-only driver. Entitlement
   // admission is independently exercised through real activation browser tests.
-  if(templateId==='night-signal-duo')await page.evaluate(()=>window.__mockupBaseline.apply({}, {pro:true}));
+  if(templateId!=='editorial-honey')await page.evaluate(()=>window.__mockupBaseline.apply({}, {pro:true}));
   await clickButton(page,'Templates');
-  await page.click(`[aria-label="Apply ${templateId==='night-signal-duo'?'Night Signal Duo':'Editorial Honey'} template"]`);
+  await page.click(`[aria-label="Apply ${{'editorial-honey':'Editorial Honey','night-signal-duo':'Night Signal Duo','pocket-flow-duo':'Pocket Flow Duo'}[templateId]} template"]`);
   await page.waitForFunction(id=>window.__mockupBaseline.snapshot.compositionDocument?.templateId===id,{},templateId);
   const seed=await page.evaluate(()=>structuredClone(window.__mockupBaseline.snapshot));
   assert.ok(seed.compositionDocument.objects.some(node=>node.id==='brand-mark'));
   assert.ok(seed.compositionDocument.objects.some(node=>node.id==='cta'));
-  result.metadata.template={id:templateId,testOnlyProFixture:templateId==='night-signal-duo',textCount:seed.textDocument.layers.length,decorationCount:seed.compositionDocument.decorations.length,main:seed.imageSrc||seed.canonicalImageSrc,secondary:seed.secondarySrc};
-  const assets=templateId==='night-signal-duo'?['public/designed/examples/collection/signal-overview.svg','public/designed/examples/collection/signal-release.svg']:['public/designed/examples/bloom-dashboard.svg','public/designed/examples/bloom-workflow.svg','public/designed/examples/bloom-workflow-card.png'];
+  result.metadata.template={id:templateId,testOnlyProFixture:templateId!=='editorial-honey',textCount:seed.textDocument.layers.length,decorationCount:seed.compositionDocument.decorations.length,main:seed.imageSrc||seed.canonicalImageSrc,secondary:seed.secondarySrc};
+  const assets=templateId==='pocket-flow-duo'?['public/designed/examples/collection/morrow-today.svg','public/designed/examples/collection/morrow-focus.svg']:templateId==='night-signal-duo'?['public/designed/examples/collection/signal-overview.svg','public/designed/examples/collection/signal-release.svg']:['public/designed/examples/bloom-dashboard.svg','public/designed/examples/bloom-workflow.svg','public/designed/examples/bloom-workflow-card.png'];
   result.metadata.assetHashes={};for(const file of assets)result.metadata.assetHashes[file]=digest(await fs.readFile(path.join(root,file)));
   await page.evaluate(()=>{
     window.__interactionPerf={active:false,frames:[],move:[],input:[],events:[],longTasks:[],hotspots:{history:[],scene:[]}};
@@ -83,12 +83,12 @@ try {
         while(compositionDocument.decorations.length<12){const index=compositionDocument.decorations.length;compositionDocument.decorations.push({id:'perf-decoration-'+index,name:'Performance decoration '+index,kind:'shape',shape:index%2?'ellipse':'rect',fill:index%2?'#e8d57c':'#fbf8eb',stroke:'#d9d1ad',frame:{centerX:.1+(index-6)*.12,centerY:.94,widthRatio:.03,heightRatio:.02,rotation:0}});}
         const layers=Array.from({length:scenario.count},(_,index)=>({id:'perf-text-'+index,content:'A'.repeat(scenario.codepoints-1)+'é',centerX:scenario.codepoints===1000?.5:.35+(index%2)*.3,centerY:.2+Math.floor(index/2)*.065,widthRatio:scenario.codepoints===1000?.8:.27,font:'manrope',fontSize:scenario.codepoints===1000?12:24,weight:700,italic:false,color:'#242313',align:'left',lineHeight:1.25}));
         compositionDocument.order=compositionDocument.order.filter(id=>!seed.textDocument.layers.some(layer=>layer.id===id)).concat(layers.map(layer=>layer.id));
-        window.__mockupBaseline.apply({...seed,aspectRatioId:'custom',customCanvasSize:{width:1600,height:1200},compositionDocument,textDocument:{version:1,layers}});
+        window.__mockupBaseline.apply({...seed,aspectRatioId:'custom',customCanvasSize:{...seed.customCanvasSize},compositionDocument,textDocument:{version:1,layers}});
       },{seed,scenario});
       await page.waitForFunction(count=>document.querySelectorAll('#studio-canvas [data-canvas-text]').length===count,{},scenario.count);
       await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.querySelectorAll('#studio-canvas img')].map(async img=>{if(!img.complete)await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;});if(!img.naturalWidth)throw Error('Image failed');await img.decode();}));});await paint(page);
       const fixture=await page.evaluate(()=>({dpr:devicePixelRatio,viewport:{width:innerWidth,height:innerHeight},canvas:window.__mockupBaseline.snapshot.customCanvasSize,text:window.__mockupBaseline.snapshot.textDocument.layers.map(({id,content})=>({id,codepoints:[...content].length})),decorations:document.querySelectorAll('#studio-canvas [data-composition-decoration]').length,objects:[...document.querySelectorAll('#studio-canvas [data-composition-object]')].map(node=>node.dataset.compositionObject),images:[...document.querySelectorAll('#studio-canvas img')].map(img=>({src:img.currentSrc,width:img.naturalWidth,height:img.naturalHeight})),fonts:document.fonts.status}));
-      assert.deepEqual(fixture.viewport,{width:1440,height:1100});assert.equal(fixture.dpr,1);assert.deepEqual(fixture.canvas,{width:1600,height:1200});assert.equal(fixture.decorations,12);assert.equal(fixture.text.length,scenario.count);assert.ok(fixture.text.every(t=>t.codepoints===scenario.codepoints));for(const id of ['main','secondary','brand-mark','cta'])assert.ok(fixture.objects.includes(id));
+      assert.deepEqual(fixture.viewport,{width:1440,height:1100});assert.equal(fixture.dpr,1);assert.deepEqual(fixture.canvas,seed.customCanvasSize);assert.equal(fixture.decorations,12);assert.equal(fixture.text.length,scenario.count);assert.ok(fixture.text.every(t=>t.codepoints===scenario.codepoints));for(const id of ['main','secondary','brand-mark','cta'])assert.ok(fixture.objects.includes(id));
       // Select through the current Inspector; the obsolete native text selector was removed in M1.
       await page.click('[aria-label="Elements"]');await page.click('[data-element-picker] button[aria-label^="Select Text:"]');await paint(page);
       const handle=await page.$('[aria-label="Move text"]'),box=await handle.boundingBox();assert.ok(box?.width&&box?.height,'Visible real drag handle');
@@ -101,7 +101,7 @@ try {
       await page.mouse.up();await paint(page);
       const drag=await page.evaluate(()=>{const p=window.__interactionPerf;p.active=false;return {duration:performance.now()-p.started,frames:p.frames,latencies:p.move,events:p.events,longTasks:p.longTasks,hotspots:p.hotspots};});
       const afterDrag=await page.evaluate(()=>({layer:structuredClone(window.__mockupBaseline.snapshot.textDocument.layers[0]),left:parseFloat(document.querySelector('#studio-canvas [data-canvas-text]').style.left),top:parseFloat(document.querySelector('#studio-canvas [data-canvas-text]').style.top)}));
-      const expected={x:before.layer.centerX*1600+(Math.sin(9)*18+10)/before.scale,y:before.layer.centerY*1200+Math.cos(9)*10/before.scale};
+      const expected={x:before.layer.centerX*seed.customCanvasSize.width+(Math.sin(9)*18+10)/before.scale,y:before.layer.centerY*seed.customCanvasSize.height+Math.cos(9)*10/before.scale};
       const dragApplied=[Math.abs(afterDrag.layer.centerX*1600-expected.x),Math.abs(afterDrag.layer.centerY*1200-expected.y),Math.abs(afterDrag.left-expected.x),Math.abs(afterDrag.top-expected.y)].every(delta=>delta<.15);
       assert.ok(dragApplied,'Trusted drag changed document and rendered layer by actual pointer displacement');
       await page.click('[data-canvas-text-controls] [aria-label="Edit text"]');await page.focus('[aria-label="Text content"]');await page.keyboard.down('Control');await page.keyboard.press('End');await page.keyboard.up('Control');

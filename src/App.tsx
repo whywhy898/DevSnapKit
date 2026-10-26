@@ -1852,7 +1852,7 @@ export default function App() {
     applyingTemplate.current = true; setPreparingTemplate(true); setTextError('');
     try {
       const initial = editorHistory.getLatestSnapshot();
-      const demoInput = (before: typeof initial) => resetDemo ? { ...before, imageSrc: '', secondarySrc: null, compositionDocument: null, windowTitle: id === 'paper-launch-duo' ? 'folio.example' : id === 'night-signal-duo' ? 'signal.example' : 'bloomboard.example', logoDataUrl: null, qrUrl: '', customBrandWatermark: '' } : before;
+      const demoInput = (before: typeof initial) => resetDemo ? { ...before, imageSrc: '', secondarySrc: null, compositionDocument: null, windowTitle: id === 'paper-launch-duo' ? 'folio.example' : id === 'night-signal-duo' ? 'signal.example' : id === 'pocket-flow-duo' ? 'morrow.example' : 'bloomboard.example', logoDataUrl: null, qrUrl: '', customBrandWatermark: '' } : before;
       const prefix = crypto.randomUUID();
       const prepared = buildCuratedSnapshot(demoInput(initial), id, prefix);
       const sources = [prepared.imageSrc, ...(prepared.compositionDocument?.detailVisible && !prepared.compositionDocument.hiddenIds.includes('secondary') && prepared.secondarySrc ? [prepared.secondarySrc] : [])];

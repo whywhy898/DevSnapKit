@@ -40,12 +40,12 @@ test('restore and reset preserve deleted objects, hidden status, custom content 
 test('Honey dispatcher retains v2 applications and versioned v1 restores; unknown IDs fail closed',()=>{
  build();const n=api.buildCuratedSnapshot(base,'editorial-honey','h');assert.equal(n.templateContext.version,2);
  const old={...n,templateContext:{...n.templateContext,version:1}};assert.equal(api.restoreCuratedLayout(old).compositionDocument.placements.secondary.widthRatio,410/1600);
- assert.throws(()=>api.buildCuratedSnapshot(base,'pocket-flow-duo','n'),/Unknown|unavailable/i);assert.throws(()=>api.buildCuratedSnapshot(base,'made-up','x'),/Unknown|unavailable/i);
+ assert.throws(()=>api.buildCuratedSnapshot(base,'studio-bridge','n'),/Unknown|unavailable/i);assert.throws(()=>api.buildCuratedSnapshot(base,'made-up','x'),/Unknown|unavailable/i);
 });
-test('published catalog contains implemented Honey, Paper and Pro Night and exposes an accessible Paper Apply action',()=>{
- build();const {CURATED_TEMPLATE_CATALOG:catalog,getCuratedTemplate}=load('templates/collection/catalog.ts');assert.deepEqual(json(catalog.map(t=>t.id)),['editorial-honey','paper-launch-duo','night-signal-duo']);assert.ok(catalog.slice(0,2).every(t=>t.tier==='free'));assert.equal(getCuratedTemplate('night-signal-duo').tier,'pro');assert.equal(getCuratedTemplate('pocket-flow-duo'),undefined);
+test('published catalog contains implemented Honey, Paper and Pro Night/Pocket with accessible Apply actions',()=>{
+ build();const {CURATED_TEMPLATE_CATALOG:catalog,getCuratedTemplate}=load('templates/collection/catalog.ts');assert.deepEqual(json(catalog.map(t=>t.id)),['editorial-honey','paper-launch-duo','night-signal-duo','pocket-flow-duo']);assert.ok(catalog.slice(0,2).every(t=>t.tier==='free'));assert.equal(getCuratedTemplate('night-signal-duo').tier,'pro');assert.equal(getCuratedTemplate('pocket-flow-duo').tier,'pro');assert.equal(getCuratedTemplate('studio-bridge'),undefined);
  const {TemplateMenu}=load('templates/TemplateMenu.tsx');const html=renderToStaticMarkup(createElement(TemplateMenu,{onApply:()=>{},onDesignedApply:()=>{},disabled:false,busy:false}));
- assert.match(html,/aria-label="Apply Paper Launch Duo template"/);assert.match(html,/1200/);assert.doesNotMatch(html,/pocket-flow-duo/);
+ assert.match(html,/aria-label="Apply Paper Launch Duo template"/);assert.match(html,/1200/);assert.match(html,/aria-label="Apply Pocket Flow Duo template"/);assert.match(html,/pocket-flow-duo/);
  const provenance=JSON.parse(fs.readFileSync(new URL('../public/designed/collection/paper-launch-provenance.json',import.meta.url)));
  assert.match(html,/paper-launch-duo\.webp/);assert.match(provenance.method,/actual browser-triggered editor PNG/);assert.equal(provenance.records.find(r=>r.file==='paper-launch-duo.webp').width,480);
 });

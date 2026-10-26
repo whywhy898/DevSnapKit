@@ -1,0 +1,48 @@
+{
+  "templateId": "pocket-flow-duo",
+  "method": "Resized from actual browser-triggered editor PNG downloads, not imagegen output",
+  "sourceDirectory": "D:\\workspace\\MarkMoney\\output\\devsnapkit\\template-collection-2026-10-26\\a2-pocket\\browser\\2026-10-26T14-33-08-150Z",
+  "baseCommit": "32e48ebf1f08d775b23a34fafdf3efd3331db4aa",
+  "workingTreeHadChanges": true,
+  "sourceFiles": {
+    "src/templates/collection/definitions/pocket-flow-duo.ts": "104af68b989b693313798a0eac2de43a009440aa99e070d7ab7a844ebdfe5de6",
+    "src/templates/collection/apply.ts": "5f95eeb9ad4b2520d45d25eb89dd6daf7b326698e28a6fd005e0ff72d77a55f5",
+    "src/composition/MediaShell.tsx": "8e594d57f796c66b01fa960d7d9e1e3049ef91bf23ff8577f03cfceae2965196",
+    "src/composition/CompositionRenderer.tsx": "7bcb66d21ecb5e28474346e81797be50fb2c0751575c0715d366b482434ea5be",
+    "src/composition/ButtonRenderer.tsx": "71be1f0eaf50eeb1ef16509822f65d9c7f103fc41535ceb1009878e936272684",
+    "src/composition/types.ts": "111eca5d385de4fdf874057d2783817cdab853fe72c24c551567090087a58135",
+    "src/App.tsx": "666ced06aeaba390dd42a21ab37b551d9dae89aceabc4ca60d58dc8d2cdc53f6"
+  },
+  "sampleSources": [
+    {
+      "file": "morrow-today.svg",
+      "width": 396,
+      "height": 810,
+      "sha256": "b0fa602e71156c24a8baada63b63e2d725a02b1834338ffc12729a3b45e0fa36"
+    },
+    {
+      "file": "morrow-focus.svg",
+      "width": 396,
+      "height": 810,
+      "sha256": "c0b34dd3262a1311bc570e05395f44f2c055dfe3fee9a99183bedd9f7ad4c9a5"
+    }
+  ],
+  "records": [
+    {
+      "file": "pocket-flow-duo.webp",
+      "width": 480,
+      "height": 853,
+      "sourcePng": "pocket-default-duo-1x.png",
+      "sourceSha256": "c78ddfd98ea39bbc26ae09242d763326269a797256c3a44f8eccf25c1143d9d7",
+      "sha256": "0a4d3c85bb9606ddcfb1893ddf9caaa369ab698cd3f568d35f06646530098446"
+    },
+    {
+      "file": "pocket-flow-duo-preview.webp",
+      "width": 1080,
+      "height": 1920,
+      "sourcePng": "pocket-default-duo-1x.png",
+      "sourceSha256": "c78ddfd98ea39bbc26ae09242d763326269a797256c3a44f8eccf25c1143d9d7",
+      "sha256": "812bd5d5c14c03ac00a38510109e4fb9942850153696b67e9ea977518bc1f895"
+    }
+  ]
+}

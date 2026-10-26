@@ -1,0 +1,23 @@
+{
+  "generator": "scripts/build-pocket-samples.mjs",
+  "provenance": "Self-authored fictional SVG app content; no device capture, third-party photography or customer data",
+  "font": {
+    "source": "public/poster/fonts/manrope-latin.woff2",
+    "license": "Manrope-OFL.txt",
+    "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+  },
+  "records": [
+    {
+      "file": "morrow-today.svg",
+      "width": 396,
+      "height": 810,
+      "sha256": "b0fa602e71156c24a8baada63b63e2d725a02b1834338ffc12729a3b45e0fa36"
+    },
+    {
+      "file": "morrow-focus.svg",
+      "width": 396,
+      "height": 810,
+      "sha256": "c0b34dd3262a1311bc570e05395f44f2c055dfe3fee9a99183bedd9f7ad4c9a5"
+    }
+  ]
+}

@@ -5,13 +5,21 @@ import { validateText } from '../../text/document';
 import type { ObjectFrame } from '../../composition/types';
 import { PAPER_LAUNCH_DUO, PAPER_BRAND_MARK } from './definitions/paper-launch-duo';
 import { NIGHT_SIGNAL_DUO, NIGHT_BRAND_MARK } from './definitions/night-signal-duo';
+import { POCKET_FLOW_DUO, POCKET_BRAND_MARK } from './definitions/pocket-flow-duo';
 
-const blueprintFor = (id: string | undefined) => [PAPER_LAUNCH_DUO, NIGHT_SIGNAL_DUO].find(template => template.id === id);
+const templates = [
+  { blueprint: PAPER_LAUNCH_DUO, brandMark: PAPER_BRAND_MARK, background: '#F6F3EC' },
+  { blueprint: NIGHT_SIGNAL_DUO, brandMark: NIGHT_BRAND_MARK, background: '#101513' },
+  { blueprint: POCKET_FLOW_DUO, brandMark: POCKET_BRAND_MARK, background: '#F4E4D6' },
+];
+const templateFor = (id: string | undefined) => templates.find(template => template.blueprint.id === id);
+const blueprintFor = (id: string | undefined) => templateFor(id)?.blueprint;
 
 export function buildCuratedSnapshot(before: EditorSnapshot, id: string, prefix: string): EditorSnapshot {
   if (id === 'editorial-honey') return buildDesignedSnapshot(before, id, prefix);
-  const paper = blueprintFor(id);
-  if (!paper) throw new Error('Unknown or unavailable curated template');
+  const template = templateFor(id);
+  if (!template) throw new Error('Unknown or unavailable curated template');
+  const paper = template.blueprint;
   const replaceMain = !before.imageSrc || before.primaryMediaOrigin?.kind === 'builtin';
   const hiddenSecondary = before.compositionDocument?.detailVisible === false || !!before.compositionDocument?.hiddenIds.includes('secondary');
   const replaceSecondary = !hiddenSecondary && (before.secondarySrc ? before.secondaryMediaOrigin?.kind === 'builtin' : replaceMain);
@@ -22,17 +30,17 @@ export function buildCuratedSnapshot(before: EditorSnapshot, id: string, prefix:
   return { ...before,
     textDocument: { version: 1, layers },
     templateContext: { id: paper.id, version: paper.version, mediaRegion: { x: 0, y: 0, width: 1, height: 1 }, textRoles: { headline: roles.headline, description: roles.description, ...roles } },
-    compositionDocument: { ...createIndependentComposition(), templateId: paper.id, mediaLayout: 'independent', adaptiveMediaLayout: 'auto',
-      placements: structuredClone(paper.placements), singlePlacement: structuredClone(paper.singlePlacement), mediaPresentation: structuredClone(paper.mediaPresentation),
+    compositionDocument: { ...createIndependentComposition(), templateId: paper.id, mediaLayout: 'independent', adaptiveMediaLayout: paper.singlePlacement ? 'auto' : 'manual',
+      placements: structuredClone(paper.placements), ...(paper.singlePlacement ? { singlePlacement: structuredClone(paper.singlePlacement) } : {}), mediaPresentation: structuredClone(paper.mediaPresentation),
       detailVisible: !!imageSrc && !!secondarySrc && !hiddenSecondary, detailRadius: 12, detailBorder: 'none', detailShadow: '0 18px 36px #25281826',
-      objects: structuredClone([paper.cta, id === NIGHT_SIGNAL_DUO.id ? NIGHT_BRAND_MARK : PAPER_BRAND_MARK]), decorations: structuredClone(paper.decorations),
+      objects: structuredClone([paper.cta, template.brandMark]), decorations: structuredClone(paper.decorations),
       order: ['main', 'secondary', 'brand-mark', 'cta', ...layers.map(layer => layer.id)], knownTextIds: layers.map(layer => layer.id),
     },
     imageSrc, imageName: replaceMain ? paper.examples.main.name : before.imageName,
     primaryMediaOrigin: replaceMain ? { kind: 'builtin', sampleId: paper.examples.main.sampleId } : before.primaryMediaOrigin ?? { kind: 'unknown' },
     secondarySrc, secondaryName: replaceSecondary ? paper.examples.secondary.name : before.secondaryName,
     secondaryMediaOrigin: replaceSecondary ? { kind: 'builtin', sampleId: paper.examples.secondary.sampleId } : before.secondaryMediaOrigin ?? { kind: 'unknown' },
-    aspectRatioId: 'custom', customCanvasSize: { ...paper.canvas }, bgType: 'solid', solidColor: id === NIGHT_SIGNAL_DUO.id ? '#101513' : '#F6F3EC',
+    aspectRatioId: 'custom', customCanvasSize: { ...paper.canvas }, bgType: 'solid', solidColor: template.background,
     windowTheme: 'browser', padding: 0, roundedCorners: 12, shadowLevel: 'soft', shadowOpacity: 35, hideMockup: false,
     layoutMode: 'single', duoLayout: 'side', layoutPreset: 'flat', cornerStyle: 'default',
     mockupZoom: 100, mockupOffsetX: 0, mockupOffsetY: 0, imageZoom: 100, imageOffsetX: 0, imageOffsetY: 0,
@@ -53,7 +61,7 @@ export function restoreCuratedLayout(before: EditorSnapshot): EditorSnapshot {
   };
   const roles: Record<string, string> = before.templateContext?.textRoles ?? {};
   return { ...before, aspectRatioId: 'custom', customCanvasSize: { ...paper.canvas }, layoutPreset: 'flat', mockupZoom: 100, mockupOffsetX: 0, mockupOffsetY: 0,
-    compositionDocument: { ...doc, mediaLayout: 'independent', adaptiveMediaLayout: 'auto', placements: structuredClone(paper.placements), singlePlacement: structuredClone(paper.singlePlacement), objects: doc.objects.map(geometry), decorations: doc.decorations.map(geometry) },
+    compositionDocument: { ...doc, mediaLayout: 'independent', adaptiveMediaLayout: paper.singlePlacement ? 'auto' : 'manual', placements: structuredClone(paper.placements), ...(paper.singlePlacement ? { singlePlacement: structuredClone(paper.singlePlacement) } : {}), objects: doc.objects.map(geometry), decorations: doc.decorations.map(geometry) },
     textDocument: { ...before.textDocument, layers: before.textDocument.layers.map(layer => {
       const role = Object.keys(roles).find(role => roles[role] === layer.id), match = paper.text.find(text => text.role === role)?.layer;
       return match ? validateText({ ...layer, centerX: match.centerX, centerY: match.centerY, widthRatio: match.widthRatio }) : layer;

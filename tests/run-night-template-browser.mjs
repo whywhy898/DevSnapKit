@@ -62,7 +62,7 @@ try{
  browser=await launchBrowser();
  for(const mode of ['free','invalid']){
   page=await fresh(mode);const before=await state(page),h=await history(page);await menu(page);
-  assert.equal(await page.$$eval('[data-template-gallery] article',nodes=>nodes.length),3);
+  assert.equal(await page.$$eval('[data-template-gallery] article',nodes=>nodes.length),4);
   await page.click('[aria-label="Preview Night Signal Duo template"]');await page.waitForSelector('[data-template-preview][open]');await page.$eval('[data-template-preview] img',async n=>{await n.decode();if(!n.naturalWidth)throw Error('Preview image failed');});await page.keyboard.press('Escape');await page.waitForSelector('[data-template-preview]',{hidden:true});assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'Preview Night Signal Duo template');
   await page.click('[aria-label="Apply Night Signal Duo template"]');await page.waitForSelector('input[placeholder="DSK-XXXX-XXXX-XXXX"]',{visible:true});
   assert.deepEqual(await state(page),before);assert.deepEqual(await history(page),h);assert.notEqual(await page.evaluate(()=>localStorage.getItem('devsnapkit_pro_unlocked')),'true');

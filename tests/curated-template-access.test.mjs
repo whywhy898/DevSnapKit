@@ -6,12 +6,13 @@ import { createTypeScriptLoader } from './helpers/load-typescript.mjs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 const load = createTypeScriptLoader(fileURLToPath(new URL('../', import.meta.url)));
-test('curated application denies unknown IDs and gates Night while Honey and Paper stay free', () => {
+test('curated application denies unknown IDs and gates Night/Pocket while Honey and Paper stay free', () => {
   const { canApplyCuratedTemplate } = load('src/templates/collection/access.ts');
   for (const unlocked of [false, true]) {
     for (const id of ['editorial-honey', 'paper-launch-duo']) assert.equal(canApplyCuratedTemplate(id, unlocked), true, id);
-    for (const id of ['unknown', '', '__proto__', 'pocket-flow-duo']) assert.equal(canApplyCuratedTemplate(id, unlocked), false, id);
+    for (const id of ['unknown', '', '__proto__', 'studio-bridge']) assert.equal(canApplyCuratedTemplate(id, unlocked), false, id);
     assert.equal(canApplyCuratedTemplate('night-signal-duo', unlocked), unlocked);
+    assert.equal(canApplyCuratedTemplate('pocket-flow-duo', unlocked), unlocked);
   }
 });
 test('premium templates add one ability without changing free branding or existing paid IDs', () => {
@@ -25,15 +26,15 @@ test('premium templates add one ability without changing free branding or existi
 test('gallery lists only implemented designs with complete-image preview and separate application controls', () => {
   const { TemplateMenu } = load('src/templates/TemplateMenu.tsx');
   const html = renderToStaticMarkup(createElement(TemplateMenu, { onApply() {}, onDesignedApply() {}, disabled: false, busy: false }));
-  assert.equal((html.match(/<article/g) || []).length, 3);
-  for (const name of ['Editorial Honey', 'Paper Launch Duo', 'Night Signal Duo']) {
+  assert.equal((html.match(/<article/g) || []).length, 4);
+  for (const name of ['Editorial Honey', 'Paper Launch Duo', 'Night Signal Duo', 'Pocket Flow Duo']) {
     assert.ok(html.includes(`Apply ${name} template`), name);
     assert.ok(html.includes(`Preview ${name} template`), name);
   }
-  assert.equal((html.match(/object-contain/g) || []).length, 3);
-  for (const size of ['1600 × 1200', '1200 × 630']) assert.ok(html.includes(size), size);
+  assert.equal((html.match(/object-contain/g) || []).length, 4);
+  for (const size of ['1600 × 1200', '1200 × 630', '1080 × 1920']) assert.ok(html.includes(size), size);
   assert.match(html, />Pro</);
-  assert.doesNotMatch(html, /Pocket|Basic layouts|Apply Minimal|Apply Split/);
+  assert.doesNotMatch(html, /Studio Bridge|Basic layouts|Apply Minimal|Apply Split/);
 });
 test('template browsing participates in the text editor focus boundary before authorization', () => {
   const { TemplateMenu } = load('src/templates/TemplateMenu.tsx');
