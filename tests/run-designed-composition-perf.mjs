@@ -10,7 +10,8 @@ import { launchBrowser, preparePage, clickButton, finishTextEditing } from './he
 
 const root = path.resolve(process.env.DESIGNED_PERF_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
 const templateId = process.env.DESIGNED_PERF_TEMPLATE || 'editorial-honey';
-if (!['editorial-honey', 'night-signal-duo', 'pocket-flow-duo'].includes(templateId)) throw new Error('Unsupported performance template');
+if (!['editorial-honey', 'night-signal-duo', 'pocket-flow-duo', 'calm-split'].includes(templateId)) throw new Error('Unsupported performance template');
+const proTemplate = templateId === 'night-signal-duo' || templateId === 'pocket-flow-duo';
 const require = createRequire(import.meta.url);
 const origin = 'http://127.0.0.1:5196';
 const output = path.resolve(process.env.DESIGNED_PERF_OUTPUT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../output/devsnapkit/whole-card-free-brand/m2/performance',new Date().toISOString().replace(/[:.]/g,'-')));
@@ -49,15 +50,15 @@ try {
   await page.waitForFunction(()=>Boolean(window.__mockupBaseline));
   // Performance fixtures may set Pro through the test-only driver. Entitlement
   // admission is independently exercised through real activation browser tests.
-  if(templateId!=='editorial-honey')await page.evaluate(()=>window.__mockupBaseline.apply({}, {pro:true}));
+  if(proTemplate)await page.evaluate(()=>window.__mockupBaseline.apply({}, {pro:true}));
   await clickButton(page,'Templates');
-  await page.click(`[aria-label="Apply ${{'editorial-honey':'Editorial Honey','night-signal-duo':'Night Signal Duo','pocket-flow-duo':'Pocket Flow Duo'}[templateId]} template"]`);
+  await page.click(`[aria-label="Apply ${{'editorial-honey':'Editorial Honey','night-signal-duo':'Night Signal Duo','pocket-flow-duo':'Pocket Flow Duo','calm-split':'Calm Split'}[templateId]} template"]`);
   await page.waitForFunction(id=>window.__mockupBaseline.snapshot.compositionDocument?.templateId===id,{},templateId);
   const seed=await page.evaluate(()=>structuredClone(window.__mockupBaseline.snapshot));
   assert.ok(seed.compositionDocument.objects.some(node=>node.id==='brand-mark'));
   assert.ok(seed.compositionDocument.objects.some(node=>node.id==='cta'));
-  result.metadata.template={id:templateId,testOnlyProFixture:templateId!=='editorial-honey',textCount:seed.textDocument.layers.length,decorationCount:seed.compositionDocument.decorations.length,main:seed.imageSrc||seed.canonicalImageSrc,secondary:seed.secondarySrc};
-  const assets=templateId==='pocket-flow-duo'?['public/designed/examples/collection/morrow-today.svg','public/designed/examples/collection/morrow-focus.svg']:templateId==='night-signal-duo'?['public/designed/examples/collection/signal-overview.svg','public/designed/examples/collection/signal-release.svg']:['public/designed/examples/bloom-dashboard.svg','public/designed/examples/bloom-workflow.svg','public/designed/examples/bloom-workflow-card.png'];
+  result.metadata.template={id:templateId,testOnlyProFixture:proTemplate,textCount:seed.textDocument.layers.length,decorationCount:seed.compositionDocument.decorations.length,main:seed.imageSrc||seed.canonicalImageSrc,secondary:seed.secondarySrc};
+  const assets=templateId==='calm-split'?['public/designed/examples/collection/calm-workspace.svg','public/designed/examples/collection/calm-detail.svg']:templateId==='pocket-flow-duo'?['public/designed/examples/collection/morrow-today.svg','public/designed/examples/collection/morrow-focus.svg']:templateId==='night-signal-duo'?['public/designed/examples/collection/signal-overview.svg','public/designed/examples/collection/signal-release.svg']:['public/designed/examples/bloom-dashboard.svg','public/designed/examples/bloom-workflow.svg','public/designed/examples/bloom-workflow-card.png'];
   result.metadata.assetHashes={};for(const file of assets)result.metadata.assetHashes[file]=digest(await fs.readFile(path.join(root,file)));
   await page.evaluate(()=>{
     window.__interactionPerf={active:false,frames:[],move:[],input:[],events:[],longTasks:[],hotspots:{history:[],scene:[]}};
@@ -80,7 +81,8 @@ try {
     try{
       await page.evaluate(({seed,scenario})=>{
         const compositionDocument=structuredClone(seed.compositionDocument);
-        while(compositionDocument.decorations.length<12){const index=compositionDocument.decorations.length;compositionDocument.decorations.push({id:'perf-decoration-'+index,name:'Performance decoration '+index,kind:'shape',shape:index%2?'ellipse':'rect',fill:index%2?'#e8d57c':'#fbf8eb',stroke:'#d9d1ad',frame:{centerX:.1+(index-6)*.12,centerY:.94,widthRatio:.03,heightRatio:.02,rotation:0}});}
+        while(compositionDocument.decorations.length<12){const index=compositionDocument.decorations.length;compositionDocument.decorations.push({id:'perf-decoration-'+index,name:'Performance decoration '+index,kind:'shape',shape:index%2?'ellipse':'rect',fill:index%2?'#e8d57c':'#fbf8eb',stroke:'#d9d1ad',frame:{centerX:.1+(index%6)*.12,centerY:.90+Math.floor(index/6)*.04,widthRatio:.03,heightRatio:.02,rotation:0}});}
+        if(compositionDocument.decorations.filter(node=>node.id.startsWith('perf-decoration-')).some(({frame})=>frame.centerX-frame.widthRatio/2<0||frame.centerX+frame.widthRatio/2>1||frame.centerY-frame.heightRatio/2<0||frame.centerY+frame.heightRatio/2>1))throw new Error('Synthetic pressure decorations must remain inside the canvas');
         const layers=Array.from({length:scenario.count},(_,index)=>({id:'perf-text-'+index,content:'A'.repeat(scenario.codepoints-1)+'é',centerX:scenario.codepoints===1000?.5:.35+(index%2)*.3,centerY:.2+Math.floor(index/2)*.065,widthRatio:scenario.codepoints===1000?.8:.27,font:'manrope',fontSize:scenario.codepoints===1000?12:24,weight:700,italic:false,color:'#242313',align:'left',lineHeight:1.25}));
         compositionDocument.order=compositionDocument.order.filter(id=>!seed.textDocument.layers.some(layer=>layer.id===id)).concat(layers.map(layer=>layer.id));
         window.__mockupBaseline.apply({...seed,aspectRatioId:'custom',customCanvasSize:{...seed.customCanvasSize},compositionDocument,textDocument:{version:1,layers}});

@@ -1,0 +1,47 @@
+{
+  "templateId": "calm-split",
+  "method": "Resized from actual Free editor-triggered PNG download; native design, not imagegen output",
+  "sourceDirectory": "D:\\workspace\\MarkMoney\\output\\devsnapkit\\template-collection-2026-10-27\\b1-calm\\browser\\2026-10-26T23-42-25-192Z",
+  "baseCommit": "9aefdbf7d6bfb223245327ca22f5179140617186",
+  "workingTreeHadChanges": true,
+  "sourceFiles": {
+    "src/templates/collection/definitions/calm-split.ts": "a27c7f4e422176413823de706969e96f80dd193ee5883657adffb44ee656a7dd",
+    "src/templates/collection/apply.ts": "8a8f0156de35cac5173ca07c73cf5cb5668cad96994513df8ed88833e5ddb9e5",
+    "src/composition/MediaShell.tsx": "8e594d57f796c66b01fa960d7d9e1e3049ef91bf23ff8577f03cfceae2965196",
+    "src/composition/CompositionRenderer.tsx": "7bcb66d21ecb5e28474346e81797be50fb2c0751575c0715d366b482434ea5be",
+    "src/composition/ButtonRenderer.tsx": "71be1f0eaf50eeb1ef16509822f65d9c7f103fc41535ceb1009878e936272684",
+    "src/App.tsx": "cf6a7c4d6e10dace82123cfd3dde3e1581cd38d67679e7cc59af3493c9b971d4"
+  },
+  "sampleSources": [
+    {
+      "file": "calm-workspace.svg",
+      "width": 800,
+      "height": 834,
+      "sha256": "c0e8465035f5c088ec6cdf4a740364426b262a7b8236a6e5ae09b1dcca773c45"
+    },
+    {
+      "file": "calm-detail.svg",
+      "width": 800,
+      "height": 834,
+      "sha256": "58a5c5591377a3622146f71dbdfddae244275575a80c2b58c439c1bbd039d549"
+    }
+  ],
+  "records": [
+    {
+      "file": "calm-split.webp",
+      "width": 480,
+      "height": 480,
+      "sourcePng": "calm-default-duo-1x.png",
+      "sourceSha256": "04b0a34ae9f5fab23fa4858855c144ee39f38cf4082c1e78be74dfc91d1be1b8",
+      "sha256": "4a04a4308c926da539df7eea5e709f91722a08efb50f717eb51dedb915d3488f"
+    },
+    {
+      "file": "calm-split-preview.webp",
+      "width": 1080,
+      "height": 1080,
+      "sourcePng": "calm-default-duo-1x.png",
+      "sourceSha256": "04b0a34ae9f5fab23fa4858855c144ee39f38cf4082c1e78be74dfc91d1be1b8",
+      "sha256": "5074fc0315cba86bb75d3196380ed1693d39e5245470175986c626ab01347e51"
+    }
+  ]
+}

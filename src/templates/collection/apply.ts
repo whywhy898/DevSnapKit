@@ -6,9 +6,11 @@ import type { ObjectFrame } from '../../composition/types';
 import { PAPER_LAUNCH_DUO, PAPER_BRAND_MARK } from './definitions/paper-launch-duo';
 import { NIGHT_SIGNAL_DUO, NIGHT_BRAND_MARK } from './definitions/night-signal-duo';
 import { POCKET_FLOW_DUO, POCKET_BRAND_MARK } from './definitions/pocket-flow-duo';
+import { CALM_SPLIT, CALM_BRAND_MARK } from './definitions/calm-split';
 
 const templates = [
   { blueprint: PAPER_LAUNCH_DUO, brandMark: PAPER_BRAND_MARK, background: '#F6F3EC' },
+  { blueprint: CALM_SPLIT, brandMark: CALM_BRAND_MARK, background: '#EEF2EE' },
   { blueprint: NIGHT_SIGNAL_DUO, brandMark: NIGHT_BRAND_MARK, background: '#101513' },
   { blueprint: POCKET_FLOW_DUO, brandMark: POCKET_BRAND_MARK, background: '#F4E4D6' },
 ];
