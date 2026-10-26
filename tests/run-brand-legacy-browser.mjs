@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import { launchBrowser, clickButton } from './helpers/browser.mjs';
 const require=createRequire(import.meta.url),root=path.resolve(import.meta.dirname,'..');
-const output=path.resolve(root,'../../output/devsnapkit/whole-card-free-brand/m1/legacy-brand');
+const output=process.env.BRAND_LEGACY_OUTPUT||path.resolve(root,'../../output/devsnapkit/whole-card-free-brand/m2/legacy-brand',new Date().toISOString().replace(/[:.]/g,'-'));
 const origin='http://127.0.0.1:5219';const pause=ms=>new Promise(r=>setTimeout(r,ms));let browser,server;
 try{
   await fs.mkdir(output,{recursive:true});server=spawn(process.execPath,[path.join(path.dirname(require.resolve('vite/package.json')),'bin/vite.js'),'--config','tests/vite-mockup-baseline.config.mjs','--host','127.0.0.1','--port','5219','--strictPort'],{cwd:root,stdio:'ignore',windowsHide:true});

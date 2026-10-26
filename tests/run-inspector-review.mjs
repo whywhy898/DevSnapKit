@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { launchBrowser, preparePage, clickButton } from './helpers/browser.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
-const output = path.resolve(root, '../../output/devsnapkit/whole-card-free-brand/m1/task3');
+const output = process.env.INSPECTOR_OUTPUT || path.resolve(root, '../../output/devsnapkit/whole-card-free-brand/m2/inspector',new Date().toISOString().replace(/[:.]/g,'-'));
 const origin = process.env.INSPECTOR_ORIGIN || 'http://127.0.0.1:5203';
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 let server, browser, page;

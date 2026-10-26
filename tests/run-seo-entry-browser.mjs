@@ -84,7 +84,8 @@ try {
         await waitSize(1200, 630);
         if (slug === 'product-hunt-image-maker') {
           assert.equal(await selected('Dual shots (2 images)'), true);
-          await page.waitForSelector('button[title="Add second screenshot to Slot 2"]', { visible: true });
+          await clickButton(page, 'Frame');
+          await page.waitForSelector('button[aria-label="Replace Image 2"]', { visible: true });
         }
       }
       await page.screenshot({ path: path.join(output, `${slug}-${width}-entry.png`), fullPage: true });
@@ -99,9 +100,9 @@ try {
   await waitSize(1200, 630);
   await clickButton(page, 'Frame');
   const chooser = page.waitForFileChooser();
-  await page.click('button[title="Add second screenshot to Slot 2"]');
+  await page.click('button[aria-label="Replace Image 2"]');
   await (await chooser).accept([new URL('../public/seo/examples/ph-secondary-original.png', import.meta.url).pathname.replace(/^\/(\w:)/, '$1')]);
-  await page.waitForSelector('button[title="Delete Slot 2 (Return to Single)"]');
+  await page.waitForFunction(() => document.querySelector('[aria-label="Select Image 2"] img')?.complete && document.querySelector('[aria-label="Select Image 2"] img')?.naturalWidth > 0);
   await waitSize(1200, 630);
   await page.click('button[title="Single shot (1 image)"]');
   assert.equal(await selected('Single shot (1 image)'), true);

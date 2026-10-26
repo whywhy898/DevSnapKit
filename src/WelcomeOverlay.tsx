@@ -56,7 +56,7 @@ const SHOWCASE_ITEMS = [
   { id: '5', title: 'Dual Cross-Platform Duo', desc: 'Web & Mobile • Ocean', img: '/welcome/showcase-5.webp' },
   { id: '6', title: 'Light Churn Analytics', desc: 'Dashboard • Studio Silver', img: '/welcome/showcase-6.webp' },
   { id: '7', title: 'Artisan Food & Coffee', desc: 'Lifestyle • Clay Phone', img: '/welcome/showcase-7.webp' },
-  { id: '8', title: 'Branded Launch Graphic', desc: 'Custom Logo + QR • Tokyo Dusk', img: '/welcome/showcase-8.webp' },
+  { id: '8', title: 'Branded Launch Graphic', desc: 'Free Logo + QR • Editorial Honey', img: '/welcome/showcase-8.webp' },
 ];
 
 const HERO_SLIDES = [

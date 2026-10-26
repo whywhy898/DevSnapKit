@@ -8,10 +8,10 @@ import { createHash } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { launchBrowser, preparePage, clickButton, finishTextEditing } from './helpers/browser.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const root = path.resolve(process.env.DESIGNED_PERF_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
 const require = createRequire(import.meta.url);
 const origin = 'http://127.0.0.1:5196';
-const output = path.resolve(process.env.DESIGNED_PERF_OUTPUT || path.join(root, '../../output/devsnapkit/designed-templates-2026-10-25/performance'));
+const output = path.resolve(process.env.DESIGNED_PERF_OUTPUT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../output/devsnapkit/whole-card-free-brand/m2/performance',new Date().toISOString().replace(/[:.]/g,'-')));
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const paint = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 const p95 = values => values.length ? [...values].sort((a,b) => a-b)[Math.ceil(values.length*.95)-1] : null;
@@ -27,8 +27,10 @@ async function save() { await fs.mkdir(output,{recursive:true}); await fs.writeF
 try {
   await fs.mkdir(output,{recursive:true});
   result.metadata.sourceHashesStart = await sourceHashes();
-  result.metadata.sourceSha = execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
-  result.metadata.sourceStatus = execFileSync('git',['status','--short'],{cwd:root,encoding:'utf8'}).trim();
+  const archivedSha = process.env.DESIGNED_PERF_SOURCE_SHA;
+  if (archivedSha && !/^[a-f0-9]{40}$/.test(archivedSha)) throw new Error('Archived source requires an exact commit SHA');
+  result.metadata.sourceSha = archivedSha || execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
+  result.metadata.sourceStatus = archivedSha ? 'Read-only extracted Git archive; source hashes recorded independently.' : execFileSync('git',['status','--short'],{cwd:root,encoding:'utf8'}).trim();
   result.metadata.harnessSha256 = digest(await fs.readFile(fileURLToPath(import.meta.url)));
   result.metadata.hardware = {cpu:os.cpus()[0]?.model,logicalProcessors:os.cpus().length,ramBytes:os.totalmem(),platform:os.platform(),release:os.release(),architecture:os.arch()};
   const vite=path.join(path.dirname(require.resolve('vite/package.json')),'bin/vite.js');
@@ -50,7 +52,7 @@ try {
   assert.ok(seed.compositionDocument.objects.some(node=>node.id==='brand-mark'));
   assert.ok(seed.compositionDocument.objects.some(node=>node.id==='cta'));
   result.metadata.template={textCount:seed.textDocument.layers.length,decorationCount:seed.compositionDocument.decorations.length,main:seed.imageSrc||seed.canonicalImageSrc,secondary:seed.secondarySrc};
-  result.metadata.assetHashes={};for(const file of ['public/designed/examples/bloom-dashboard.svg','public/designed/examples/bloom-workflow.svg'])result.metadata.assetHashes[file]=digest(await fs.readFile(path.join(root,file)));
+  result.metadata.assetHashes={};for(const file of ['public/designed/examples/bloom-dashboard.svg','public/designed/examples/bloom-workflow.svg','public/designed/examples/bloom-workflow-card.png'])result.metadata.assetHashes[file]=digest(await fs.readFile(path.join(root,file)));
   await page.evaluate(()=>{
     window.__interactionPerf={active:false,frames:[],move:[],input:[],events:[],longTasks:[],hotspots:{history:[],scene:[]}};
     let previous=0;
@@ -81,7 +83,8 @@ try {
       await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.querySelectorAll('#studio-canvas img')].map(async img=>{if(!img.complete)await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;});if(!img.naturalWidth)throw Error('Image failed');await img.decode();}));});await paint(page);
       const fixture=await page.evaluate(()=>({dpr:devicePixelRatio,viewport:{width:innerWidth,height:innerHeight},canvas:window.__mockupBaseline.snapshot.customCanvasSize,text:window.__mockupBaseline.snapshot.textDocument.layers.map(({id,content})=>({id,codepoints:[...content].length})),decorations:document.querySelectorAll('#studio-canvas [data-composition-decoration]').length,objects:[...document.querySelectorAll('#studio-canvas [data-composition-object]')].map(node=>node.dataset.compositionObject),images:[...document.querySelectorAll('#studio-canvas img')].map(img=>({src:img.currentSrc,width:img.naturalWidth,height:img.naturalHeight})),fonts:document.fonts.status}));
       assert.deepEqual(fixture.viewport,{width:1440,height:1100});assert.equal(fixture.dpr,1);assert.deepEqual(fixture.canvas,{width:1600,height:1200});assert.equal(fixture.decorations,12);assert.equal(fixture.text.length,scenario.count);assert.ok(fixture.text.every(t=>t.codepoints===scenario.codepoints));for(const id of ['main','secondary','brand-mark','cta'])assert.ok(fixture.objects.includes(id));
-      await clickButton(page,'Text');await page.select('[aria-label="Current text"]','perf-text-0');await paint(page);
+      // Select through the current Inspector; the obsolete native text selector was removed in M1.
+      await page.click('[aria-label="Elements"]');await page.click('[data-element-picker] button[aria-label^="Select Text:"]');await paint(page);
       const handle=await page.$('[aria-label="Move text"]'),box=await handle.boundingBox();assert.ok(box?.width&&box?.height,'Visible real drag handle');
       const before=await page.evaluate(()=>({layer:structuredClone(window.__mockupBaseline.snapshot.textDocument.layers[0]),scale:document.querySelector('[data-text-logical-overlay]').getBoundingClientRect().width/document.querySelector('[data-text-logical-overlay]').offsetWidth}));
       const x=box.x+box.width/2,y=box.y+box.height/2;

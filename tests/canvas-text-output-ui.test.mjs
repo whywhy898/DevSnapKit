@@ -6,7 +6,8 @@ import sharp from 'sharp';
 import { launchBrowser, preparePage, clickButton, revealInspectorControl, finishTextEditing } from './helpers/browser.mjs';
 
 const url = process.env.TEST_UI_URL;
-const output = path.resolve('../../output/devsnapkit/canvas-text-v1/outputs');
+const output = path.resolve(process.env.CANVAS_TEXT_OUTPUT || '../../output/devsnapkit/canvas-text-v1/outputs');
+if (url) await fs.mkdir(output, { recursive: true });
 const snapshot = page => page.evaluate(() => ({ snapshot: window.__mockupBaseline.snapshot, history: window.__mockupBaseline.history, selected: document.querySelector('[aria-label="Current text"]')?.value }));
 const paint = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 async function fill(page, selector, value, commit = true) {
