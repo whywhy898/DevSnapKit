@@ -5,7 +5,10 @@ import { buildTemplateSnapshot, restoreTemplateLayout, releaseTemplateMediaRegio
 import { getTemplate } from './templates/catalog';
 import { equalValues } from './editorHistory';
 import { TemplateMenu } from './templates/TemplateMenu';
-import { buildDesignedSnapshot, restoreDesignedLayout, resetDesignedStyles, createHoneyComposition } from './composition/designedCatalog';
+import { createHoneyComposition } from './composition/designedCatalog';
+import { buildCuratedSnapshot, restoreCuratedLayout, resetCuratedStyles } from './templates/collection/apply';
+import { isCuratedTemplateAvailable } from './templates/collection/catalog';
+import type { CuratedTemplateId } from './templates/collection/types';
 import type { CompositionDocument } from './composition/types';
 import { createIndependentComposition, compositionFrame, moveCompositionObject, secondaryRequired, boxOutsideCanvas } from './composition/document';
 import { SelectionControls } from './inspector/SelectionControls';
@@ -1678,9 +1681,9 @@ export default function App() {
 
   // Handle Reset to Default Studio Styling
   const handleReset = () => {
-    if (compositionDocument?.templateId === 'editorial-honey') {
+    if (compositionDocument?.templateId && isCuratedTemplateAvailable(compositionDocument.templateId)) {
       let valid = false; flushSync(() => { valid = textEditor.finish(); });
-      if (valid && !editorHistory.isInTransaction()) editorHistory.applyCommand(resetDesignedStyles(editorHistory.getLatestSnapshot())); return;
+      if (valid && !editorHistory.isInTransaction()) editorHistory.applyCommand(resetCuratedStyles(editorHistory.getLatestSnapshot())); return;
     }
     setTemplateContext(null);
     for (const key of ['main', 'secondary', 'background', 'logo', 'qr']) artworkTasks.current!.clear(key);
@@ -1827,15 +1830,22 @@ export default function App() {
     trackEvent('preset_change', { preset: preset.id, name: preset.name });
   };
 
-  const handleApplyDesignedTemplate = async (id: 'editorial-honey') => {
+  const handleApplyDesignedTemplate = async (id: CuratedTemplateId, resetDemo = false) => {
     if (applyingTemplate.current || exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) return;
     applyingTemplate.current = true; setPreparingTemplate(true); setTextError('');
     try {
-      await Promise.all([decodeArtworkImage('/designed/examples/bloom-dashboard.svg'), decodeArtworkImage('/designed/examples/bloom-workflow.svg')]);
+      const initial = editorHistory.getLatestSnapshot();
+      const demoInput = (before: typeof initial) => resetDemo ? { ...before, imageSrc: '', secondarySrc: null, compositionDocument: null, windowTitle: id === 'paper-launch-duo' ? 'folio.example' : 'bloomboard.example', logoDataUrl: null, qrUrl: '', customBrandWatermark: '' } : before;
+      const prefix = crypto.randomUUID();
+      const prepared = buildCuratedSnapshot(demoInput(initial), id, prefix);
+      const sources = [prepared.imageSrc, ...(prepared.compositionDocument?.detailVisible && !prepared.compositionDocument.hiddenIds.includes('secondary') && prepared.secondarySrc ? [prepared.secondarySrc] : [])];
+      await Promise.all([...new Set(sources)].map(src => decodeArtworkImage(src)));
       if (exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) return;
+      if (!equalValues(initial, editorHistory.getLatestSnapshot())) { setTextError('Your canvas changed while preparing the template. Apply it again.'); return; }
       let valid = false; flushSync(() => { valid = textEditor.finish(); });
       if (!valid || editorHistory.isInTransaction()) return;
-      const next = buildDesignedSnapshot(editorHistory.getLatestSnapshot(), id, crypto.randomUUID());
+      const next = buildCuratedSnapshot(demoInput(editorHistory.getLatestSnapshot()), id, prefix);
+      if (next.imageSrc !== prepared.imageSrc || next.secondarySrc !== prepared.secondarySrc) return;
       if (editorHistory.applyCommand(next)) { textEditor.select(null); setSelectedObject(null); setSidebarTab('style'); setShowDemoTemplatesMenu(false); }
     } catch (error) { setTextError(error instanceof Error ? error.message : 'Could not prepare designed template.'); }
     finally { applyingTemplate.current = false; setPreparingTemplate(false); }
@@ -1880,8 +1890,8 @@ export default function App() {
     flushSync(() => { valid = textEditor.finish(); });
     if (!valid || editorHistory.isInTransaction()) return;
     const before = editorHistory.getLatestSnapshot();
-    if (before.compositionDocument?.templateId === 'editorial-honey') {
-      editorHistory.applyCommand(restoreDesignedLayout(before)); return;
+    if (before.compositionDocument?.templateId && isCuratedTemplateAvailable(before.compositionDocument.templateId)) {
+      editorHistory.applyCommand(restoreCuratedLayout(before)); return;
     }
     const template = before.templateContext && getTemplate(before.templateContext.id);
     if (template) editorHistory.applyCommand(restoreTemplateLayout(before, template));
@@ -2636,10 +2646,9 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             onIndependent={() => { if (textEditor.finish()) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), ...(aspectRatio.id === 'auto' ? { aspectRatioId: 'custom', customCanvasSize: { ...canvasLogicalSize } } : {}), compositionDocument: compositionDocument ? { ...compositionDocument, mediaLayout: 'independent' } : createIndependentComposition() }); }}
             onAddButton={() => { if (!textEditor.finish()) return; const document = compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: layoutMode === 'duo' }; const id = crypto.randomUUID(); changeComposition({ ...document, objects: [...document.objects, { id, name: 'Button', kind: 'button', frame: { centerX: .5, centerY: .8, widthRatio: .25, heightRatio: .07, rotation: 0 }, text: 'Get started', fill: '#272617', color: '#ffffff', fontSize: 20, radius: 8, padding: 16, autoWidth: false, arrow: true }], order: [...document.order, id] }); setSelectedObject(id); }}
             onResetTemplate={() => {
-              if (!compositionDocument?.templateId || !textEditor.finish() || !window.confirm('Reset all template text, screenshots and design settings to the original demo? You can Undo this change.')) return;
-              const before = editorHistory.getLatestSnapshot();
-              const next = buildDesignedSnapshot({ ...before, imageSrc: '', secondarySrc: null, windowTitle: 'bloomboard.example', logoDataUrl: null, qrUrl: '', customBrandWatermark: '' }, 'editorial-honey', crypto.randomUUID());
-              editorHistory.applyCommand(next); setSelectedObject(null); textEditor.select(null);
+              if (!compositionDocument?.templateId || !window.confirm('Reset all template text, screenshots and design settings to the original demo? You can Undo this change.')) return;
+              const id = compositionDocument.templateId;
+              if (isCuratedTemplateAvailable(id)) void handleApplyDesignedTemplate(id, true);
             }}
             onDuplicateText={id => {
               if (!textEditor.finish() || textDocument.layers.length >= 20) return;

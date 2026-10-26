@@ -15,6 +15,7 @@ export interface ButtonObject extends GraphicBase {
   radius: number; padding: number; autoWidth: boolean; arrow: boolean; border?: string;
 }
 export interface ShapeObject extends GraphicBase {
+  markVariant?: 'orbit';
   kind: 'shape'; shape: 'rect' | 'ellipse' | 'line' | 'halo' | 'grid' | 'mark';
   fill: string; stroke?: string; strokeWidth?: number; radius?: number; shadow?: string;
 }
