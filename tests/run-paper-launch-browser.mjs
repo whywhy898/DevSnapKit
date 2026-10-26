@@ -17,7 +17,21 @@ async function settle(p){await p.evaluate(async()=>{await document.fonts.ready;a
 async function fresh(width=1440){const p=await browser.newPage();await p.setViewport({width,height:1100,deviceScaleFactor:1});await p.evaluateOnNewDocument(()=>{localStorage.clear();localStorage.setItem('devsnapkit_welcome_seen','1');});p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());await p.goto(origin+'/?editor=1',{waitUntil:'networkidle0'});await p.waitForFunction(()=>!!window.__mockupBaseline);await settle(p);return p;}
 async function apply(p){await clickButton(p,'Templates');assert.ok(await p.$('[aria-label="Apply Paper Launch Duo template"]'),'Paper Launch Duo has a real accessible Apply action');await p.click('[aria-label="Apply Paper Launch Duo template"]');await p.waitForFunction(()=>window.__mockupBaseline.snapshot.templateContext?.id==='paper-launch-duo');await settle(p);}
 async function blank(p){const b=await(await p.$('#studio-canvas')).boundingBox();await p.mouse.click(b.x+b.width*.35,b.y+b.height*.95);await p.mouse.move(0,0);await pause(60);}
-async function png(p,name,scale){await clickButton(p,'Export');await clickButton(p,scale===1?'1x Web':'2x HD');const r=await downloadPng(p,output,name,()=>clickButton(p,`Download ${scale}x (${1200*scale}×${630*scale})`));const b=await fs.readFile(r.path);assert.equal(b.readUInt32BE(16),1200*scale);assert.equal(b.readUInt32BE(20),630*scale);return r;}
+async function png(p,name,scale){
+ await clickButton(p,'Export');await clickButton(p,scale===1?'1x Web':'2x HD');await settle(p);
+ await p.evaluate(()=>{
+  const measure=canvas=>{const c=canvas.getBoundingClientRect(),s=c.width/canvas.offsetWidth;return [...canvas.querySelectorAll('[data-canvas-text],[data-composition-object]')].map(n=>{const b=n.getBoundingClientRect();return{id:n.dataset.canvasText||n.dataset.compositionObject,x:(b.x-c.x)/s,y:(b.y-c.y)/s,width:b.width/s,height:b.height/s};});};
+  window.__paperPreviewGeometry=measure(document.querySelector('#studio-canvas'));window.__paperExportGeometry=null;
+  window.__paperGeometryObserver=new MutationObserver(()=>{const canvas=document.querySelector('[data-export-target]>[data-canvas-root]');if(canvas)window.__paperExportGeometry=measure(canvas);});
+  window.__paperGeometryObserver.observe(document.body,{subtree:true,childList:true,attributes:true});
+ });
+ const r=await downloadPng(p,output,name,()=>clickButton(p,`Download ${scale}x (${1200*scale}×${630*scale})`));
+ const b=await fs.readFile(r.path);assert.equal(b.readUInt32BE(16),1200*scale);assert.equal(b.readUInt32BE(20),630*scale);
+ const geometry=await p.evaluate(()=>{window.__paperGeometryObserver.disconnect();return{preview:window.__paperPreviewGeometry,exported:window.__paperExportGeometry};});assert.ok(geometry.exported,'Real export host geometry captured');
+ let maxDelta=0;for(const before of geometry.preview){const after=geometry.exported.find(n=>n.id===before.id);assert.ok(after,before.id);for(const k of ['x','y','width','height'])maxDelta=Math.max(maxDelta,Math.abs(before[k]-after[k]));}
+ assert.ok(maxDelta<=2,`Own preview/export geometry mismatch ${maxDelta} logical pixels`);await fs.writeFile(path.join(output,name+'.geometry.json'),JSON.stringify({...geometry,maxDelta},null,2));
+ return {...r,maxGeometryDelta:maxDelta};
+}
 async function fill(p,selector,value){await p.focus(selector);await p.keyboard.down('Control');await p.keyboard.press('A');await p.keyboard.up('Control');await p.keyboard.type(String(value));await p.keyboard.press('Tab');await pause(120);}
 async function placement(p){return p.$eval('[data-composition-object="main"]',n=>({left:n.style.left,top:n.style.top,width:n.style.width,height:n.style.height}));}
 async function capture(p,name){await blank(p);await(await p.$('#studio-canvas')).screenshot({path:path.join(output,name+'.preview.png')});for(const scale of [1,2])await png(p,name+'-'+scale+'x.png',scale);await fs.writeFile(path.join(output,name+'.snapshot.json'),JSON.stringify(await state(p),null,2));}
