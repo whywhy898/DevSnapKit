@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { X, ArrowRight, Smartphone, Layers, Compass, ShieldCheck } from 'lucide-react';
+import { productCopy } from './productCopy';
 
 export const STORAGE_KEY = 'devsnapkit_welcome_seen';
 
@@ -38,9 +39,9 @@ const FEATURE_CARDS = [
   },
   {
     id: 'feature-brand',
-    badge: 'No Subscription',
-    title: 'Brand It — Own It',
-    desc: 'Imprint your Logo, QR code, and custom watermarks with clean, watermark-free exports. One-time $1 lifetime access with zero monthly subscriptions.',
+    badge: 'Included in Free',
+    title: 'Logo & QR — Free',
+    desc: productCopy.free,
     img: '/welcome/feature-brand.webp',
     fallbackGrad: 'from-amber-500 via-orange-600 to-rose-600',
     icon: ShieldCheck,
@@ -296,21 +297,19 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
           <section className="welcome-section welcome-brand-section">
             <div className="welcome-brand-card">
               <div className="welcome-brand-content">
-                <span className="welcome-brand-tag">Exclusively in DevSnapKit</span>
-                <h2 className="welcome-brand-title">Make It Yours</h2>
+                <span className="welcome-brand-tag">Included in Free</span>
+                <h2 className="welcome-brand-title">Logo &amp; QR — Free</h2>
                 <p className="welcome-brand-desc">
-                  Print your personal or startup brand onto every visual. Upload custom logos,
-                  render scan-to-visit QR codes, and add verification badges.
+                  {productCopy.free} Upload your logo and add a static QR code linking to your website.
                 </p>
                 <div className="welcome-brand-pricing">
-                  <span className="welcome-brand-price">One-time $1.</span>
-                  <span className="welcome-brand-nopay">No subscriptions. Forever.</span>
+                  <span className="welcome-brand-nopay">Create a branded visual for free.</span>
                 </div>
               </div>
               <div className="welcome-brand-visual">
                 <div className="welcome-brand-placeholder bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-900">
                   <ShieldCheck className="w-16 h-16 text-amber-400/40 mb-2" />
-                  <span className="text-xs font-mono text-white/50">Custom Brand & Watermark</span>
+                  <span className="text-xs font-mono text-white/50">Logo &amp; QR — Free</span>
                 </div>
                 <img
                   src="/welcome/welcome-brand.webp"

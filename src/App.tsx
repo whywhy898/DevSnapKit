@@ -12,6 +12,8 @@ import { SelectionControls } from './inspector/SelectionControls';
 import { ElementPicker } from './inspector/ElementPicker';
 import { inspectorTabFor } from './inspector/model';
 import { BrandControls } from './inspector/BrandControls';
+import { productCopy } from './productCopy';
+import { ProUpsellContent } from './ProUpsellContent';
 import { templateLogo, resizeTemplateLogo, moveTemplateLogo } from './inspector/brandModel';
 import { CompositionOverlay } from './composition/CompositionOverlay';
 import { 
@@ -1634,7 +1636,7 @@ export default function App() {
         localStorage.setItem('devsnapkit_license_key', cleanKey);
         setShowProModal(false);
         setShowClaimModal(false);
-        alert('License Key Verified! DevSnapKit Pro Lifetime Pass has been activated.');
+        alert(productCopy.activation);
       } else {
         setLicenseError(result.reason || 'Invalid license key. Format: DSK-XXXX-XXXX-XXXX.');
       }
@@ -1982,7 +1984,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                   type="button"
                   onClick={() => setShowProModal(true)}
                   className="h-full px-2.5 flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 hover:bg-amber-500/10 transition-colors cursor-pointer active:scale-[0.98]"
-                  title="Upgrade to Pro for $1"
+                  title={productCopy.tooltip}
                 >
                   <Zap className="w-3.5 h-3.5 fill-amber-500 dark:fill-amber-300 text-amber-500 dark:text-amber-300" />
                   <span>Pro ($1)</span>
@@ -4230,8 +4232,8 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                   <Zap className="w-3.5 h-3.5 fill-amber-300" />
                   <span>COMMERCIAL CREATOR & PRO DEAL</span>
                 </div>
-                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">Unlock DevSnapKit Pro</h3>
-                <p className="text-xs text-slate-400">One-time payment of $1. Lifetime commercial access. No recurring subscriptions.</p>
+                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">{productCopy.title}</h3>
+                <p className="text-xs text-slate-400">{productCopy.price}</p>
               </div>
               <div className="flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center gap-1 shrink-0 pt-0.5">
                 <div className="flex items-baseline gap-1.5">
@@ -4246,42 +4248,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
             {/* Responsive 2-Column Content */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-5 pt-4">
-              {/* Left Column: Feature List */}
-              <div className="md:col-span-7 bg-slate-950 p-3.5 sm:p-4 rounded-2xl border border-slate-800 space-y-2 text-xs text-slate-300">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 pb-1 border-b border-slate-800/80">
-                  Everything Included Forever
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex items-start gap-2 text-white font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span className="text-[11px] leading-tight">Upload Your Brand Logo — watermark every visual with your agency, channel or company mark</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-white font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span className="text-[11px] leading-tight">Dynamic QR Code on Every Visual — turn social posts into direct website clicks & waitlist signups</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-white font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span className="text-[11px] leading-tight">One-Click Batch Export for All Platforms (Twitter/X, LinkedIn, OpenGraph, 16:9, 1:1)</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-white font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span className="text-[11px] leading-tight">Ultra HD 4K Lossless Retina PNG & WebP (up to 3840px) for crystal-clear presentations</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-white font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span className="text-[11px] leading-tight">Stamp Custom Brand Attribution (@YourHandle, company.com, or newsletter name)</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-white font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span className="text-[11px] leading-tight">Unlock All 32 Handcrafted Studio Lighting Themes & Luxury Color Palettes</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-white font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span className="text-[11px] leading-tight">Full Commercial License for Client Deliverables, Social Posts & Product Launches</span>
-                  </div>
-                </div>
-              </div>
+              <ProUpsellContent />
 
               {/* Right Column: Instant Checkout & Key Activation */}
               <div className="md:col-span-5 flex flex-col justify-between space-y-3">
@@ -4485,7 +4452,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               </div>
               <h3 className="text-xl font-black text-white">Payment Verified!</h3>
               <p className="text-xs text-slate-300">
-                Thank you for purchasing DevSnapKit Pro Lifetime Pass. All Pro features, 32 themes, and 4K exports are unlocked forever.
+                {productCopy.success}
               </p>
             </div>
 

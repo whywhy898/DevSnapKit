@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import type { ObjectFrame } from '../composition/types';
 import './brand.css';
+import { productCopy } from '../productCopy';
 
 export type BrandPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 type Props = {
@@ -21,7 +22,7 @@ export function BrandControls(props: Props) {
   const input = useRef<HTMLInputElement>(null);
   const frame = props.templateFrame;
   return <fieldset data-brand-controls className="brand-controls" disabled={props.disabled || props.isProcessingLogo}>
-    <p className="brand-intro">Add your logo and a QR code. Included in Free.</p>
+    <p className="brand-intro">{productCopy.freeBrand}</p>
     <section className="brand-section" aria-label="Logo controls">
       <h3>Logo <span className="brand-free">Free</span></h3>
       <input ref={input} type="file" aria-label="Logo file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={props.onUploadLogo} hidden disabled={props.isProcessingLogo} />
