@@ -1,0 +1,23 @@
+{
+  "generator": "scripts/build-night-samples.mjs",
+  "provenance": "Self-authored fictional SVG UI; no website capture, third-party photography or customer data",
+  "font": {
+    "source": "public/poster/fonts/manrope-latin.woff2",
+    "license": "Manrope-OFL.txt",
+    "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+  },
+  "records": [
+    {
+      "file": "signal-overview.svg",
+      "width": 1200,
+      "height": 670,
+      "sha256": "f8ec169f86b8cdb227a7b2209e7bb89c583f65c0c1c63bde25377e9497c30cb4"
+    },
+    {
+      "file": "signal-release.svg",
+      "width": 600,
+      "height": 534,
+      "sha256": "c1c2774fd76a05fc6ead0b253b49bdb8c25b3e892155ae774697c20fc910a5c9"
+    }
+  ]
+}

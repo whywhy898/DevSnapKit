@@ -8,6 +8,7 @@ import { TemplateMenu } from './templates/TemplateMenu';
 import { createHoneyComposition } from './composition/designedCatalog';
 import { buildCuratedSnapshot, restoreCuratedLayout, resetCuratedStyles } from './templates/collection/apply';
 import { isCuratedTemplateAvailable } from './templates/collection/catalog';
+import { canApplyCuratedTemplate } from './templates/collection/access';
 import type { CuratedTemplateId } from './templates/collection/types';
 import type { CompositionDocument } from './composition/types';
 import { createIndependentComposition, compositionFrame, moveCompositionObject, secondaryRequired, boxOutsideCanvas } from './composition/document';
@@ -668,6 +669,15 @@ export default function App() {
 
   // Pro & License State
   const [isProUnlocked, setIsProUnlocked] = useState<boolean>(false);
+  const templateAccess = useRef(isProUnlocked);
+  templateAccess.current = isProUnlocked;
+  const templateRequest = useRef(0);
+  const dismissTemplateGallery = () => {
+    templateRequest.current++;
+    applyingTemplate.current = false;
+    setPreparingTemplate(false);
+    setShowDemoTemplatesMenu(false);
+  };
   const [proLicenseInput, setProLicenseInput] = useState<string>('');
   const [licenseError, setLicenseError] = useState<string>('');
   const [isVerifyingKey, setIsVerifyingKey] = useState<boolean>(false);
@@ -985,6 +995,9 @@ export default function App() {
     sizingAction.current.active = false; commitTransaction(currentSnapshot); sizingAction.current.commitId = editorHistory.getCommitId();
   };
   const guardEditorAction = (event: React.SyntheticEvent) => {
+    // Viewing designs and denied application must leave in-progress edits untouched.
+    // Authorized application finishes the edit explicitly after resource admission.
+    if ((event.target as HTMLElement).closest('[data-template-trigger], [data-template-gallery], [data-template-preview], [data-template-dismiss]')) return;
     if (exportLock.current) { event.preventDefault(); event.stopPropagation(); return; }
     if (event.type === 'pointerdown') {
       if (!(event.target as HTMLElement).closest('[data-brand-controls], [data-legacy-brand-text]')) leaveBrandEdit();
@@ -1731,6 +1744,7 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (exportLock.current) { e.preventDefault(); return; }
       if (studioMode !== 'mockup') return;
+      if (e.key === 'Escape' && showDemoTemplatesMenu) { e.preventDefault(); dismissTemplateGallery(); return; }
       if (isEditable(e.target) || e.isComposing) return;
 
       if (e.key === 'Escape') {
@@ -1831,24 +1845,30 @@ export default function App() {
   };
 
   const handleApplyDesignedTemplate = async (id: CuratedTemplateId, resetDemo = false) => {
+    if (!isCuratedTemplateAvailable(id)) return;
+    if (!canApplyCuratedTemplate(id, templateAccess.current)) { setShowProModal(true); return; }
     if (applyingTemplate.current || exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) return;
+    const request = ++templateRequest.current;
     applyingTemplate.current = true; setPreparingTemplate(true); setTextError('');
     try {
       const initial = editorHistory.getLatestSnapshot();
-      const demoInput = (before: typeof initial) => resetDemo ? { ...before, imageSrc: '', secondarySrc: null, compositionDocument: null, windowTitle: id === 'paper-launch-duo' ? 'folio.example' : 'bloomboard.example', logoDataUrl: null, qrUrl: '', customBrandWatermark: '' } : before;
+      const demoInput = (before: typeof initial) => resetDemo ? { ...before, imageSrc: '', secondarySrc: null, compositionDocument: null, windowTitle: id === 'paper-launch-duo' ? 'folio.example' : id === 'night-signal-duo' ? 'signal.example' : 'bloomboard.example', logoDataUrl: null, qrUrl: '', customBrandWatermark: '' } : before;
       const prefix = crypto.randomUUID();
       const prepared = buildCuratedSnapshot(demoInput(initial), id, prefix);
       const sources = [prepared.imageSrc, ...(prepared.compositionDocument?.detailVisible && !prepared.compositionDocument.hiddenIds.includes('secondary') && prepared.secondarySrc ? [prepared.secondarySrc] : [])];
       await Promise.all([...new Set(sources)].map(src => decodeArtworkImage(src)));
+      if (request !== templateRequest.current) return;
+      if (!canApplyCuratedTemplate(id, templateAccess.current)) { setShowProModal(true); return; }
       if (exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) return;
       if (!equalValues(initial, editorHistory.getLatestSnapshot())) { setTextError('Your canvas changed while preparing the template. Apply it again.'); return; }
       let valid = false; flushSync(() => { valid = textEditor.finish(); });
       if (!valid || editorHistory.isInTransaction()) return;
       const next = buildCuratedSnapshot(demoInput(editorHistory.getLatestSnapshot()), id, prefix);
       if (next.imageSrc !== prepared.imageSrc || next.secondarySrc !== prepared.secondarySrc) return;
+      if (request !== templateRequest.current || !canApplyCuratedTemplate(id, templateAccess.current)) return;
       if (editorHistory.applyCommand(next)) { textEditor.select(null); setSelectedObject(null); setSidebarTab('style'); setShowDemoTemplatesMenu(false); }
-    } catch (error) { setTextError(error instanceof Error ? error.message : 'Could not prepare designed template.'); }
-    finally { applyingTemplate.current = false; setPreparingTemplate(false); }
+    } catch (error) { if (request === templateRequest.current) setTextError(error instanceof Error ? error.message : 'Could not prepare designed template.'); }
+    finally { if (request === templateRequest.current) { applyingTemplate.current = false; setPreparingTemplate(false); } }
   };
 
   const handleApplyTemplate = async (template: MockupTemplate) => {
@@ -2366,8 +2386,10 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 <span>Replace Image</span>
               </button>
               <button
+                data-template-trigger
+                data-text-editor-ui
                 type="button"
-                onClick={() => setShowDemoTemplatesMenu(!showDemoTemplatesMenu)}
+                onClick={() => showDemoTemplatesMenu ? dismissTemplateGallery() : setShowDemoTemplatesMenu(true)}
                 className="h-full px-2 rounded-r-xl border border-white/15 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center gap-1 text-xs font-semibold"
                 title="Templates"
                 aria-label="Templates"
@@ -2379,7 +2401,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               {/* Starter Demo Dropdown Popover */}
               {showDemoTemplatesMenu && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowDemoTemplatesMenu(false)} />
+                  <div data-template-dismiss data-text-editor-ui className="fixed inset-0 z-40" onPointerDown={event => event.preventDefault()} onClick={dismissTemplateGallery} />
                   <TemplateMenu onApply={handleApplyTemplate} onDesignedApply={handleApplyDesignedTemplate} disabled={isExporting || preparingTemplate || assetBusy} busy={preparingTemplate || assetBusy} />
                 </>
               )}

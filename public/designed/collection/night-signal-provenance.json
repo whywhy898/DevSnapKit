@@ -1,0 +1,57 @@
+{
+  "templateId": "night-signal-duo",
+  "method": "Resized from real browser-triggered PNG downloads, not imagegen output",
+  "sourceDirectory": "D:\\workspace\\MarkMoney\\output\\devsnapkit\\template-collection-2026-10-26\\a2-night\\browser\\2026-10-26T09-49-46-916Z",
+  "baseCommit": "ed23eb8a574b68ba894cc87eb44c511aaf2fdd20",
+  "workingTreeHadChanges": true,
+  "sourceFiles": {
+    "src/templates/collection/definitions/night-signal-duo.ts": "39a614f3e692a609e975ac4759bce8cbe2662607ed9d1ca8a41d2babfb1a23bd",
+    "src/templates/collection/apply.ts": "9c6d56a5f210dcc6490eabc02de21df3d571433814a7e62ee09af47087220641",
+    "src/composition/DecorationRenderer.tsx": "640b508580379de1068ab49f8b2365793e63ffe685a4581f726a3f3561bda259",
+    "src/composition/MediaShell.tsx": "cee0a52183890869f75d618d7019241439703f175d2c3d45d42f28186b549f6f",
+    "src/composition/CompositionRenderer.tsx": "c59e800f7bfc20306470955bee421b990c0f0eca8d4bfcc78e3532635d1505b9",
+    "src/composition/ButtonRenderer.tsx": "71be1f0eaf50eeb1ef16509822f65d9c7f103fc41535ceb1009878e936272684",
+    "src/composition/types.ts": "111eca5d385de4fdf874057d2783817cdab853fe72c24c551567090087a58135",
+    "src/App.tsx": "15899d10ebd8b582b51e9dec71c6afdf306d409ab947c431e5b94edbe9e71f4a"
+  },
+  "sampleSources": [
+    {
+      "file": "signal-overview.svg",
+      "width": 1200,
+      "height": 670,
+      "sha256": "f8ec169f86b8cdb227a7b2209e7bb89c583f65c0c1c63bde25377e9497c30cb4"
+    },
+    {
+      "file": "signal-release.svg",
+      "width": 600,
+      "height": 534,
+      "sha256": "c1c2774fd76a05fc6ead0b253b49bdb8c25b3e892155ae774697c20fc910a5c9"
+    }
+  ],
+  "records": [
+    {
+      "file": "night-signal-duo.webp",
+      "width": 480,
+      "height": 360,
+      "sourcePng": "night-default-duo-1x.png",
+      "sourceSha256": "6b8ab71573a2ce52d852deab5c07adb40e85a9d4e7f12ebccea5d653995853a7",
+      "sha256": "36da00687994ee2180e6527cf32207f8800026b7fd9e057565fedeacdb28863d"
+    },
+    {
+      "file": "night-signal-duo-preview.webp",
+      "width": 1600,
+      "height": 1200,
+      "sourcePng": "night-default-duo-1x.png",
+      "sourceSha256": "6b8ab71573a2ce52d852deab5c07adb40e85a9d4e7f12ebccea5d653995853a7",
+      "sha256": "0e32105e0fb840e575c12dd086cf44e37e4409571e27efbcc28ea29cefa192b3"
+    },
+    {
+      "file": "night-signal-single-preview.webp",
+      "width": 1600,
+      "height": 1200,
+      "sourcePng": "night-default-single-1x.png",
+      "sourceSha256": "7073ae14d496e7abc75105a686dda90ba04117fc209834ca27e5bb44d8e08118",
+      "sha256": "7507b790d8388f116184a8961b5fc4bc3ab58b391bdbdd237a3286481d51289f"
+    }
+  ]
+}

@@ -43,8 +43,13 @@ test('screenshot upload hover coexists with text hit boxes, editing and drag han
     await page.waitForFunction(() => +getComputedStyle(document.querySelector('.media-hover-overlay')).opacity > .95);
     assert.equal(await chooserDuring(page, () => page.click('[data-media-surface]')), true, 'ordinary screenshot still opens upload');
 
-    await page.click('button[aria-label="Templates"]');
-    await page.click('button[aria-label="Apply Social Launch template"]');
+    // Legacy Basic entries retired from the curated gallery. Exercise the same
+    // original factory through saved-state restoration, retaining hover coverage.
+    await page.evaluate(async () => {
+      const { buildSocialLaunchSnapshot } = await import('/src/templates/apply.ts');
+      const state = window.__mockupBaseline;
+      state.apply(buildSocialLaunchSnapshot(state.snapshot, { headline: 'legacy-hover-headline', description: 'legacy-hover-description' }));
+    });
     await page.waitForFunction(() => document.querySelectorAll('[data-text-hit]').length === 2);
     await page.hover('[data-media-surface]');
     await page.waitForFunction(() => +getComputedStyle(document.querySelector('.media-hover-overlay')).opacity > .95);

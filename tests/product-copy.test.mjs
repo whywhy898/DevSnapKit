@@ -6,12 +6,12 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createTypeScriptLoader } from './helpers/load-typescript.mjs';
 const load = createTypeScriptLoader(fileURLToPath(new URL('../src/', import.meta.url)));
-test('upgrade presents exactly three paid abilities and explicitly includes branding in Free', () => {
+test('upgrade presents exactly four paid abilities and explicitly includes branding in Free', () => {
   assert.ok(fs.existsSync(new URL('../src/ProUpsellContent.tsx', import.meta.url)), 'focused upgrade content exists');
   const { ProUpsellContent } = load('ProUpsellContent.tsx');
   const html = renderToStaticMarkup(createElement(ProUpsellContent));
-  assert.equal((html.match(/<li/g) || []).length, 3);
-  for (const copy of ['Pro includes', 'High-resolution export presets', 'Batch export', 'Premium gradient backgrounds', 'Text, logo uploads and QR codes are included in Free.', 'final pixel dimensions']) assert.ok(html.includes(copy), copy);
+  assert.equal((html.match(/<li/g) || []).length, 4);
+  for (const copy of ['Pro includes', 'Premium templates', 'High-resolution export presets', 'Batch export', 'Premium gradient backgrounds', 'Text, logo uploads and QR codes are included in Free.', 'final pixel dimensions']) assert.ok(html.includes(copy), copy);
   assert.doesNotMatch(html, /Dynamic QR|4x|3840|Logo.*Pro|WebP.*Pro|brand kit|cloud save/i);
 });
 test('dynamic sales and success surfaces use the shared copy', () => {
@@ -28,6 +28,7 @@ test('static pages consistently describe Free branding and actual Pro abilities'
     const html = fs.readFileSync(new URL(`../public/${page}/index.html`, import.meta.url), 'utf8');
     assert.doesNotMatch(html, /Pro logo slot|logo slot is Pro|logo slot, batch export|batch export and the logo slot/);
     assert.match(html, /logo.*[Ff]ree|[Ff]ree.*logo/);
+    assert.match(html, /premium templates/i);
   }
 });
 test('existing formats remain Free and no resolution implementation changes are required', () => {

@@ -11,11 +11,15 @@ export interface SlotPresentation {
 export interface ObjectFrame { centerX: number; centerY: number; widthRatio: number; heightRatio: number; rotation: number }
 export interface GraphicBase { id: string; name: string; frame: ObjectFrame; hidden?: boolean; opacity?: number }
 export interface ButtonObject extends GraphicBase {
+  /** Optional authored logical box for proportional content scaling on resized canvases. */
+  referenceSize?: { width: number; height: number };
   labelAlign?: 'start' | 'center';
   kind: 'button'; text: string; color: string; fill: string; fontSize: number;
   radius: number; padding: number; autoWidth: boolean; arrow: boolean; border?: string;
 }
 export interface ShapeObject extends GraphicBase {
+  /** Optional logical-pixel blur for native soft decorations. Legacy shapes stay unfiltered. */
+  blur?: number;
   markVariant?: 'orbit';
   kind: 'shape'; shape: 'rect' | 'ellipse' | 'line' | 'halo' | 'grid' | 'mark';
   fill: string; stroke?: string; strokeWidth?: number; radius?: number; shadow?: string;

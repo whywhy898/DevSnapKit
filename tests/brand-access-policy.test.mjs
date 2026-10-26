@@ -10,7 +10,7 @@ import { createTypeScriptLoader } from './helpers/load-typescript.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const load = createTypeScriptLoader(root);
 const free = ['canvas_text', 'brand_logo', 'qr_code', 'png_export', 'webp_export', 'jpeg_export', 'legacy_brand_badge'];
-const pro = ['4k_export', 'batch_export', 'all_gradients'];
+const pro = ['4k_export', 'batch_export', 'all_gradients', 'premium_templates'];
 const policy = () => {
   assert.ok(fs.existsSync(path.join(root, 'shared/productCapabilities.ts')), 'shared product capability policy exists');
   return load('shared/productCapabilities.ts');
@@ -48,7 +48,7 @@ test('shared policy declares the exact free and Pro capabilities with a stable v
   const capabilities = policy();
   assert.deepEqual(Array.from(capabilities.FREE_FEATURES), free);
   assert.deepEqual(Array.from(capabilities.PRO_FEATURES), pro);
-  assert.equal(capabilities.CAPABILITY_POLICY_VERSION, 1);
+  assert.equal(capabilities.CAPABILITY_POLICY_VERSION, 2);
 });
 
 test('all free capabilities are available before and after Pro unlock', () => {
@@ -85,7 +85,7 @@ test('authentic old-format license returns explicit free and Pro policy alongsid
   assert.equal(body.serverVerified, true);
   assert.deepEqual(body.freeFeatures, free);
   assert.deepEqual(body.proFeatures, pro);
-  assert.equal(body.capabilityPolicyVersion, 1);
+  assert.equal(body.capabilityPolicyVersion, 2);
   assert.deepEqual(new Set(body.unlockedFeatures), new Set([...free, ...pro, 'custom_watermark', 'commercial_rights']));
   assert.equal(body.unlockedFeatures.length, new Set(body.unlockedFeatures).size);
   assert.ok(body.unlockedFeatures.includes('webp_export'));

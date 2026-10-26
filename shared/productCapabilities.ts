@@ -1,5 +1,5 @@
 /** Shared access policy; independent of React and stored composition content. */
-export const CAPABILITY_POLICY_VERSION = 1;
+export const CAPABILITY_POLICY_VERSION = 2;
 
 export const FREE_FEATURES = [
   'canvas_text',
@@ -16,6 +16,7 @@ export const PRO_FEATURES = [
   '4k_export',
   'batch_export',
   'all_gradients',
+  'premium_templates',
 ] as const;
 
 export type Capability = typeof FREE_FEATURES[number] | typeof PRO_FEATURES[number];

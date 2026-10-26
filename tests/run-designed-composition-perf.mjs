@@ -9,6 +9,8 @@ import { spawn, execFileSync } from 'node:child_process';
 import { launchBrowser, preparePage, clickButton, finishTextEditing } from './helpers/browser.mjs';
 
 const root = path.resolve(process.env.DESIGNED_PERF_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
+const templateId = process.env.DESIGNED_PERF_TEMPLATE || 'editorial-honey';
+if (!['editorial-honey', 'night-signal-duo'].includes(templateId)) throw new Error('Unsupported performance template');
 const require = createRequire(import.meta.url);
 const origin = 'http://127.0.0.1:5196';
 const output = path.resolve(process.env.DESIGNED_PERF_OUTPUT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../output/devsnapkit/whole-card-free-brand/m2/performance',new Date().toISOString().replace(/[:.]/g,'-')));
@@ -45,14 +47,18 @@ try {
   const cdp=await page.createCDPSession();await cdp.send('Emulation.setCPUThrottlingRate',{rate:1});
   result.metadata.cpuThrottling={rate:1,verifiedBy:'CDP Emulation.setCPUThrottlingRate rate1'};
   await page.waitForFunction(()=>Boolean(window.__mockupBaseline));
+  // Performance fixtures may set Pro through the test-only driver. Entitlement
+  // admission is independently exercised through real activation browser tests.
+  if(templateId==='night-signal-duo')await page.evaluate(()=>window.__mockupBaseline.apply({}, {pro:true}));
   await clickButton(page,'Templates');
-  await page.click('[aria-label="Apply Editorial Honey template"]');
-  await page.waitForFunction(()=>window.__mockupBaseline.snapshot.compositionDocument?.templateId==='editorial-honey');
+  await page.click(`[aria-label="Apply ${templateId==='night-signal-duo'?'Night Signal Duo':'Editorial Honey'} template"]`);
+  await page.waitForFunction(id=>window.__mockupBaseline.snapshot.compositionDocument?.templateId===id,{},templateId);
   const seed=await page.evaluate(()=>structuredClone(window.__mockupBaseline.snapshot));
   assert.ok(seed.compositionDocument.objects.some(node=>node.id==='brand-mark'));
   assert.ok(seed.compositionDocument.objects.some(node=>node.id==='cta'));
-  result.metadata.template={textCount:seed.textDocument.layers.length,decorationCount:seed.compositionDocument.decorations.length,main:seed.imageSrc||seed.canonicalImageSrc,secondary:seed.secondarySrc};
-  result.metadata.assetHashes={};for(const file of ['public/designed/examples/bloom-dashboard.svg','public/designed/examples/bloom-workflow.svg','public/designed/examples/bloom-workflow-card.png'])result.metadata.assetHashes[file]=digest(await fs.readFile(path.join(root,file)));
+  result.metadata.template={id:templateId,testOnlyProFixture:templateId==='night-signal-duo',textCount:seed.textDocument.layers.length,decorationCount:seed.compositionDocument.decorations.length,main:seed.imageSrc||seed.canonicalImageSrc,secondary:seed.secondarySrc};
+  const assets=templateId==='night-signal-duo'?['public/designed/examples/collection/signal-overview.svg','public/designed/examples/collection/signal-release.svg']:['public/designed/examples/bloom-dashboard.svg','public/designed/examples/bloom-workflow.svg','public/designed/examples/bloom-workflow-card.png'];
+  result.metadata.assetHashes={};for(const file of assets)result.metadata.assetHashes[file]=digest(await fs.readFile(path.join(root,file)));
   await page.evaluate(()=>{
     window.__interactionPerf={active:false,frames:[],move:[],input:[],events:[],longTasks:[],hotspots:{history:[],scene:[]}};
     let previous=0;
