@@ -50,3 +50,11 @@ test('published catalog contains only implemented free Honey and Paper and expos
 test('a Paper snapshot is one history command and Undo returns the complete prior document',()=>{
  const {EditorHistory}=load('editorHistory.ts');const history=new EditorHistory(base);const next=build();history.flush(next);assert.equal(history.count,2);assert.deepEqual(json(history.undo(next)),json(base));assert.deepEqual(json(history.redo()),json(next));
 });
+test('Paper default CTA fits its line box and centers its label while legacy buttons keep their layout',()=>{
+ const n=build(),cta=n.compositionDocument.objects.find(o=>o.id==='cta');
+ assert.ok(cta.fontSize*1.3+cta.padding*2 <= cta.frame.heightRatio*n.customCanvasSize.height,'CTA line box and padding must fit its frame');
+ const {ButtonRenderer}=load('composition/ButtonRenderer.tsx');
+ const html=renderToStaticMarkup(createElement(ButtonRenderer,{object:cta}));assert.match(html,/justify-content:center/);assert.doesNotMatch(html,/<svg/);
+ const honey=api.buildCuratedSnapshot(base,'editorial-honey','legacy');const legacy=renderToStaticMarkup(createElement(ButtonRenderer,{object:honey.compositionDocument.objects.find(o=>o.id==='cta')}));assert.match(legacy,/justify-content:space-between/);
+ assert.equal(n.textDocument.layers.find(t=>t.id==='paper-eyebrow').content,'A CALMER WAY TO WORK');assert.equal(n.textDocument.layers.find(t=>t.id==='paper-description').content,'One clear place for your next idea.');
+});

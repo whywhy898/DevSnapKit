@@ -11,6 +11,7 @@ export interface SlotPresentation {
 export interface ObjectFrame { centerX: number; centerY: number; widthRatio: number; heightRatio: number; rotation: number }
 export interface GraphicBase { id: string; name: string; frame: ObjectFrame; hidden?: boolean; opacity?: number }
 export interface ButtonObject extends GraphicBase {
+  labelAlign?: 'start' | 'center';
   kind: 'button'; text: string; color: string; fill: string; fontSize: number;
   radius: number; padding: number; autoWidth: boolean; arrow: boolean; border?: string;
 }

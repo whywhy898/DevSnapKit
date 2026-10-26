@@ -23,15 +23,15 @@ export const PAPER_LAUNCH_DUO: CuratedTemplateBlueprint = {
   },
   text: [
     text('brand', 'folio', 98, 68, 210, 38, 30, { weight: 800, letterSpacing: -1.3 }),
-    text('eyebrow', 'A LITTLE SPACE FOR BIG IDEAS', 60, 169, 430, 18, 12, { weight: 700, letterSpacing: 2, color: '#777B68' }),
+    text('eyebrow', 'A CALMER WAY TO WORK', 60, 169, 430, 18, 12, { weight: 700, letterSpacing: 2, color: '#777B68' }),
     text('headline', 'A little less busy.\nA lot more done.', 60, 207, 435, 142, 60, { weight: 800, lineHeight: 1.06, letterSpacing: -3.5 }),
-    text('description', 'Your projects, notes and next steps.\nTogether in one calmer workspace.', 60, 355, 385, 50, 21, { color: '#777B70', lineHeight: 1.2, letterSpacing: -.4 }),
+    text('description', 'One clear place for your next idea.', 60, 355, 385, 50, 21, { color: '#777B70', lineHeight: 1.2, letterSpacing: -.4 }),
     text('website', 'folio.example', 60, 560, 300, 26, 20, { weight: 600, letterSpacing: -.6 }),
   ],
-  cta: { id: 'cta', name: 'Call to action', kind: 'button', frame: frame(60, 420, 172, 52), text: 'Meet folio', fontSize: 17, color: '#F6F3EC', fill: '#24261F', radius: 26, padding: 18, autoWidth: false, arrow: false },
+  cta: { id: 'cta', name: 'Call to action', kind: 'button', frame: frame(60, 420, 172, 52), text: 'Meet folio', fontSize: 21, color: '#F6F3EC', fill: '#24261F', radius: 8, padding: 12, autoWidth: false, arrow: false, labelAlign: 'center' },
   decorations: [
-    { id: 'paper-orbit', name: 'Lime orbit', kind: 'shape', shape: 'ellipse', frame: frame(485, 31, 790, 560, -17), fill: 'transparent', stroke: '#D1D89B', strokeWidth: 1 },
-    { id: 'paper-orbit-bottom', name: 'Lower lime orbit', kind: 'shape', shape: 'ellipse', frame: frame(700, 320, 610, 400, -17), fill: 'transparent', stroke: '#D1D89B', strokeWidth: 1 },
+    { id: 'paper-orbit', name: 'Upper lime arc', kind: 'shape', shape: 'ellipse', frame: frame(820, -1380, 1760, 1760), fill: 'transparent', stroke: '#CADB8A', strokeWidth: 1 },
+    { id: 'paper-orbit-bottom', name: 'Lower lime arc', kind: 'shape', shape: 'ellipse', frame: frame(-30, 410, 1400, 1400), fill: 'transparent', stroke: '#CADB8A', strokeWidth: 1 },
   ],
 };
 

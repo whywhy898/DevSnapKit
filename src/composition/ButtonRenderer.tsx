@@ -1,7 +1,7 @@
 import { ArrowUpRight } from 'lucide-react';
 import type { ButtonObject } from './types';
 export function ButtonRenderer({ object }: { object: ButtonObject }) {
-  return <div data-composition-text={object.id} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: 28,
+  return <div data-composition-text={object.id} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: object.labelAlign === 'center' ? 'center' : 'space-between', gap: 28,
     width: object.autoWidth ? 'max-content' : '100%', minHeight: '100%', maxWidth: object.autoWidth ? undefined : '100%', boxSizing: 'border-box',
     padding: object.padding, background: object.fill, color: object.color, border: object.border || 'none', borderRadius: object.radius,
     fontFamily: '"Poster Manrope", sans-serif', fontSize: object.fontSize, fontWeight: 700, lineHeight: 1.3 }}>
