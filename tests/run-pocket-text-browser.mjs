@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {createRequire} from 'node:module';
+import {spawn} from 'node:child_process';
+import {launchBrowser,clickButton,selectElement,finishTextEditing,downloadPng} from './helpers/browser.mjs';
+const root=path.resolve(import.meta.dirname,'..'),require=createRequire(import.meta.url),output=process.env.POCKET_TEXT_OUTPUT||path.resolve(root,'../../output/devsnapkit/template-collection-2026-10-26/a2-pocket/text',new Date().toISOString().replace(/[:.]/g,'-'));
+const origin='http://127.0.0.1:5289',pause=ms=>new Promise(r=>setTimeout(r,ms));let server,browser,page;const rows=[],errors=[];
+try{
+ await fs.mkdir(output,{recursive:true});server=spawn(process.execPath,[path.join(path.dirname(require.resolve('vite/package.json')),'bin/vite.js'),'--config','tests/vite-mockup-baseline.config.mjs','--host','127.0.0.1','--port','5289','--strictPort'],{cwd:root,stdio:'ignore',windowsHide:true});for(let i=0;i<100;i++){try{if((await fetch(origin)).ok)break;}catch{}await pause(100);}browser=await launchBrowser();
+ const english=('A clearer plan gives you more time for the work and people that matter. ').repeat(3).slice(0,120),chinese=Array.from(('把时间留给重要的事情，让计划更清晰，让每一天留下一点从容。').repeat(3)).slice(0,40).join('');
+ for(const [label,content,count]of [['english',english,120],['chinese',chinese,40]]){
+  page=await browser.newPage();await page.setViewport({width:1440,height:1100});page.on('dialog',d=>d.accept());page.on('pageerror',e=>errors.push(e.message));await page.evaluateOnNewDocument(()=>{localStorage.clear();localStorage.setItem('devsnapkit_welcome_seen','1');localStorage.setItem('devsnapkit_license_key','DSK-AAAA-BBBB-CCCC');});await page.setRequestInterception(true);page.on('request',async request=>{const u=new URL(request.url());if(u.pathname==='/api/verify-license'){await request.respond({contentType:'application/json',body:'{"valid":true,"tier":"pro_lifetime"}'});return;}if(['http:','https:'].includes(u.protocol)&&!['127.0.0.1','localhost'].includes(u.hostname)){await request.respond({status:204,body:''});return;}await request.continue();});await page.goto(origin+'/?editor=1',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>!!window.__mockupBaseline&&localStorage.getItem('devsnapkit_pro_unlocked')==='true');await clickButton(page,'Templates');await page.click('[aria-label="Apply Pocket Flow Duo template"]');await page.waitForFunction(()=>window.__mockupBaseline.snapshot.templateContext?.id==='pocket-flow-duo');
+  await selectElement(page,'Headline');await page.click('[data-canvas-text-controls] [aria-label="Edit text"]');await page.focus('[aria-label="Text content"]');await page.keyboard.down('Control');await page.keyboard.press('A');await page.keyboard.up('Control');await page.keyboard.type(content);await finishTextEditing(page);await pause(120);
+  const saved=await page.evaluate(()=>{const s=window.__mockupBaseline.snapshot;return s.textDocument.layers.find(n=>n.id===s.templateContext.textRoles.headline);});assert.equal(saved.content,content);assert.equal(Array.from(saved.content).length,count);
+  // Long custom copy needs a deliberate typography adjustment; do not silently
+  // truncate or auto-fit the user's content to make the export pass.
+  await page.focus('[aria-label="Text size"]');await page.keyboard.down('Control');await page.keyboard.press('A');await page.keyboard.up('Control');await page.keyboard.type('28');await page.keyboard.press('Tab');await clickButton(page,'Export');await clickButton(page,'1x Web');
+  const file=await downloadPng(page,output,'pocket-'+label+'-custom-title.png',()=>clickButton(page,'Download 1x (1080×1920)'));const bytes=await fs.readFile(file.path);assert.equal(bytes.readUInt32BE(16),1080);assert.equal(bytes.readUInt32BE(20),1920);const current=await page.evaluate(()=>{const s=window.__mockupBaseline.snapshot;return s.textDocument.layers.find(n=>n.id===s.templateContext.textRoles.headline);});assert.equal(current.content,content);assert.equal(current.fontSize,28);rows.push({scenario:label+'-'+count+'-codepoints-preserved-user-adjusted-font-real-export',pass:true,codepoints:count,file:file.path});await page.close();page=null;
+ }
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({output,passed:true,scenarios:rows.length}));
+}catch(error){process.exitCode=1;errors.push(error.stack);await page?.screenshot({path:output+'/failure.png',fullPage:true}).catch(()=>{});console.error(error.message);}
+finally{if(browser)await browser.close();if(server)server.kill();await fs.writeFile(output+'/results.json',JSON.stringify({output,rows,errors,passed:!process.exitCode,realImeTest:false},null,2));}

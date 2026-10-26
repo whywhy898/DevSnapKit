@@ -102,7 +102,7 @@ try {
       const drag=await page.evaluate(()=>{const p=window.__interactionPerf;p.active=false;return {duration:performance.now()-p.started,frames:p.frames,latencies:p.move,events:p.events,longTasks:p.longTasks,hotspots:p.hotspots};});
       const afterDrag=await page.evaluate(()=>({layer:structuredClone(window.__mockupBaseline.snapshot.textDocument.layers[0]),left:parseFloat(document.querySelector('#studio-canvas [data-canvas-text]').style.left),top:parseFloat(document.querySelector('#studio-canvas [data-canvas-text]').style.top)}));
       const expected={x:before.layer.centerX*seed.customCanvasSize.width+(Math.sin(9)*18+10)/before.scale,y:before.layer.centerY*seed.customCanvasSize.height+Math.cos(9)*10/before.scale};
-      const dragApplied=[Math.abs(afterDrag.layer.centerX*1600-expected.x),Math.abs(afterDrag.layer.centerY*1200-expected.y),Math.abs(afterDrag.left-expected.x),Math.abs(afterDrag.top-expected.y)].every(delta=>delta<.15);
+      const dragApplied=[Math.abs(afterDrag.layer.centerX*seed.customCanvasSize.width-expected.x),Math.abs(afterDrag.layer.centerY*seed.customCanvasSize.height-expected.y),Math.abs(afterDrag.left-expected.x),Math.abs(afterDrag.top-expected.y)].every(delta=>delta<.15);
       assert.ok(dragApplied,'Trusted drag changed document and rendered layer by actual pointer displacement');
       await page.click('[data-canvas-text-controls] [aria-label="Edit text"]');await page.focus('[aria-label="Text content"]');await page.keyboard.down('Control');await page.keyboard.press('End');await page.keyboard.up('Control');
       await page.evaluate(()=>Object.assign(window.__interactionPerf,{active:true,phase:'input',started:performance.now(),frames:[],move:[],input:[],events:[],longTasks:[],hotspots:{history:[],scene:[]}}));
