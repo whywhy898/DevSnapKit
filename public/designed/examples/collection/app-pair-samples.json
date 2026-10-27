@@ -1,0 +1,23 @@
+{
+  "generator": "scripts/build-app-pair-samples.mjs",
+  "provenance": "Self-authored fictional SVG reading app content; original geometric book covers, summaries and notes; no website capture, third-party photography or customer data",
+  "font": {
+    "source": "public/poster/fonts/manrope-latin.woff2",
+    "license": "Manrope-OFL.txt",
+    "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+  },
+  "records": [
+    {
+      "file": "shelf-library.svg",
+      "width": 396,
+      "height": 858,
+      "sha256": "a446f6e7cde8b2bb23da603adf6134c4deea79da5074a7344a215b14b92c7636"
+    },
+    {
+      "file": "shelf-notes.svg",
+      "width": 396,
+      "height": 858,
+      "sha256": "ea5b6841cac45693ac367ff2872cdbc8c1c51554f099d24476fe52ebadb4315c"
+    }
+  ]
+}

@@ -42,7 +42,7 @@ test('Night restore and reset preserve deletions, custom text, hidden status and
  assert.notEqual(r.textDocument.layers.find(t=>t.id==='night-headline').centerX,.9);assert.equal(r.compositionDocument.objects.find(o=>o.id==='cta').fill,'#ff0000');assert.equal(s.compositionDocument.objects.find(o=>o.id==='cta').frame.centerX,.2);assert.equal(s.compositionDocument.objects.find(o=>o.id==='cta').fill,'#D9F58B');
 });
 test('Night and Pocket are the two implemented Pro templates',()=>{
- const {getCuratedTemplate,CURATED_TEMPLATE_CATALOG}=load('templates/collection/catalog.ts');const n=getCuratedTemplate('night-signal-duo');assert.equal(n?.tier,'pro');assert.equal(n.thumbnail,'/designed/collection/night-signal-duo.webp');assert.equal(n.width,1600);assert.equal(n.height,1200);assert.equal(getCuratedTemplate('pocket-flow-duo').tier,'pro');assert.equal(CURATED_TEMPLATE_CATALOG.length,5);
+ const {getCuratedTemplate,CURATED_TEMPLATE_CATALOG}=load('templates/collection/catalog.ts');const n=getCuratedTemplate('night-signal-duo');assert.equal(n?.tier,'pro');assert.equal(n.thumbnail,'/designed/collection/night-signal-duo.webp');assert.equal(n.width,1600);assert.equal(n.height,1200);assert.equal(getCuratedTemplate('pocket-flow-duo').tier,'pro');assert.equal(CURATED_TEMPLATE_CATALOG.length,6);
  assert.throws(()=>api.buildCuratedSnapshot(base,'studio-bridge','p'),/Unknown|unavailable/i);
 });
 test('Night CTA scales from its reference box on short canvases while default and legacy styles stay identical',()=>{

@@ -1,0 +1,47 @@
+{
+  "templateId": "app-pair",
+  "method": "Resized from actual Free editor PNG download; no poster CTA; not imagegen output",
+  "sourceDirectory": "D:\\workspace\\MarkMoney\\output\\devsnapkit\\template-collection-2026-10-27\\b2-app-pair\\browser\\2026-10-27T01-26-44-427Z",
+  "baseCommit": "e9b24d5ca83489463ac88c7f7c13798f75c15b17",
+  "workingTreeHadChanges": true,
+  "sourceFiles": {
+    "src/templates/collection/definitions/app-pair.ts": "2f8bf4382e75827966d868e3200ee3553514f5016c363822cc17236e04c3eca0",
+    "src/templates/collection/apply.ts": "1979011027467ef65bf278b10b8389ab4d66b4cb38a8d8797d73c0a95840ad98",
+    "src/templates/collection/types.ts": "c16f9f9a48925b60673fcb03a87971699e161dda88ab1534e05143a445583f23",
+    "src/composition/MediaShell.tsx": "8e594d57f796c66b01fa960d7d9e1e3049ef91bf23ff8577f03cfceae2965196",
+    "src/composition/CompositionRenderer.tsx": "7bcb66d21ecb5e28474346e81797be50fb2c0751575c0715d366b482434ea5be",
+    "src/App.tsx": "d78239aff2f40a1b6e950e97fd454ade14d993a9fd569d7c4bd2282b7aa10663"
+  },
+  "sampleSources": [
+    {
+      "file": "shelf-library.svg",
+      "width": 396,
+      "height": 858,
+      "sha256": "a446f6e7cde8b2bb23da603adf6134c4deea79da5074a7344a215b14b92c7636"
+    },
+    {
+      "file": "shelf-notes.svg",
+      "width": 396,
+      "height": 858,
+      "sha256": "ea5b6841cac45693ac367ff2872cdbc8c1c51554f099d24476fe52ebadb4315c"
+    }
+  ],
+  "records": [
+    {
+      "file": "app-pair.webp",
+      "width": 480,
+      "height": 853,
+      "sourcePng": "appPair-default-duo-1x.png",
+      "sourceSha256": "7ec0fe4b053187cd6c1ab929348081cc481d50350fc1c90224715cde289cc834",
+      "sha256": "0c1a8146c181ab395a1a895a8320e011a53a379b0d610f605c413478475962f2"
+    },
+    {
+      "file": "app-pair-preview.webp",
+      "width": 1080,
+      "height": 1920,
+      "sourcePng": "appPair-default-duo-1x.png",
+      "sourceSha256": "7ec0fe4b053187cd6c1ab929348081cc481d50350fc1c90224715cde289cc834",
+      "sha256": "1278509471334bfed5ef4a2e25a9d20e9a005c2f0aaeefc8da6e386522eb7171"
+    }
+  ]
+}

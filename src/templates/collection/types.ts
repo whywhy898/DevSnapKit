@@ -52,6 +52,6 @@ export interface CuratedTemplateBlueprint {
   singlePlacement?: ObjectFrame;
   mediaPresentation: Record<MediaSlot, SlotPresentation>;
   text: CuratedTextDefinition[];
-  cta: ButtonObject;
+  cta?: ButtonObject;
   decorations: ShapeObject[];
 }

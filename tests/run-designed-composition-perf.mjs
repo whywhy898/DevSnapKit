@@ -10,8 +10,9 @@ import { launchBrowser, preparePage, clickButton, finishTextEditing } from './he
 
 const root = path.resolve(process.env.DESIGNED_PERF_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
 const templateId = process.env.DESIGNED_PERF_TEMPLATE || 'editorial-honey';
-if (!['editorial-honey', 'night-signal-duo', 'pocket-flow-duo', 'calm-split'].includes(templateId)) throw new Error('Unsupported performance template');
+if (!['editorial-honey', 'night-signal-duo', 'pocket-flow-duo', 'calm-split', 'app-pair'].includes(templateId)) throw new Error('Unsupported performance template');
 const proTemplate = templateId === 'night-signal-duo' || templateId === 'pocket-flow-duo';
+const hasCta = templateId !== 'app-pair';
 const require = createRequire(import.meta.url);
 const origin = 'http://127.0.0.1:5196';
 const output = path.resolve(process.env.DESIGNED_PERF_OUTPUT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../output/devsnapkit/whole-card-free-brand/m2/performance',new Date().toISOString().replace(/[:.]/g,'-')));
@@ -24,7 +25,7 @@ const budget = { inputToNextPaintOpportunityP95Ms:80, dragFrameIntervalP95Ms:33.
 const sourceFiles = async (directory='src') => (await fs.readdir(path.join(root,directory),{withFileTypes:true})).flatMap(item => item.isDirectory() ? [] : /\.(tsx?|css)$/.test(item.name) ? [path.posix.join(directory,item.name)] : []).concat(...await Promise.all((await fs.readdir(path.join(root,directory),{withFileTypes:true})).filter(item=>item.isDirectory()).map(item=>sourceFiles(path.posix.join(directory,item.name)))));
 async function sourceHashes() { const result={}; for(const file of [...await sourceFiles(),'tests/vite-mockup-baseline.config.mjs','tests/vite-poster.config.mjs']) result[file]=digest(await fs.readFile(path.join(root,file))); return result; }
 const changes = (before,after) => [...new Set([...Object.keys(before),...Object.keys(after)])].filter(file=>before[file]!==after[file]);
-const result = {metadata:{started:new Date().toISOString(),budget,measurement:'Trusted native pointer/input capture listener to requestAnimationFrame followed by setTimeout(0): next paint opportunity estimate, not GPU presentation. No fixture updates inside timed phases.',setup:'Real template UI, cloned only for setup. Main + secondary + independent brand mark + CTA + 12 decorations in every scenario. Fonts and rendered images ready. 1440x1100 DPR1; actual template and canvas dimensions recorded below.',rows:[]},rows:[],errors:[]};
+const result = {metadata:{started:new Date().toISOString(),budget,measurement:'Trusted native pointer/input capture listener to requestAnimationFrame followed by setTimeout(0): next paint opportunity estimate, not GPU presentation. No fixture updates inside timed phases.',setup:'Real template UI, cloned only for setup. Main + secondary + independent brand mark + native CTA when present + 12 decorations in every scenario. Fonts and rendered images ready. 1440x1100 DPR1; actual template and canvas dimensions recorded below.',rows:[]},rows:[],errors:[]};
 let browser,server,serverError='';
 async function save() { await fs.mkdir(output,{recursive:true}); await fs.writeFile(path.join(output,'interaction-performance.json'),JSON.stringify(result,null,2)); await fs.writeFile(path.join(output,'interaction-performance-summary.json'),JSON.stringify({metadata:result.metadata,rows:result.rows.map(({scenario,run,summary,checks,passed,sourceChangedDuringRun})=>({scenario,run,summary,checks,passed,sourceChangedDuringRun})),errors:result.errors},null,2)); }
 try {
@@ -52,13 +53,13 @@ try {
   // admission is independently exercised through real activation browser tests.
   if(proTemplate)await page.evaluate(()=>window.__mockupBaseline.apply({}, {pro:true}));
   await clickButton(page,'Templates');
-  await page.click(`[aria-label="Apply ${{'editorial-honey':'Editorial Honey','night-signal-duo':'Night Signal Duo','pocket-flow-duo':'Pocket Flow Duo','calm-split':'Calm Split'}[templateId]} template"]`);
+  await page.click(`[aria-label="Apply ${{'editorial-honey':'Editorial Honey','night-signal-duo':'Night Signal Duo','pocket-flow-duo':'Pocket Flow Duo','calm-split':'Calm Split','app-pair':'App Pair'}[templateId]} template"]`);
   await page.waitForFunction(id=>window.__mockupBaseline.snapshot.compositionDocument?.templateId===id,{},templateId);
   const seed=await page.evaluate(()=>structuredClone(window.__mockupBaseline.snapshot));
   assert.ok(seed.compositionDocument.objects.some(node=>node.id==='brand-mark'));
-  assert.ok(seed.compositionDocument.objects.some(node=>node.id==='cta'));
-  result.metadata.template={id:templateId,canvas:{...seed.customCanvasSize},testOnlyProFixture:proTemplate,textCount:seed.textDocument.layers.length,decorationCount:seed.compositionDocument.decorations.length,main:seed.imageSrc||seed.canonicalImageSrc,secondary:seed.secondarySrc};
-  const assets=templateId==='calm-split'?['public/designed/examples/collection/calm-workspace.svg','public/designed/examples/collection/calm-detail.svg']:templateId==='pocket-flow-duo'?['public/designed/examples/collection/morrow-today.svg','public/designed/examples/collection/morrow-focus.svg']:templateId==='night-signal-duo'?['public/designed/examples/collection/signal-overview.svg','public/designed/examples/collection/signal-release.svg']:['public/designed/examples/bloom-dashboard.svg','public/designed/examples/bloom-workflow.svg','public/designed/examples/bloom-workflow-card.png'];
+  assert.equal(seed.compositionDocument.objects.some(node=>node.id==='cta'),hasCta);
+  result.metadata.template={id:templateId,canvas:{...seed.customCanvasSize},hasCta,testOnlyProFixture:proTemplate,textCount:seed.textDocument.layers.length,decorationCount:seed.compositionDocument.decorations.length,main:seed.imageSrc||seed.canonicalImageSrc,secondary:seed.secondarySrc};
+  const assets=templateId==='app-pair'?['public/designed/examples/collection/shelf-library.svg','public/designed/examples/collection/shelf-notes.svg']:templateId==='calm-split'?['public/designed/examples/collection/calm-workspace.svg','public/designed/examples/collection/calm-detail.svg']:templateId==='pocket-flow-duo'?['public/designed/examples/collection/morrow-today.svg','public/designed/examples/collection/morrow-focus.svg']:templateId==='night-signal-duo'?['public/designed/examples/collection/signal-overview.svg','public/designed/examples/collection/signal-release.svg']:['public/designed/examples/bloom-dashboard.svg','public/designed/examples/bloom-workflow.svg','public/designed/examples/bloom-workflow-card.png'];
   result.metadata.assetHashes={};for(const file of assets)result.metadata.assetHashes[file]=digest(await fs.readFile(path.join(root,file)));
   await page.evaluate(()=>{
     window.__interactionPerf={active:false,frames:[],move:[],input:[],events:[],longTasks:[],hotspots:{history:[],scene:[]}};
@@ -90,7 +91,7 @@ try {
       await page.waitForFunction(count=>document.querySelectorAll('#studio-canvas [data-canvas-text]').length===count,{},scenario.count);
       await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.querySelectorAll('#studio-canvas img')].map(async img=>{if(!img.complete)await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;});if(!img.naturalWidth)throw Error('Image failed');await img.decode();}));});await paint(page);
       const fixture=await page.evaluate(()=>({dpr:devicePixelRatio,viewport:{width:innerWidth,height:innerHeight},canvas:window.__mockupBaseline.snapshot.customCanvasSize,text:window.__mockupBaseline.snapshot.textDocument.layers.map(({id,content})=>({id,codepoints:[...content].length})),decorations:document.querySelectorAll('#studio-canvas [data-composition-decoration]').length,objects:[...document.querySelectorAll('#studio-canvas [data-composition-object]')].map(node=>node.dataset.compositionObject),images:[...document.querySelectorAll('#studio-canvas img')].map(img=>({src:img.currentSrc,width:img.naturalWidth,height:img.naturalHeight})),fonts:document.fonts.status}));
-      assert.deepEqual(fixture.viewport,{width:1440,height:1100});assert.equal(fixture.dpr,1);assert.deepEqual(fixture.canvas,seed.customCanvasSize);assert.equal(fixture.decorations,12);assert.equal(fixture.text.length,scenario.count);assert.ok(fixture.text.every(t=>t.codepoints===scenario.codepoints));for(const id of ['main','secondary','brand-mark','cta'])assert.ok(fixture.objects.includes(id));
+      assert.deepEqual(fixture.viewport,{width:1440,height:1100});assert.equal(fixture.dpr,1);assert.deepEqual(fixture.canvas,seed.customCanvasSize);assert.equal(fixture.decorations,12);assert.equal(fixture.text.length,scenario.count);assert.ok(fixture.text.every(t=>t.codepoints===scenario.codepoints));for(const id of ['main','secondary','brand-mark'])assert.ok(fixture.objects.includes(id));assert.equal(fixture.objects.includes('cta'),hasCta);
       // Select through the current Inspector; the obsolete native text selector was removed in M1.
       await page.click('[aria-label="Elements"]');await page.click('[data-element-picker] button[aria-label^="Select Text:"]');await paint(page);
       const handle=await page.$('[aria-label="Move text"]'),box=await handle.boundingBox();assert.ok(box?.width&&box?.height,'Visible real drag handle');

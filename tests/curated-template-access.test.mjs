@@ -9,7 +9,7 @@ const load = createTypeScriptLoader(fileURLToPath(new URL('../', import.meta.url
 test('curated application denies unknown IDs and gates Night/Pocket while Honey and Paper stay free', () => {
   const { canApplyCuratedTemplate } = load('src/templates/collection/access.ts');
   for (const unlocked of [false, true]) {
-    for (const id of ['editorial-honey', 'paper-launch-duo', 'calm-split']) assert.equal(canApplyCuratedTemplate(id, unlocked), true, id);
+    for (const id of ['editorial-honey', 'paper-launch-duo', 'calm-split', 'app-pair']) assert.equal(canApplyCuratedTemplate(id, unlocked), true, id);
     for (const id of ['unknown', '', '__proto__', 'studio-bridge']) assert.equal(canApplyCuratedTemplate(id, unlocked), false, id);
     assert.equal(canApplyCuratedTemplate('night-signal-duo', unlocked), unlocked);
     assert.equal(canApplyCuratedTemplate('pocket-flow-duo', unlocked), unlocked);
@@ -26,12 +26,12 @@ test('premium templates add one ability without changing free branding or existi
 test('gallery lists only implemented designs with complete-image preview and separate application controls', () => {
   const { TemplateMenu } = load('src/templates/TemplateMenu.tsx');
   const html = renderToStaticMarkup(createElement(TemplateMenu, { onApply() {}, onDesignedApply() {}, disabled: false, busy: false }));
-  assert.equal((html.match(/<article/g) || []).length, 5);
-  for (const name of ['Editorial Honey', 'Paper Launch Duo', 'Calm Split', 'Night Signal Duo', 'Pocket Flow Duo']) {
+  assert.equal((html.match(/<article/g) || []).length, 6);
+  for (const name of ['Editorial Honey', 'Paper Launch Duo', 'Calm Split', 'App Pair', 'Night Signal Duo', 'Pocket Flow Duo']) {
     assert.ok(html.includes(`Apply ${name} template`), name);
     assert.ok(html.includes(`Preview ${name} template`), name);
   }
-  assert.equal((html.match(/object-contain/g) || []).length, 5);
+  assert.equal((html.match(/object-contain/g) || []).length, 6);
   for (const size of ['1600 × 1200', '1200 × 630', '1080 × 1080', '1080 × 1920']) assert.ok(html.includes(size), size);
   assert.match(html, />Pro</);
   assert.doesNotMatch(html, /Studio Bridge|Basic layouts|Apply Minimal|Apply Split/);

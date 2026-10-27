@@ -7,10 +7,12 @@ import { PAPER_LAUNCH_DUO, PAPER_BRAND_MARK } from './definitions/paper-launch-d
 import { NIGHT_SIGNAL_DUO, NIGHT_BRAND_MARK } from './definitions/night-signal-duo';
 import { POCKET_FLOW_DUO, POCKET_BRAND_MARK } from './definitions/pocket-flow-duo';
 import { CALM_SPLIT, CALM_BRAND_MARK } from './definitions/calm-split';
+import { APP_PAIR, APP_PAIR_BRAND_MARK } from './definitions/app-pair';
 
 const templates = [
   { blueprint: PAPER_LAUNCH_DUO, brandMark: PAPER_BRAND_MARK, background: '#F6F3EC' },
   { blueprint: CALM_SPLIT, brandMark: CALM_BRAND_MARK, background: '#EEF2EE' },
+  { blueprint: APP_PAIR, brandMark: APP_PAIR_BRAND_MARK, background: '#EAF2FA' },
   { blueprint: NIGHT_SIGNAL_DUO, brandMark: NIGHT_BRAND_MARK, background: '#101513' },
   { blueprint: POCKET_FLOW_DUO, brandMark: POCKET_BRAND_MARK, background: '#F4E4D6' },
 ];
@@ -35,8 +37,8 @@ export function buildCuratedSnapshot(before: EditorSnapshot, id: string, prefix:
     compositionDocument: { ...createIndependentComposition(), templateId: paper.id, mediaLayout: 'independent', adaptiveMediaLayout: paper.singlePlacement ? 'auto' : 'manual',
       placements: structuredClone(paper.placements), ...(paper.singlePlacement ? { singlePlacement: structuredClone(paper.singlePlacement) } : {}), mediaPresentation: structuredClone(paper.mediaPresentation),
       detailVisible: !!imageSrc && !!secondarySrc && !hiddenSecondary, detailRadius: 12, detailBorder: 'none', detailShadow: '0 18px 36px #25281826',
-      objects: structuredClone([paper.cta, template.brandMark]), decorations: structuredClone(paper.decorations),
-      order: ['main', 'secondary', 'brand-mark', 'cta', ...layers.map(layer => layer.id)], knownTextIds: layers.map(layer => layer.id),
+      objects: structuredClone([...(paper.cta ? [paper.cta] : []), template.brandMark]), decorations: structuredClone(paper.decorations),
+      order: ['main', 'secondary', 'brand-mark', ...(paper.cta ? ['cta'] : []), ...layers.map(layer => layer.id)], knownTextIds: layers.map(layer => layer.id),
     },
     imageSrc, imageName: replaceMain ? paper.examples.main.name : before.imageName,
     primaryMediaOrigin: replaceMain ? { kind: 'builtin', sampleId: paper.examples.main.sampleId } : before.primaryMediaOrigin ?? { kind: 'unknown' },
