@@ -68,7 +68,7 @@ function PresentedMedia({ props, slot, src, zIndex }: { props: Props; slot: 'mai
     onPointerDown={event => { pointer.current = interactive && event.button === 0 ? { x: event.clientX, y: event.clientY } : null; props.onObjectPointerDown?.(slot, event); }}
     onClick={event => { const start = pointer.current; pointer.current = null; if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) < 4) replace?.(); }}>
     <MediaShell src={src} name={slot === 'main' ? props.imageName : props.secondaryName} presentation={props.document.mediaPresentation![slot]!}
-      logicalWidth={props.document.mediaPresentation![slot]!.frame.startsWith('phone-') ? compositionFrame(props.document, slot).widthRatio * props.size.width : undefined} />
+      logicalWidth={compositionFrame(props.document, slot).widthRatio * props.size.width} />
     {interactive && hovered && <MediaHoverOverlay />}
   </div>;
 }

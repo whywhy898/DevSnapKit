@@ -8,6 +8,8 @@ export function TextControls({ document, editor, disabled, exportError }: { docu
   const { active, session } = editor;
   const numericOrColor = (kind: 'fontSize' | 'color' | 'lineHeight' | 'letterSpacing' | 'x' | 'y' | 'width', label: string) => <label className="flex min-w-0 flex-col gap-1.5 text-xs text-white/60">{label}
     <input aria-label={kind === 'fontSize' ? 'Text size' : kind === 'color' ? 'Text color' : `Text ${kind}`} type="text" inputMode={kind === 'color' ? 'text' : 'decimal'}
+      title={kind === 'fontSize' ? '8–512 px' : kind === 'letterSpacing' ? '−40–40 px' : undefined}
+      min={kind === 'fontSize' ? 8 : kind === 'letterSpacing' ? -40 : undefined} max={kind === 'fontSize' ? 512 : kind === 'letterSpacing' ? 40 : undefined}
       className={field + ' w-full'} value={session?.kind === kind ? session.value : active ? kind === 'x' ? Math.round(active.centerX * editor.size.width * 100) / 100 : kind === 'y' ? Math.round(active.centerY * editor.size.height * 100) / 100 : kind === 'width' ? Math.round(active.widthRatio * editor.size.width * 100) / 100 : kind === 'lineHeight' ? active.lineHeight ?? 1.25 : kind === 'letterSpacing' ? active.letterSpacing ?? 0 : active[kind] : ''}
       aria-invalid={session?.kind === kind && !!session.error} onFocus={() => editor.styleStart(kind)}
       onChange={event => editor.changeStyle(kind, event.target.value)} onBlur={event => { if (!(event.relatedTarget as HTMLElement | null)?.closest('[data-text-cancel]')) editor.finishStyle(kind); }}

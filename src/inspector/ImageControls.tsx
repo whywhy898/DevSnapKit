@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import type { CompositionDocument, MediaSlot } from '../composition/types';
 import { compositionFrame, moveCompositionObject } from '../composition/document';
 
-export function GeometryInput({ label, value, disabled = false, onCommit }: { label: string; value: number; disabled?: boolean; onCommit: (value: number) => void }) {
+export function GeometryInput({ label, value, disabled = false, min, max, step, onCommit }: { label: string; value: number; disabled?: boolean; min?: number; max?: number; step?: number | 'any'; onCommit: (value: number) => void }) {
   const [draft, setDraft] = useState(String(value));
   const editing = useRef(false);
   const cancelled = useRef(false);
   useEffect(() => { if (!editing.current) setDraft(String(value)); }, [value]);
-  return <input aria-label={label} type="number" disabled={disabled} value={draft} onFocus={() => { editing.current = true; cancelled.current = false; }} onChange={event => setDraft(event.target.value)} onBlur={() => {
+  return <input aria-label={label} type="number" min={min} max={max} step={step} disabled={disabled} value={draft} onFocus={() => { editing.current = true; cancelled.current = false; }} onChange={event => setDraft(event.target.value)} onBlur={() => {
     editing.current = false; if (!cancelled.current && draft.trim() && Number.isFinite(Number(draft))) onCommit(Number(draft)); setDraft(String(value));
   }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') { cancelled.current = true; event.currentTarget.blur(); } }} />;
 }
@@ -41,7 +41,9 @@ export function ImageControls({ document: doc, selected, size, onChange, onStart
       <button type="button" onClick={() => onChange({ ...doc, detailShadow: doc.detailShadow === 'none' ? '0 12px 28px #00000026' : 'none' })}>{doc.detailShadow === 'none' ? 'Add shadow' : 'Remove shadow'}</button>
     </fieldset>}
     <details data-image-advanced><summary>Advanced</summary><div className="inspector-advanced-content">
-      {independent && <fieldset className="inspector-two-column" onFocusCapture={onStart} onBlurCapture={end}>{(['centerX','centerY','widthRatio','heightRatio'] as const).map(key => <label key={`${selected}-${key}`}>{({ centerX: 'Center X', centerY: 'Center Y', widthRatio: 'Width', heightRatio: 'Height' })[key]}<GeometryInput label={`Object ${key}`} value={Math.round(frame[key] * (key === 'centerY' || key === 'heightRatio' ? size.height : size.width))} onCommit={value => { if (key.startsWith('center') || value > 0) patch({ [key]: value / (key === 'centerY' || key === 'heightRatio' ? size.height : size.width) }); }} /></label>)}</fieldset>}
+      {independent && <fieldset className="inspector-two-column" onFocusCapture={onStart} onBlurCapture={end}>{(['centerX','centerY','widthRatio','heightRatio'] as const).map(key => <label key={`${selected}-${key}`}>{({ centerX: 'Center X', centerY: 'Center Y', widthRatio: 'Width', heightRatio: 'Height' })[key]}<GeometryInput label={`Object ${key}`} value={Math.round(frame[key] * (key === 'centerY' || key === 'heightRatio' ? size.height : size.width))} onCommit={value => { if (key.startsWith('center') || value > 0) patch({ [key]: value / (key === 'centerY' || key === 'heightRatio' ? size.height : size.width) }); }} /></label>)}
+        <label>Rotation (°)<GeometryInput label="Object rotation" value={frame.rotation} min={-180} max={180} step="any" onCommit={value => { if (Number.isFinite(value) && value >= -180 && value <= 180) patch({ rotation: value }); }} /></label>
+      </fieldset>}
       <label><input aria-label="Allow image bleed" type="checkbox" checked={doc.allowBleed} onChange={event => onChange({ ...doc, allowBleed: event.target.checked })} /> Allow image bleed</label>
       <button type="button" onClick={() => independent ? onChange({ ...doc, mediaLayout: 'legacy' }) : onIndependent()}>{independent ? 'Use layout presets' : 'Independent two-slot layout'}</button>
       <button type="button" onClick={() => { if (window.confirm('Restore the template layout? You can Undo this change.')) onRestore(); }}>Restore layout</button>

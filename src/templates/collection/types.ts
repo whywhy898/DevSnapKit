@@ -26,7 +26,8 @@ export type CuratedTextRole =
   | 'description'
   | 'website'
   | 'disclosure'
-  | 'credit';
+  | 'credit'
+  | 'annotation';
 
 export interface CuratedTextDefinition {
   role: CuratedTextRole;
@@ -50,6 +51,10 @@ export interface CuratedTemplateBlueprint {
   placements: Record<MediaSlot, ObjectFrame>;
   /** Main screenshot placement used when an adaptive template has no visible secondary. */
   singlePlacement?: ObjectFrame;
+  /** Authored media may extend past the canvas; text remains bounded. */
+  allowBleed?: boolean;
+  /** Text roles painted beneath media, resolved to real layer IDs on apply. */
+  textBehindMedia?: CuratedTextRole[];
   mediaPresentation: Record<MediaSlot, SlotPresentation>;
   text: CuratedTextDefinition[];
   cta?: ButtonObject;

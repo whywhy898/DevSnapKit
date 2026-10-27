@@ -47,7 +47,7 @@ test('T3 actual style controls target selection, validate drafts, normalize font
   await page.click('[aria-label="Text italic"]'); await page.select('[aria-label="Text font"]', 'manrope');
   assert.equal((await snap(page)).layers[1].italic, false);
   const size = await page.$('[aria-label="Text size"]'); await size.focus(); await page.keyboard.down('Control'); await size.press('a'); await page.keyboard.up('Control'); await page.keyboard.type('999');
-  assert.equal((await snap(page)).layers[1].fontSize, 99); assert.match(await page.$eval('[role="alert"]', el => el.textContent), /8.*160/);
+  assert.equal((await snap(page)).layers[1].fontSize, 99); assert.match(await page.$eval('[role="alert"]', el => el.textContent), /8.*512/);
   await page.keyboard.down('Control'); await size.press('a'); await page.keyboard.up('Control'); await page.keyboard.type('64'); await size.press('Tab');
   await page.waitForFunction(() => window.__mockupBaseline.snapshot.textDocument.layers[1].fontSize === 64);
   await page.click('[aria-label="Align left"]'); await undo(page); assert.equal((await snap(page)).layers[1].align, 'center');

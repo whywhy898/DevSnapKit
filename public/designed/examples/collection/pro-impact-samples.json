@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "generator": "scripts/build-pro-impact-samples.mjs",
+  "authorship": "Original native SVG UI; charts and typography authored in this repository. No third-party screenshot assets.",
+  "samples": [
+    {
+      "id": "kiln-overview",
+      "file": "kiln-overview.svg",
+      "width": 1000,
+      "height": 620,
+      "sourceKind": "original vector app UI",
+      "sha256": "d41ac4a61fb3bfdb22cd4a5d726b1c870856639fd9efc55f6dbfca13ed57fe3e",
+      "reference": {
+        "path": "../../output/devsnapkit/template-collection-2026-10-27/pro-impact/concept-1-big-type.html",
+        "sha256": "a1aab13e9e919b14e316193cb6a8187c9effadb6cdfaef4ed3e7ce3e5bb18500"
+      },
+      "fonts": [
+        {
+          "family": "Manrope",
+          "file": "public/poster/fonts/manrope-latin.woff2",
+          "license": "public/poster/fonts/Manrope-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+        }
+      ],
+      "description": "Fictional deploy application UI based on the approved Kiln concept."
+    },
+    {
+      "id": "kiln-deploy",
+      "file": "kiln-deploy.svg",
+      "width": 396,
+      "height": 760,
+      "sourceKind": "original vector app UI",
+      "sha256": "573614eaa2c08eafcb8cdc57bf1c6dfcd8f67d5b9bc7a33dd4427bffe37d4ca9",
+      "reference": {
+        "path": "../../output/devsnapkit/template-collection-2026-10-27/pro-impact/concept-1-big-type.html",
+        "sha256": "a1aab13e9e919b14e316193cb6a8187c9effadb6cdfaef4ed3e7ce3e5bb18500"
+      },
+      "fonts": [
+        {
+          "family": "Manrope",
+          "file": "public/poster/fonts/manrope-latin.woff2",
+          "license": "public/poster/fonts/Manrope-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+        }
+      ],
+      "description": "Fictional deploy application UI based on the approved Kiln concept."
+    },
+    {
+      "id": "halden-journal",
+      "file": "halden-journal.svg",
+      "width": 420,
+      "height": 840,
+      "sourceKind": "original vector app UI",
+      "sha256": "feccfceb83ba44c2f83578fdf9fb84965871364730d319f52194f1bde2db8560",
+      "reference": {
+        "path": "../../output/devsnapkit/template-collection-2026-10-27/pro-impact/concept-2-cover-story.html",
+        "sha256": "279e8b5e096baf40e485483ab73094ba59d75dd2d04cfb41d6ba9be65f36f39a"
+      },
+      "fonts": [
+        {
+          "family": "Manrope",
+          "file": "public/poster/fonts/manrope-latin.woff2",
+          "license": "public/poster/fonts/Manrope-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+        },
+        {
+          "family": "Gelasio",
+          "file": "public/poster/fonts/Gelasio.ttf",
+          "license": "public/poster/fonts/Gelasio-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "4daecea457258c9ebeb8bc99ed3fd24353618bfad3ea4b93fa0b5d0468fc04e4"
+        },
+        {
+          "family": "Gelasio",
+          "file": "public/poster/fonts/Gelasio-Italic.ttf",
+          "license": "public/poster/fonts/Gelasio-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "52559e845a4d33514e5f93bb9ae7dbeae1894a53f2c565a15f18af40cd337c09"
+        }
+      ],
+      "description": "Fictional private writing application UI based on the approved Halden concept."
+    },
+    {
+      "id": "halden-week",
+      "file": "halden-week.svg",
+      "width": 350,
+      "height": 404,
+      "sourceKind": "original vector app UI",
+      "sha256": "ab8761875fa5e654511cc94dba23b3e6f3a01bfb3ba0025f5df8b78d4426c82d",
+      "reference": {
+        "path": "../../output/devsnapkit/template-collection-2026-10-27/pro-impact/concept-2-cover-story.html",
+        "sha256": "279e8b5e096baf40e485483ab73094ba59d75dd2d04cfb41d6ba9be65f36f39a"
+      },
+      "fonts": [
+        {
+          "family": "Manrope",
+          "file": "public/poster/fonts/manrope-latin.woff2",
+          "license": "public/poster/fonts/Manrope-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+        },
+        {
+          "family": "Gelasio",
+          "file": "public/poster/fonts/Gelasio.ttf",
+          "license": "public/poster/fonts/Gelasio-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "4daecea457258c9ebeb8bc99ed3fd24353618bfad3ea4b93fa0b5d0468fc04e4"
+        }
+      ],
+      "description": "Fictional private writing application UI based on the approved Halden concept."
+    }
+  ]
+}

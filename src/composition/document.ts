@@ -86,6 +86,16 @@ export function validateComposition(doc: CompositionDocument, textIds: readonly 
   // they never resurrect content. Unknown references remain invalid.
   const known = new Set(['main', 'secondary', 'brand', ...ids, ...textIds, ...(doc.knownTextIds ?? [])]);
   if (doc.order.some(id => !known.has(id))) throw new Error('Unknown object order reference');
+  for (const presentation of Object.values(doc.mediaPresentation ?? {})) {
+    if (!presentation) continue;
+    if (presentation.radius !== undefined && (!Number.isFinite(presentation.radius) || presentation.radius < 0 || presentation.radius > 128)) throw new Error('Invalid presentation radius');
+    const shadow = presentation.shadow;
+    if (shadow !== undefined && (!shadow || typeof shadow !== 'object' || Array.isArray(shadow)
+      || Object.keys(shadow).some(key => !['x', 'y', 'blur', 'color', 'referenceWidth'].includes(key))
+      || ![shadow.x, shadow.y, shadow.blur].every(Number.isFinite) || Math.abs(shadow.x) > 128 || Math.abs(shadow.y) > 128 || shadow.blur < 0 || shadow.blur > 128
+      || typeof shadow.color !== 'string' || !/^#[\da-f]{6}([\da-f]{2})?$/i.test(shadow.color)
+      || (shadow.referenceWidth !== undefined && (!Number.isFinite(shadow.referenceWidth) || shadow.referenceWidth <= 0)))) throw new Error('Invalid presentation shadow');
+  }
   for (const frame of [...Object.values(doc.placements), ...(doc.singlePlacement ? [doc.singlePlacement] : []), ...nodes.map(node => node.frame)]) {
     if (!frame || !(['centerX', 'centerY', 'widthRatio', 'heightRatio', 'rotation'] as const).every(key => Number.isFinite(frame[key])) || frame.widthRatio <= 0 || frame.heightRatio <= 0 || Math.abs(frame.rotation) > 180) throw new Error('Invalid placement geometry');
   }

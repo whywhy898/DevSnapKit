@@ -4,6 +4,9 @@ import type { SlotPresentation } from './types';
 export function MediaShell({ src, name, presentation, title, logicalWidth }: {
   src: string; name?: string; presentation: SlotPresentation; title?: string; logicalWidth?: number;
 }) {
+  const shadow = presentation.shadow;
+  const effectScale = shadow?.referenceWidth && logicalWidth && Number.isFinite(logicalWidth) && logicalWidth > 0 ? logicalWidth / shadow.referenceWidth : 1;
+  const authoredShadow = shadow ? `${shadow.x * effectScale}px ${shadow.y * effectScale}px ${shadow.blur * effectScale}px ${shadow.color}` : undefined;
   if (presentation.frame === 'phone-light' || presentation.frame === 'phone-dark') {
     // Logical canvas width keeps chrome proportional in previews and resized exports.
     const scale = (logicalWidth && Number.isFinite(logicalWidth) && logicalWidth > 0 ? logicalWidth : 430) / 430;
@@ -12,7 +15,7 @@ export function MediaShell({ src, name, presentation, title, logicalWidth }: {
     const foreground = dark ? '#FBF5EF' : '#25232A';
     return <div data-media-frame={presentation.frame} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
       overflow: 'hidden', borderRadius: 56 * scale, background, border: `${10 * scale}px solid #24202A`, boxSizing: 'border-box',
-      boxShadow: `0 ${10 * scale}px ${24 * scale}px #211b2526` }}>
+      boxShadow: authoredShadow ?? `0 ${10 * scale}px ${24 * scale}px #211b2526` }}>
       <div data-media-chrome={presentation.frame} aria-hidden="true" style={{ position: 'relative', height: 54 * scale, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${25 * scale}px`, boxSizing: 'border-box', color: foreground }}>
         <span data-phone-status style={{ fontFamily: 'Arial, sans-serif', fontSize: 14 * scale, fontWeight: 700, lineHeight: 1 }}>9:41</span>
@@ -38,8 +41,8 @@ export function MediaShell({ src, name, presentation, title, logicalWidth }: {
   const browser = presentation.frame === 'browser-light' || presentation.frame === 'browser-dark';
   const dark = presentation.frame === 'browser-dark';
   return <div data-media-frame={presentation.frame} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
-    overflow: 'hidden', borderRadius: browser ? 12 : 0, background: dark ? '#171b23' : '#fff',
-    border: browser ? `1px solid ${dark ? '#404754' : '#d9dce2'}` : undefined, boxSizing: 'border-box', boxShadow: browser ? '0 10px 28px #15203320' : undefined }}>
+    overflow: 'hidden', borderRadius: browser ? 12 : (presentation.radius ?? 0) * effectScale, background: dark ? '#171b23' : '#fff',
+    border: browser ? `1px solid ${dark ? '#404754' : '#d9dce2'}` : undefined, boxSizing: 'border-box', boxShadow: authoredShadow ?? (browser ? '0 10px 28px #15203320' : undefined) }}>
     {browser && <div data-media-chrome={dark ? 'dark' : 'light'} style={{ height: 26, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0 10px',
       background: dark ? '#252a34' : '#f1f2f4', color: dark ? '#c7ced9' : '#68717d', borderBottom: `1px solid ${dark ? '#404754' : '#d9dce2'}`, boxSizing: 'border-box' }}>
       {['#ed6a5e', '#f4bf50', '#61c454'].map(color => <span key={color} aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />)}

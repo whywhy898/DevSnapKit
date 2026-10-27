@@ -1,0 +1,151 @@
+{
+  "templateId": "studio-bridge",
+  "method": "Resized from actual editor PNG download with simulated valid license; original concept is not product output",
+  "sourceDirectory": "D:\\workspace\\MarkMoney\\output\\devsnapkit\\template-collection-2026-10-27\\pro-impact\\implementation\\studio-bridge\\browser\\2026-10-27T04-53-48-622Z",
+  "baseCommit": "75e9d09122f8775614bb9c7be69e978525dd4d8c",
+  "workingTreeHadChanges": true,
+  "sourceFiles": {
+    "src/templates/collection/definitions/studio-bridge.ts": "e0b8b2320429be40c456e180e94c643634f06526a320aec2ff136748d6c820cb",
+    "src/templates/collection/apply.ts": "71b5d2f0ef03dc8d0e19c459ed121b65b310942be0ae801fd312358454a5316e",
+    "src/templates/collection/types.ts": "4d7ac21a46f91f8da4328eae025122af8bc19828d701afab094e70cc2e7b3545",
+    "src/composition/types.ts": "ccff127383a95d580dfc9de75b2157527b1db768f60bd1f0e2d9aae6169e6485",
+    "src/composition/MediaShell.tsx": "22037ef51fd3dcb35732267cc79fd02d1c6dc66d1a6b437f7ec96d737bfb3010",
+    "src/composition/CompositionRenderer.tsx": "4dcc6cea8e116f3698e8a834799a04c684990a7188933c0ff14b51a6f7f13934",
+    "src/text/document.ts": "bc055e5a3a5abe27b6516878e16b9dc8d0c6483dd3ca33f7283a16e535b2845c",
+    "src/App.tsx": "2b32a4e54e936dfcedc5edc10582c17d02b38437f2c670d06b4d6fe2412a0856"
+  },
+  "sampleManifest": {
+    "version": 1,
+    "generator": "scripts/build-pro-impact-samples.mjs",
+    "authorship": "Original native SVG UI; charts and typography authored in this repository. No third-party screenshot assets.",
+    "samples": [
+      {
+        "id": "kiln-overview",
+        "file": "kiln-overview.svg",
+        "width": 1000,
+        "height": 620,
+        "sourceKind": "original vector app UI",
+        "sha256": "d41ac4a61fb3bfdb22cd4a5d726b1c870856639fd9efc55f6dbfca13ed57fe3e",
+        "reference": {
+          "path": "../../output/devsnapkit/template-collection-2026-10-27/pro-impact/concept-1-big-type.html",
+          "sha256": "a1aab13e9e919b14e316193cb6a8187c9effadb6cdfaef4ed3e7ce3e5bb18500"
+        },
+        "fonts": [
+          {
+            "family": "Manrope",
+            "file": "public/poster/fonts/manrope-latin.woff2",
+            "license": "public/poster/fonts/Manrope-OFL.txt",
+            "licenseType": "SIL OFL 1.1",
+            "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+          }
+        ],
+        "description": "Fictional deploy application UI based on the approved Kiln concept."
+      },
+      {
+        "id": "kiln-deploy",
+        "file": "kiln-deploy.svg",
+        "width": 396,
+        "height": 760,
+        "sourceKind": "original vector app UI",
+        "sha256": "573614eaa2c08eafcb8cdc57bf1c6dfcd8f67d5b9bc7a33dd4427bffe37d4ca9",
+        "reference": {
+          "path": "../../output/devsnapkit/template-collection-2026-10-27/pro-impact/concept-1-big-type.html",
+          "sha256": "a1aab13e9e919b14e316193cb6a8187c9effadb6cdfaef4ed3e7ce3e5bb18500"
+        },
+        "fonts": [
+          {
+            "family": "Manrope",
+            "file": "public/poster/fonts/manrope-latin.woff2",
+            "license": "public/poster/fonts/Manrope-OFL.txt",
+            "licenseType": "SIL OFL 1.1",
+            "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+          }
+        ],
+        "description": "Fictional deploy application UI based on the approved Kiln concept."
+      },
+      {
+        "id": "halden-journal",
+        "file": "halden-journal.svg",
+        "width": 420,
+        "height": 840,
+        "sourceKind": "original vector app UI",
+        "sha256": "feccfceb83ba44c2f83578fdf9fb84965871364730d319f52194f1bde2db8560",
+        "reference": {
+          "path": "../../output/devsnapkit/template-collection-2026-10-27/pro-impact/concept-2-cover-story.html",
+          "sha256": "279e8b5e096baf40e485483ab73094ba59d75dd2d04cfb41d6ba9be65f36f39a"
+        },
+        "fonts": [
+          {
+            "family": "Manrope",
+            "file": "public/poster/fonts/manrope-latin.woff2",
+            "license": "public/poster/fonts/Manrope-OFL.txt",
+            "licenseType": "SIL OFL 1.1",
+            "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+          },
+          {
+            "family": "Gelasio",
+            "file": "public/poster/fonts/Gelasio.ttf",
+            "license": "public/poster/fonts/Gelasio-OFL.txt",
+            "licenseType": "SIL OFL 1.1",
+            "sha256": "4daecea457258c9ebeb8bc99ed3fd24353618bfad3ea4b93fa0b5d0468fc04e4"
+          },
+          {
+            "family": "Gelasio",
+            "file": "public/poster/fonts/Gelasio-Italic.ttf",
+            "license": "public/poster/fonts/Gelasio-OFL.txt",
+            "licenseType": "SIL OFL 1.1",
+            "sha256": "52559e845a4d33514e5f93bb9ae7dbeae1894a53f2c565a15f18af40cd337c09"
+          }
+        ],
+        "description": "Fictional private writing application UI based on the approved Halden concept."
+      },
+      {
+        "id": "halden-week",
+        "file": "halden-week.svg",
+        "width": 350,
+        "height": 404,
+        "sourceKind": "original vector app UI",
+        "sha256": "ab8761875fa5e654511cc94dba23b3e6f3a01bfb3ba0025f5df8b78d4426c82d",
+        "reference": {
+          "path": "../../output/devsnapkit/template-collection-2026-10-27/pro-impact/concept-2-cover-story.html",
+          "sha256": "279e8b5e096baf40e485483ab73094ba59d75dd2d04cfb41d6ba9be65f36f39a"
+        },
+        "fonts": [
+          {
+            "family": "Manrope",
+            "file": "public/poster/fonts/manrope-latin.woff2",
+            "license": "public/poster/fonts/Manrope-OFL.txt",
+            "licenseType": "SIL OFL 1.1",
+            "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+          },
+          {
+            "family": "Gelasio",
+            "file": "public/poster/fonts/Gelasio.ttf",
+            "license": "public/poster/fonts/Gelasio-OFL.txt",
+            "licenseType": "SIL OFL 1.1",
+            "sha256": "4daecea457258c9ebeb8bc99ed3fd24353618bfad3ea4b93fa0b5d0468fc04e4"
+          }
+        ],
+        "description": "Fictional private writing application UI based on the approved Halden concept."
+      }
+    ]
+  },
+  "records": [
+    {
+      "file": "studio-bridge.webp",
+      "width": 480,
+      "height": 270,
+      "sourcePng": "impact-default-duo-1x.png",
+      "sourceSha256": "8b7cceb3332e354f249442c3b6580273f571318ef079aa6917559fe8dc7f20c7",
+      "sha256": "0f009cdabb660dcb8304dec738b492b3f933df2ed76d753b279cf5bda6a72060"
+    },
+    {
+      "file": "studio-bridge-preview.webp",
+      "width": 1920,
+      "height": 1080,
+      "sourcePng": "impact-default-duo-1x.png",
+      "sourceSha256": "8b7cceb3332e354f249442c3b6580273f571318ef079aa6917559fe8dc7f20c7",
+      "sha256": "32ecc0202025f8328f7c711ebd613b4ad9bd2de81463b05f38e981fd012174b4"
+    }
+  ]
+}

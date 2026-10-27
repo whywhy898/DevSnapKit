@@ -8,6 +8,8 @@ import { NIGHT_SIGNAL_DUO, NIGHT_BRAND_MARK } from './definitions/night-signal-d
 import { POCKET_FLOW_DUO, POCKET_BRAND_MARK } from './definitions/pocket-flow-duo';
 import { CALM_SPLIT, CALM_BRAND_MARK } from './definitions/calm-split';
 import { APP_PAIR, APP_PAIR_BRAND_MARK } from './definitions/app-pair';
+import { STUDIO_BRIDGE, STUDIO_BRAND_MARK } from './definitions/studio-bridge';
+import { EDITORIAL_STORY, EDITORIAL_STORY_BRAND_MARK } from './definitions/editorial-story';
 
 const templates = [
   { blueprint: PAPER_LAUNCH_DUO, brandMark: PAPER_BRAND_MARK, background: '#F6F3EC' },
@@ -15,6 +17,8 @@ const templates = [
   { blueprint: APP_PAIR, brandMark: APP_PAIR_BRAND_MARK, background: '#EAF2FA' },
   { blueprint: NIGHT_SIGNAL_DUO, brandMark: NIGHT_BRAND_MARK, background: '#101513' },
   { blueprint: POCKET_FLOW_DUO, brandMark: POCKET_BRAND_MARK, background: '#F4E4D6' },
+  { blueprint: STUDIO_BRIDGE, brandMark: STUDIO_BRAND_MARK, background: '#FF5B1F' },
+  { blueprint: EDITORIAL_STORY, brandMark: EDITORIAL_STORY_BRAND_MARK, background: '#EEE7D9' },
 ];
 const templateFor = (id: string | undefined) => templates.find(template => template.blueprint.id === id);
 const blueprintFor = (id: string | undefined) => templateFor(id)?.blueprint;
@@ -31,6 +35,7 @@ export function buildCuratedSnapshot(before: EditorSnapshot, id: string, prefix:
   const secondarySrc = replaceSecondary ? paper.examples.secondary.src : before.secondarySrc;
   const layers = paper.text.map(({ role, layer }) => validateText({ ...structuredClone(layer), id: `${prefix}-${role}` }));
   const roles = Object.fromEntries(paper.text.map(({ role }) => [role, `${prefix}-${role}`]));
+  const behind = new Set((paper.textBehindMedia ?? []).map(role => roles[role]));
   return { ...before,
     textDocument: { version: 1, layers },
     templateContext: { id: paper.id, version: paper.version, mediaRegion: { x: 0, y: 0, width: 1, height: 1 }, textRoles: { headline: roles.headline, description: roles.description, ...roles } },
@@ -38,7 +43,8 @@ export function buildCuratedSnapshot(before: EditorSnapshot, id: string, prefix:
       placements: structuredClone(paper.placements), ...(paper.singlePlacement ? { singlePlacement: structuredClone(paper.singlePlacement) } : {}), mediaPresentation: structuredClone(paper.mediaPresentation),
       detailVisible: !!imageSrc && !!secondarySrc && !hiddenSecondary, detailRadius: 12, detailBorder: 'none', detailShadow: '0 18px 36px #25281826',
       objects: structuredClone([...(paper.cta ? [paper.cta] : []), template.brandMark]), decorations: structuredClone(paper.decorations),
-      order: ['main', 'secondary', 'brand-mark', ...(paper.cta ? ['cta'] : []), ...layers.map(layer => layer.id)], knownTextIds: layers.map(layer => layer.id),
+      ...(paper.allowBleed !== undefined ? { allowBleed: paper.allowBleed } : {}),
+      order: [...layers.filter(layer => behind.has(layer.id)).map(layer => layer.id), 'main', 'secondary', 'brand-mark', ...(paper.cta ? ['cta'] : []), ...layers.filter(layer => !behind.has(layer.id)).map(layer => layer.id)], knownTextIds: layers.map(layer => layer.id),
     },
     imageSrc, imageName: replaceMain ? paper.examples.main.name : before.imageName,
     primaryMediaOrigin: replaceMain ? { kind: 'builtin', sampleId: paper.examples.main.sampleId } : before.primaryMediaOrigin ?? { kind: 'unknown' },
@@ -64,8 +70,15 @@ export function restoreCuratedLayout(before: EditorSnapshot): EditorSnapshot {
     return match ? { ...node, frame: { ...match.frame } } : node;
   };
   const roles: Record<string, string> = before.templateContext?.textRoles ?? {};
+  const authoredOrder = paper.allowBleed !== undefined || paper.textBehindMedia !== undefined;
+  const liveIds = new Set(['main', 'secondary', ...doc.objects.map(node => node.id), ...before.textDocument.layers.map(layer => layer.id)]);
+  const restoredOrder = target.order.map(id => {
+    const role = Object.keys(defaults.templateContext?.textRoles ?? {}).find(role => defaults.templateContext?.textRoles?.[role] === id);
+    return role ? roles[role] : id;
+  }).filter((id): id is string => !!id && liveIds.has(id));
+  const extraOrder = [...doc.order, ...before.textDocument.layers.map(layer => layer.id), ...doc.objects.map(node => node.id)].filter(id => liveIds.has(id) && !restoredOrder.includes(id));
   return { ...before, aspectRatioId: 'custom', customCanvasSize: { ...paper.canvas }, layoutPreset: 'flat', mockupZoom: 100, mockupOffsetX: 0, mockupOffsetY: 0,
-    compositionDocument: { ...doc, mediaLayout: 'independent', adaptiveMediaLayout: paper.singlePlacement ? 'auto' : 'manual', placements: structuredClone(paper.placements), ...(paper.singlePlacement ? { singlePlacement: structuredClone(paper.singlePlacement) } : {}), objects: doc.objects.map(geometry), decorations: doc.decorations.map(geometry) },
+    compositionDocument: { ...doc, mediaLayout: 'independent', adaptiveMediaLayout: paper.singlePlacement ? 'auto' : 'manual', placements: structuredClone(paper.placements), ...(paper.singlePlacement ? { singlePlacement: structuredClone(paper.singlePlacement) } : {}), ...(authoredOrder ? { order: [...new Set([...restoredOrder, ...extraOrder])], allowBleed: paper.allowBleed ?? false } : {}), objects: doc.objects.map(geometry), decorations: doc.decorations.map(geometry) },
     textDocument: { ...before.textDocument, layers: before.textDocument.layers.map(layer => {
       const role = Object.keys(roles).find(role => roles[role] === layer.id), match = paper.text.find(text => text.role === role)?.layer;
       return match ? validateText({ ...layer, centerX: match.centerX, centerY: match.centerY, widthRatio: match.widthRatio }) : layer;

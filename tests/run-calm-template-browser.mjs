@@ -77,14 +77,14 @@ try{
  for(const mode of ['free','invalid','valid']){
   page=await fresh(mode);const before=await state(page),h=await history(page);await menu(page);
   const gallery=await page.$$eval('[data-template-gallery] article',nodes=>nodes.map(n=>({name:n.querySelector('button[aria-label^="Preview"]')?.getAttribute('aria-label')?.replace(/^Preview | template$/g,''),tier:n.querySelector('div.flex span:last-child')?.textContent})));
-  assert.deepEqual(gallery,[{name:'Editorial Honey',tier:'Free'},{name:'Paper Launch Duo',tier:'Free'},{name:'Calm Split',tier:'Free'},{name:'App Pair',tier:'Free'},{name:'Night Signal Duo',tier:'Pro'},{name:'Pocket Flow Duo',tier:'Pro'}]);
+  assert.deepEqual(gallery,[{name:'Editorial Honey',tier:'Free'},{name:'Paper Launch Duo',tier:'Free'},{name:'Calm Split',tier:'Free'},{name:'App Pair',tier:'Free'},{name:'Night Signal Duo',tier:'Pro'},{name:'Pocket Flow Duo',tier:'Pro'},{name:'Big Type Launch',tier:'Pro'},{name:'Cover Story',tier:'Pro'}]);
   await page.click('[aria-label="Preview Calm Split template"]');await page.waitForSelector('[data-template-preview][open]');await page.$eval('[data-template-preview] img',async n=>{await n.decode();if(!n.naturalWidth)throw Error('Preview image failed');});await page.keyboard.press('Escape');await page.waitForSelector('[data-template-preview]',{hidden:true});assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'Preview Calm Split template');
   assert.deepEqual(await state(page),before);assert.deepEqual(await history(page),h);
   await apply(page);assert.equal(await page.$('[data-pro-upsell]'),null,'Calm is Free');
   assert.equal(await page.evaluate(()=>window.__mockupBaseline.artwork().isProUnlocked),mode==='valid');
   assert.equal((await history(page)).count,h.count+1);await clickButton(page,'Undo');assert.deepEqual(await state(page),before);await clickButton(page,'Redo');assert.equal((await state(page)).templateContext.id,'calm-split');
   if(mode==='free')await capture(page,'calm-free-default-duo');
-  rows.push({scenario:mode+'-six-gallery-preview-focus-free-apply-single-history-undo-redo',pass:true});await page.close();
+  rows.push({scenario:mode+'-eight-gallery-preview-focus-free-apply-single-history-undo-redo',pass:true});await page.close();
  }
  page=await fresh('free');const before=await state(page),h=await history(page);await apply(page);const duo=await state(page);
  assert.deepEqual(duo.customCanvasSize,{width:1080,height:1080});assert.equal(duo.compositionDocument.detailVisible,true);assert.notEqual(duo.imageSrc,duo.secondarySrc);assert.equal(await page.$$eval('[data-media-screen] img',n=>n.length),2);

@@ -81,12 +81,12 @@ export function validateText(layer: CanvasTextLayer) {
   if (Array.from(layer.content).length > TEXT_LIMITS.codepoints) throw new Error('Maximum 1000 Unicode characters per text box. Draft not applied.');
   if (![layer.centerX, layer.centerY].every(Number.isFinite) || layer.centerX < 0 || layer.centerX > 1 || layer.centerY < 0 || layer.centerY > 1) throw new Error('Text position must be finite and inside the canvas.');
   if (!Number.isFinite(layer.widthRatio) || layer.widthRatio <= 0 || layer.widthRatio > 1) throw new Error('Text width must be finite and between 0 and 100%.');
-  if (!Number.isFinite(layer.fontSize) || layer.fontSize < 8 || layer.fontSize > 160) throw new Error('Text size must be between 8 and 160 px.');
+  if (!Number.isFinite(layer.fontSize) || layer.fontSize < 8 || layer.fontSize > 512) throw new Error('Text size must be between 8 and 512 px.');
   if (!['manrope', 'gelasio'].includes(layer.font) || ![400, 600, 700, 800].includes(layer.weight) || (layer.font === 'gelasio' && layer.weight === 800) || (layer.font === 'manrope' && layer.italic)) throw new Error('Unsupported font weight or italic combination.');
   if (!/^#[\da-f]{6}$/i.test(layer.color)) throw new Error('Text color must be #RRGGBB.');
   if (!['left', 'center', 'right'].includes(layer.align)) throw new Error('Invalid text alignment.');
   if (layer.lineHeight !== undefined && (!Number.isFinite(layer.lineHeight) || layer.lineHeight < .5 || layer.lineHeight > 3)) throw new Error('Text line height must be between 0.5 and 3.');
-  if (layer.letterSpacing !== undefined && (!Number.isFinite(layer.letterSpacing) || layer.letterSpacing < -10 || layer.letterSpacing > 40)) throw new Error('Text letter spacing must be between -10 and 40 px.');
+  if (layer.letterSpacing !== undefined && (!Number.isFinite(layer.letterSpacing) || layer.letterSpacing < -40 || layer.letterSpacing > 40)) throw new Error('Text letter spacing must be between -40 and 40 px.');
   if (layer.textTransform !== undefined && !['none', 'uppercase'].includes(layer.textTransform)) throw new Error('Invalid text transform.');
   if (layer.runs !== undefined) {
     const runs = normalizeTextRuns(layer.runs);

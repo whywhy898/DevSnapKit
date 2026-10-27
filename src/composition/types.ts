@@ -7,6 +7,10 @@ export interface SlotPresentation {
   fit: 'contain' | 'cover';
   align: 'center' | 'top' | 'bottom' | 'left' | 'right';
   title?: string;
+  /** Finite native shadow values; no arbitrary CSS or filters. */
+  shadow?: { x: number; y: number; blur: number; color: string; referenceWidth?: number };
+  /** Plain card corner radius, scaled with shadow.referenceWidth when present. */
+  radius?: number;
 }
 export interface ObjectFrame { centerX: number; centerY: number; widthRatio: number; heightRatio: number; rotation: number }
 export interface GraphicBase { id: string; name: string; frame: ObjectFrame; hidden?: boolean; opacity?: number }
