@@ -1,0 +1,261 @@
+{
+  "method": "Two distinct app screens per concept; removed device and browser chrome before native Chrome capture at 2x",
+  "samples": [
+    {
+      "id": "motive-board",
+      "file": "motive-board.png",
+      "width": 1496,
+      "height": 638,
+      "logical": {
+        "width": 748,
+        "height": 319
+      },
+      "sha256": "3481676bb460e0ca9bc98f3a6b8ccedb2e8f6ab23017eb52d0e8f4bd9065cbd5",
+      "source": "tests/fixtures/remaining-pro/01-feature-spotlight-v2.html",
+      "sourceSHA256": "59ace01378e6fda6d3d80123d345f3ea91ec7cb645c24b61df4fdbff2b784efe",
+      "sourceKind": "original native UI rendered to PNG",
+      "chromeIncluded": false,
+      "uiTypographyMatched": true,
+      "fonts": [
+        {
+          "family": "Manrope",
+          "file": "public/poster/fonts/manrope-latin.woff2",
+          "license": "public/poster/fonts/Manrope-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+        },
+        {
+          "family": "Gelasio",
+          "file": "public/poster/fonts/Gelasio.ttf",
+          "license": "public/poster/fonts/Gelasio-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "4daecea457258c9ebeb8bc99ed3fd24353618bfad3ea4b93fa0b5d0468fc04e4"
+        }
+      ]
+    },
+    {
+      "id": "motive-rules",
+      "file": "motive-rules.png",
+      "width": 1016,
+      "height": 402,
+      "logical": {
+        "width": 508,
+        "height": 201
+      },
+      "sha256": "c2b8e552c88729f4af629868cb7b90b3a4d8a31a2d54bea10c59255af7d579c3",
+      "source": "tests/fixtures/remaining-pro/01-feature-spotlight-v2.html",
+      "sourceSHA256": "59ace01378e6fda6d3d80123d345f3ea91ec7cb645c24b61df4fdbff2b784efe",
+      "sourceKind": "original native UI rendered to PNG",
+      "chromeIncluded": false,
+      "uiTypographyMatched": true,
+      "fonts": [
+        {
+          "family": "Manrope",
+          "file": "public/poster/fonts/manrope-latin.woff2",
+          "license": "public/poster/fonts/Manrope-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+        },
+        {
+          "family": "Gelasio",
+          "file": "public/poster/fonts/Gelasio.ttf",
+          "license": "public/poster/fonts/Gelasio-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "4daecea457258c9ebeb8bc99ed3fd24353618bfad3ea4b93fa0b5d0468fc04e4"
+        }
+      ]
+    },
+    {
+      "id": "sidea-web",
+      "file": "sidea-web.png",
+      "width": 2216,
+      "height": 1070,
+      "logical": {
+        "width": 1108,
+        "height": 535
+      },
+      "sha256": "fe6578e71d1b979883a2e42f46e75e3ef7e04c73ced369f0786ccaa6fb3f269d",
+      "source": "tests/fixtures/remaining-pro/02-web-mobile-v3.html",
+      "sourceSHA256": "485c0f6846231160f785e38d6898d5724e9c0bf0dd4e695346ad5242cb454e08",
+      "sourceKind": "original native UI rendered to PNG",
+      "chromeIncluded": false,
+      "uiTypographyMatched": true,
+      "fonts": [
+        {
+          "family": "Manrope",
+          "file": "public/poster/fonts/manrope-latin.woff2",
+          "license": "public/poster/fonts/Manrope-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+        },
+        {
+          "family": "Gelasio",
+          "file": "public/poster/fonts/Gelasio.ttf",
+          "license": "public/poster/fonts/Gelasio-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "4daecea457258c9ebeb8bc99ed3fd24353618bfad3ea4b93fa0b5d0468fc04e4"
+        }
+      ]
+    },
+    {
+      "id": "sidea-mobile",
+      "file": "sidea-mobile.png",
+      "width": 664,
+      "height": 1418,
+      "logical": {
+        "width": 332,
+        "height": 709
+      },
+      "sha256": "5c50ddd632d1f44b78fd147841770dd231b4a45d27a086ab0ede9e06a13470a2",
+      "source": "tests/fixtures/remaining-pro/02-web-mobile-v3.html",
+      "sourceSHA256": "485c0f6846231160f785e38d6898d5724e9c0bf0dd4e695346ad5242cb454e08",
+      "sourceKind": "original native UI rendered to PNG",
+      "chromeIncluded": false,
+      "uiTypographyMatched": true,
+      "fonts": [
+        {
+          "family": "Manrope",
+          "file": "public/poster/fonts/manrope-latin.woff2",
+          "license": "public/poster/fonts/Manrope-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+        },
+        {
+          "family": "Gelasio",
+          "file": "public/poster/fonts/Gelasio.ttf",
+          "license": "public/poster/fonts/Gelasio-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "4daecea457258c9ebeb8bc99ed3fd24353618bfad3ea4b93fa0b5d0468fc04e4"
+        }
+      ]
+    },
+    {
+      "id": "north-overview",
+      "file": "north-overview.png",
+      "width": 2100,
+      "height": 942,
+      "logical": {
+        "width": 1050,
+        "height": 471
+      },
+      "sha256": "42b621fd2d020ff0d56af70d7f1a9d68d7ba7f2969bb1488fd78df5eac9bdbbc",
+      "source": "tests/fixtures/remaining-pro/03-metric-focus.html",
+      "sourceSHA256": "05786449de0ef7ade2cb68d618a0e7168273a49dac75225d6953666c54abd662",
+      "sourceKind": "original native UI rendered to PNG",
+      "chromeIncluded": false,
+      "uiTypographyMatched": true,
+      "fonts": [
+        {
+          "family": "Manrope",
+          "file": "public/poster/fonts/manrope-latin.woff2",
+          "license": "public/poster/fonts/Manrope-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+        },
+        {
+          "family": "Gelasio",
+          "file": "public/poster/fonts/Gelasio.ttf",
+          "license": "public/poster/fonts/Gelasio-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "4daecea457258c9ebeb8bc99ed3fd24353618bfad3ea4b93fa0b5d0468fc04e4"
+        }
+      ]
+    },
+    {
+      "id": "north-audience",
+      "file": "north-audience.png",
+      "width": 1228,
+      "height": 916,
+      "logical": {
+        "width": 614,
+        "height": 458
+      },
+      "sha256": "f64c46061d900018869035e24b490541edd69d4b904a11a5f2987aa49a645d42",
+      "source": "tests/fixtures/remaining-pro/03-metric-focus.html",
+      "sourceSHA256": "05786449de0ef7ade2cb68d618a0e7168273a49dac75225d6953666c54abd662",
+      "sourceKind": "original native UI rendered to PNG",
+      "chromeIncluded": false,
+      "uiTypographyMatched": true,
+      "fonts": [
+        {
+          "family": "Manrope",
+          "file": "public/poster/fonts/manrope-latin.woff2",
+          "license": "public/poster/fonts/Manrope-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+        },
+        {
+          "family": "Gelasio",
+          "file": "public/poster/fonts/Gelasio.ttf",
+          "license": "public/poster/fonts/Gelasio-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "4daecea457258c9ebeb8bc99ed3fd24353618bfad3ea4b93fa0b5d0468fc04e4"
+        }
+      ]
+    },
+    {
+      "id": "outline-before",
+      "file": "outline-before.png",
+      "width": 900,
+      "height": 1122,
+      "logical": {
+        "width": 450,
+        "height": 561
+      },
+      "sha256": "11a9f9df99c151e2f627f69350a8a3ca3122ba81f0f1333cb5353de7b88edbcf",
+      "source": "tests/fixtures/remaining-pro/04-before-after.html",
+      "sourceSHA256": "6b68fce91002b6b7cce16e6ec2d6ba4c92c6344e74b161e931724ded2374c10b",
+      "sourceKind": "original native UI rendered to PNG",
+      "chromeIncluded": false,
+      "uiTypographyMatched": true,
+      "fonts": [
+        {
+          "family": "Manrope",
+          "file": "public/poster/fonts/manrope-latin.woff2",
+          "license": "public/poster/fonts/Manrope-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+        },
+        {
+          "family": "Gelasio",
+          "file": "public/poster/fonts/Gelasio.ttf",
+          "license": "public/poster/fonts/Gelasio-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "4daecea457258c9ebeb8bc99ed3fd24353618bfad3ea4b93fa0b5d0468fc04e4"
+        }
+      ]
+    },
+    {
+      "id": "outline-after",
+      "file": "outline-after.png",
+      "width": 900,
+      "height": 1122,
+      "logical": {
+        "width": 450,
+        "height": 561
+      },
+      "sha256": "05bddf41a8ad4140304f71b60d0398866d9fa078df86a905a986dfee805da462",
+      "source": "tests/fixtures/remaining-pro/04-before-after.html",
+      "sourceSHA256": "6b68fce91002b6b7cce16e6ec2d6ba4c92c6344e74b161e931724ded2374c10b",
+      "sourceKind": "original native UI rendered to PNG",
+      "chromeIncluded": false,
+      "uiTypographyMatched": true,
+      "fonts": [
+        {
+          "family": "Manrope",
+          "file": "public/poster/fonts/manrope-latin.woff2",
+          "license": "public/poster/fonts/Manrope-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+        },
+        {
+          "family": "Gelasio",
+          "file": "public/poster/fonts/Gelasio.ttf",
+          "license": "public/poster/fonts/Gelasio-OFL.txt",
+          "licenseType": "SIL OFL 1.1",
+          "sha256": "4daecea457258c9ebeb8bc99ed3fd24353618bfad3ea4b93fa0b5d0468fc04e4"
+        }
+      ]
+    }
+  ]
+}

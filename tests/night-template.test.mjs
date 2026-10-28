@@ -41,9 +41,9 @@ test('Night restore and reset preserve deletions, custom text, hidden status and
  for(const n of [r,s]){assert.equal(n.imageSrc,base.imageSrc);assert.equal(n.compositionDocument.detailVisible,false);assert.equal(n.compositionDocument.objects.some(o=>o.id==='brand-mark'),false);assert.equal(n.textDocument.layers.some(t=>t.id==='night-brand'),false);assert.equal(n.textDocument.layers.find(t=>t.id==='night-headline').content,'My headline');const c=n.compositionDocument.objects.find(o=>o.id==='cta');assert.equal(c.text,'Own CTA');assert.equal(c.hidden,true);}
  assert.notEqual(r.textDocument.layers.find(t=>t.id==='night-headline').centerX,.9);assert.equal(r.compositionDocument.objects.find(o=>o.id==='cta').fill,'#ff0000');assert.equal(s.compositionDocument.objects.find(o=>o.id==='cta').frame.centerX,.2);assert.equal(s.compositionDocument.objects.find(o=>o.id==='cta').fill,'#D9F58B');
 });
-test('Night and Pocket remain Pro in the expanded eight-template catalog',()=>{
- const {getCuratedTemplate,CURATED_TEMPLATE_CATALOG}=load('templates/collection/catalog.ts');const n=getCuratedTemplate('night-signal-duo');assert.equal(n?.tier,'pro');assert.equal(n.thumbnail,'/designed/collection/night-signal-duo.webp');assert.equal(n.width,1600);assert.equal(n.height,1200);assert.equal(getCuratedTemplate('pocket-flow-duo').tier,'pro');assert.equal(CURATED_TEMPLATE_CATALOG.length,8);
- assert.throws(()=>api.buildCuratedSnapshot(base,'feature-spotlight','p'),/Unknown|unavailable/i);
+test('Night and Pocket remain Pro in the expanded twelve-template catalog',()=>{
+ const {getCuratedTemplate,CURATED_TEMPLATE_CATALOG}=load('templates/collection/catalog.ts');const n=getCuratedTemplate('night-signal-duo');assert.equal(n?.tier,'pro');assert.equal(n.thumbnail,'/designed/collection/night-signal-duo.webp');assert.equal(n.width,1600);assert.equal(n.height,1200);assert.equal(getCuratedTemplate('pocket-flow-duo').tier,'pro');assert.equal(CURATED_TEMPLATE_CATALOG.length,12);
+ assert.throws(()=>api.buildCuratedSnapshot(base,'unavailable-template','p'),/Unknown|unavailable/i);
 });
 test('Night CTA scales from its reference box on short canvases while default and legacy styles stay identical',()=>{
  const n=build(),cta=n.compositionDocument.objects.find(o=>o.id==='cta');

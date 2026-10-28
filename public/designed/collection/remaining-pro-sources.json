@@ -1,0 +1,91 @@
+{
+  "generatedAt": "2026-10-27T10:49:07.902Z",
+  "simulatedLicense": true,
+  "realPayment": false,
+  "templates": [
+    {
+      "id": "feature-spotlight",
+      "source": "../../output/devsnapkit/template-collection-2026-10-27/remaining-pro-implementation/browser/feature-spotlight/default-duo-1x.png",
+      "sourceSha256": "657ddbfc3b64ca1e17ab79f0e09effa41b614e13b08665fad12ab5bf71a2b04c",
+      "thumbnailSha256": "5ba75415a67bbb4480a4b8c0e6396516db566fed3fc182f9e46abdc71ef0995d",
+      "previewSha256": "4c113a0f9aff36ef441cba4717db386d0d714ac34d2bbeb32774b9089e9bb658",
+      "width": 1200,
+      "height": 630,
+      "sourceType": "actual-browser-default-download",
+      "simulatedLicense": true,
+      "imageSources": [
+        {
+          "url": "/designed/examples/collection/motive-board.png",
+          "sha256": "3481676bb460e0ca9bc98f3a6b8ccedb2e8f6ab23017eb52d0e8f4bd9065cbd5"
+        },
+        {
+          "url": "/designed/examples/collection/motive-rules.png",
+          "sha256": "c2b8e552c88729f4af629868cb7b90b3a4d8a31a2d54bea10c59255af7d579c3"
+        }
+      ]
+    },
+    {
+      "id": "code-preview",
+      "source": "../../output/devsnapkit/template-collection-2026-10-27/remaining-pro-implementation/browser/code-preview/default-duo-1x.png",
+      "sourceSha256": "905b0473d646fa05a76820fae0d7d4e5248e5b5b92f72549e306ecdb314ea59a",
+      "thumbnailSha256": "335ca79957a0873778b4866cac9455bec44e94a416df2dfc2e1587eb58fbcc01",
+      "previewSha256": "e50c805bd8d095f28af08fd915d7b9989388b2d3736c857d0fcec3e0b4d2a2cf",
+      "width": 1600,
+      "height": 1200,
+      "sourceType": "actual-browser-default-download",
+      "simulatedLicense": true,
+      "imageSources": [
+        {
+          "url": "/designed/examples/collection/sidea-web.png",
+          "sha256": "fe6578e71d1b979883a2e42f46e75e3ef7e04c73ced369f0786ccaa6fb3f269d"
+        },
+        {
+          "url": "/designed/examples/collection/sidea-mobile.png",
+          "sha256": "5c50ddd632d1f44b78fd147841770dd231b4a45d27a086ab0ede9e06a13470a2"
+        }
+      ]
+    },
+    {
+      "id": "metric-focus",
+      "source": "../../output/devsnapkit/template-collection-2026-10-27/remaining-pro-implementation/browser/metric-focus/default-duo-1x.png",
+      "sourceSha256": "969c495733f6f9f11755244dfe9ec2eb2688335ee0f050c488f1d557f68a07a9",
+      "thumbnailSha256": "44607b5daca878558de3cbc79b393a2b69d5d9dbcbd3e41dda07ce4cd949e6a0",
+      "previewSha256": "a23b440f244ccb73f88848a4556717e6423c4c2624c38417775033bf0515f02c",
+      "width": 1920,
+      "height": 1080,
+      "sourceType": "actual-browser-default-download",
+      "simulatedLicense": true,
+      "imageSources": [
+        {
+          "url": "/designed/examples/collection/north-overview.png",
+          "sha256": "42b621fd2d020ff0d56af70d7f1a9d68d7ba7f2969bb1488fd78df5eac9bdbbc"
+        },
+        {
+          "url": "/designed/examples/collection/north-audience.png",
+          "sha256": "f64c46061d900018869035e24b490541edd69d4b904a11a5f2987aa49a645d42"
+        }
+      ]
+    },
+    {
+      "id": "before-after",
+      "source": "../../output/devsnapkit/template-collection-2026-10-27/remaining-pro-implementation/browser/before-after/default-duo-1x.png",
+      "sourceSha256": "e2ac0dd5b756c1bc7d4b199f8dd7ebaa888e50d5efb4c334e34e8f0c0cb99387",
+      "thumbnailSha256": "81ac7df399e418e6531d9613ef8dcdcc94beab7978cecb9aac3d04a94200e8e8",
+      "previewSha256": "3245419122742aabef6a95ff6f5efe3b07dd9a0d1fa3bb1acd6114e34408557f",
+      "width": 1080,
+      "height": 1080,
+      "sourceType": "actual-browser-default-download",
+      "simulatedLicense": true,
+      "imageSources": [
+        {
+          "url": "/designed/examples/collection/outline-before.png",
+          "sha256": "11a9f9df99c151e2f627f69350a8a3ca3122ba81f0f1333cb5353de7b88edbcf"
+        },
+        {
+          "url": "/designed/examples/collection/outline-after.png",
+          "sha256": "05bddf41a8ad4140304f71b60d0398866d9fa078df86a905a986dfee805da462"
+        }
+      ]
+    }
+  ]
+}

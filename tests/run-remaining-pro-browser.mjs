@@ -1,0 +1,59 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {launchBrowser, selectElement, openImageAdvanced, downloadPng} from './helpers/browser.mjs';
+process.env.IMPACT_ORIGIN ||= 'http://127.0.0.1:5333';
+const out=path.resolve(import.meta.dirname,'../../../output/devsnapkit/template-collection-2026-10-27/remaining-pro-implementation/browser');
+process.env.IMPACT_OUTPUT=out;
+const {fresh,state,history,settle,fill,clickButton,menu,setBrowser,fixtures,sharp}=await import('./run-pro-impact-browser.mjs');
+const configs=[{id:'feature-spotlight',name:'Feature Spotlight',width:1200,height:630},{id:'code-preview',name:'Web & Mobile',width:1600,height:1200},{id:'metric-focus',name:'Metric Focus',width:1920,height:1080},{id:'before-after',name:'Before & After',width:1080,height:1080}];
+const hash=x=>createHash('sha256').update(x).digest('hex');
+const results={simulatedLicense:true,realPayment:false,checks:[],templates:[],errors:[]};
+const check=(scenario)=>{results.checks.push({scenario,pass:true});console.log('PASS '+scenario);};
+await fs.mkdir(out,{recursive:true});
+let browser,page;
+async function apply(p,c){await menu(p);await p.click(`[aria-label="Apply ${c.name} template"]`);await p.waitForFunction(id=>window.__mockupBaseline.snapshot.templateContext?.id===id,{},c.id);await settle(p);}
+async function geom(p){return p.$eval('#studio-canvas [data-composition-object="main"]',n=>{const r=n.getBoundingClientRect();return {width:r.width,height:r.height};});}
+async function exportPng(p,c,dir,name,scale){
+ await clickButton(p,'Export');await clickButton(p,scale===1?'1x Web':'2x HD');await settle(p);
+ const before=await state(p),hist=await history(p);
+ await p.evaluate(()=>{
+  const measure=c=>{const b=c.getBoundingClientRect(),s=b.width/c.offsetWidth;return [...c.querySelectorAll('[data-canvas-text],[data-composition-object],[data-media-screen],[data-media-chrome],[data-media-frame]')].map((n,i)=>{const r=n.getBoundingClientRect(),css=getComputedStyle(n);return {id:i+':'+(n.dataset.canvasText||n.dataset.compositionObject||n.tagName),x:(r.x-b.x)/s,y:(r.y-b.y)/s,width:r.width/s,height:r.height/s,shadow:css.boxShadow,radius:css.borderRadius};});};
+  window.__remainingPreview=measure(document.querySelector('#studio-canvas'));window.__remainingExport=null;
+  window.__remainingObserver=new MutationObserver(()=>{const c=document.querySelector('[data-export-target]>[data-canvas-root]');if(c)window.__remainingExport=measure(c);});window.__remainingObserver.observe(document.body,{subtree:true,childList:true,attributes:true});
+ });
+ const d=await downloadPng(p,dir,name,()=>clickButton(p,`Download ${scale}x (${c.width*scale}×${c.height*scale})`));
+ const meta=await sharp(d.path).metadata();assert.equal(meta.width,c.width*scale);assert.equal(meta.height,c.height*scale);assert.equal(meta.format,'png');
+ assert.deepEqual(await state(p),before,'Export preserves snapshot');assert.deepEqual(await history(p),hist,'Export preserves history');
+ const geometry=await p.evaluate(()=>{window.__remainingObserver.disconnect();return {preview:window.__remainingPreview,exported:window.__remainingExport};});
+ assert.ok(geometry.exported);assert.equal(geometry.preview.length,geometry.exported.length);let maxDelta=0;
+ for(const a of geometry.preview){const b=geometry.exported.find(n=>n.id===a.id);assert.ok(b);for(const k of ['x','y','width','height'])maxDelta=Math.max(maxDelta,Math.abs(a[k]-b[k]));assert.equal(a.shadow,b.shadow);assert.equal(a.radius,b.radius);}
+ assert.ok(maxDelta<=2,`${c.id} preview/export delta ${maxDelta}`);await fs.writeFile(path.join(dir,name+'.geometry.json'),JSON.stringify({...geometry,maxDelta},null,2));return d.path;
+}
+try{
+ browser=await launchBrowser();setBrowser(browser);
+ for(const mode of ['free','invalid'])for(const c of configs){
+  page=await fresh(mode);page.on('pageerror',e=>results.errors.push(e.message));const before=await state(page),hist=await history(page);await menu(page);
+  const gallery=await page.$$eval('[data-template-gallery] article',nodes=>nodes.map(n=>n.querySelector('div.flex span:last-child')?.textContent));assert.equal(gallery.length,12);assert.equal(gallery.filter(x=>x==='Free').length,4);assert.equal(gallery.filter(x=>x==='Pro').length,8);
+  await page.click(`[aria-label="Apply ${c.name} template"]`);await page.waitForSelector('input[placeholder="DSK-XXXX-XXXX-XXXX"]',{visible:true});assert.deepEqual(await state(page),before);assert.deepEqual(await history(page),hist);assert.notEqual(await page.evaluate(()=>localStorage.getItem('devsnapkit_pro_unlocked')),'true');check(`${c.id} ${mode} gate without mutation`);await page.close();page=null;
+ }
+ const fixtureDir=await fixtures();const manifest=[];
+ for(const c of configs){
+  const dir=path.join(out,c.id);await fs.mkdir(dir,{recursive:true});page=await fresh('valid');page.on('pageerror',e=>results.errors.push(e.message));const initial=await state(page),hist=await history(page);await apply(page,c);const duo=await state(page);
+  assert.equal((await history(page)).count,hist.count+1);await clickButton(page,'Undo');assert.deepEqual(await state(page),initial);await clickButton(page,'Redo');assert.deepEqual(await state(page),duo);
+  assert.ok(duo.imageSrc&&duo.secondarySrc);assert.notEqual(duo.imageSrc,duo.secondarySrc);const imgs=await page.$$eval('#studio-canvas [data-media-screen] img',ns=>ns.map(n=>({width:n.naturalWidth,height:n.naturalHeight,src:n.currentSrc})));assert.equal(imgs.length,2);assert.ok(imgs.every(n=>n.width>0&&n.height>0));assert.notEqual(imgs[0].src,imgs[1].src);
+  await fs.writeFile(path.join(dir,'default-duo.snapshot.json'),JSON.stringify(duo,null,2));await(await page.$('#studio-canvas')).screenshot({path:path.join(dir,'default-duo.preview.png')});
+  const defaultPng=await exportPng(page,c,dir,'default-duo-1x.png',1);await exportPng(page,c,dir,'default-duo-2x.png',2);
+  await selectElement(page,'Headline');await clickButton(page,'Text');await page.click('[data-canvas-text-controls] [aria-label="Edit text"]');await fill(page,'[aria-label="Text content"]','Native editable headline');await clickButton(page,'Text');await settle(page);assert.notDeepEqual((await state(page)).textDocument,duo.textDocument);await clickButton(page,'Undo');assert.deepEqual(await state(page),duo);
+  await clickButton(page,'Frame');const duoGeometry=await geom(page);await clickButton(page,'Hide Image 2');await settle(page);const single=await state(page),singleGeometry=await geom(page);assert.equal(single.secondarySrc,duo.secondarySrc);assert.deepEqual(single.compositionDocument.placements,duo.compositionDocument.placements);await fs.writeFile(path.join(dir,'single-placement.geometry.json'),JSON.stringify({duo:duoGeometry,single:singleGeometry,authored:single.compositionDocument.singlePlacement},null,2));assert.ok(singleGeometry.width*singleGeometry.height>duoGeometry.width*duoGeometry.height+1,`${c.id} single image expands ${JSON.stringify({duo:duoGeometry,single:singleGeometry})}`);
+  await fs.writeFile(path.join(dir,'single.snapshot.json'),JSON.stringify(single,null,2));await fs.writeFile(path.join(dir,'single-placement.geometry.json'),JSON.stringify({duo:duoGeometry,single:singleGeometry},null,2));await(await page.$('#studio-canvas')).screenshot({path:path.join(dir,'single.preview.png')});await exportPng(page,c,dir,'single-1x.png',1);await clickButton(page,'Undo');assert.deepEqual(await state(page),duo);
+  await clickButton(page,'Frame');await(await page.$('[aria-label="Main screenshot file"]')).uploadFile(path.join(fixtureDir,'square.png'));await page.waitForFunction(()=>window.__mockupBaseline.snapshot.imageName==='square.png');assert.equal((await state(page)).secondarySrc,duo.secondarySrc);const uploadedMain=(await state(page)).imageSrc;
+  await(await page.$('[aria-label="Second screenshot file"]')).uploadFile(path.join(fixtureDir,'long.png'));await page.waitForFunction(()=>window.__mockupBaseline.snapshot.secondaryName==='long.png');assert.equal((await state(page)).imageSrc,uploadedMain);
+  const userData=await state(page);await selectElement(page,'Image 1');await openImageAdvanced(page);await clickButton(page,'Restore layout');assert.equal(hash((await state(page)).imageSrc),hash(userData.imageSrc),'Restore layout preserves main upload');assert.equal(hash((await state(page)).secondarySrc),hash(userData.secondarySrc),'Restore layout preserves secondary upload');await clickButton(page,'Reset');const reset=await state(page);assert.equal(hash(reset.imageSrc),hash(userData.imageSrc),'Style reset preserves main upload');assert.equal(hash(reset.secondarySrc),hash(userData.secondarySrc),'Style reset preserves secondary upload');assert.deepEqual(reset.textDocument,userData.textDocument);await fs.writeFile(path.join(dir,'uploaded-reset.snapshot.json'),JSON.stringify(reset,null,2));await settle(page);await(await page.$('#studio-canvas')).screenshot({path:path.join(dir,'uploaded-reset.preview.png')});
+  await clickButton(page,'Reset template');await settle(page);const resetDemo=await state(page);assert.equal(resetDemo.templateContext.id,c.id);assert.equal(hash(resetDemo.imageSrc),hash(duo.imageSrc),'Reset template intentionally restores demo main');assert.equal(hash(resetDemo.secondarySrc),hash(duo.secondarySrc),'Reset template intentionally restores demo secondary');
+  const thumb=path.resolve(import.meta.dirname,`../public/designed/collection/${c.id}.webp`);await sharp(defaultPng).resize(480,320,{fit:'inside'}).webp({quality:88}).toFile(thumb);const preview=thumb.replace(/\.webp$/,'-preview.webp');await sharp(defaultPng).resize(1600,1200,{fit:'inside',withoutEnlargement:true}).webp({quality:92}).toFile(preview);manifest.push({id:c.id,source:path.relative(path.resolve(import.meta.dirname,'..'),defaultPng).replaceAll('\\','/'),sourceSha256:hash(await fs.readFile(defaultPng)),thumbnailSha256:hash(await fs.readFile(thumb)),previewSha256:hash(await fs.readFile(preview)),width:c.width,height:c.height,sourceType:'actual-browser-default-download',imageSources:await Promise.all([duo.imageSrc,duo.secondarySrc].map(async url=>({url,sha256:hash(await fs.readFile(path.resolve(import.meta.dirname,'../public'+url)))}))),simulatedLicense:true});results.templates.push({id:c.id,decodedImages:imgs.map(({src,...rest})=>rest),singleGeometry,duoGeometry});check(`${c.id} apply undo redo editable headline independent uploads restore reset actual PNG 1x 2x single geometry`);await page.close();page=null;
+  for(const width of [390,1440]){page=await fresh('free',width);await menu(page);await page.click(`[aria-label="Preview ${c.name} template"]`);await page.waitForSelector('[data-template-preview][open]');await page.$eval('[data-template-preview] img',async n=>n.decode());const sizes=await page.evaluate(()=>({html:document.documentElement.scrollWidth,body:document.body.scrollWidth,dialog:document.querySelector('[data-template-preview]').getBoundingClientRect().width}));assert.ok(Object.values(sizes).every(x=>x<=width),JSON.stringify(sizes));await page.screenshot({path:path.join(dir,`gallery-${width}.png`),fullPage:true});check(`${c.id} preview ${width} no overflow`);await page.close();page=null;}
+ }
+ await fs.writeFile(path.resolve(import.meta.dirname,'../public/designed/collection/remaining-pro-sources.json'),JSON.stringify({generatedAt:new Date().toISOString(),simulatedLicense:true,realPayment:false,templates:manifest},null,2));assert.deepEqual(results.errors,[]);results.pass=true;
+}catch(e){results.pass=false;results.failure=e.stack;console.error(e.stack);if(page)await page.screenshot({path:path.join(out,'failure.png'),fullPage:true}).catch(()=>{});process.exitCode=1;}finally{await fs.writeFile(path.join(out,'results.json'),JSON.stringify(results,null,2));await browser?.close();}

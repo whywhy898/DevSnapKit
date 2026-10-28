@@ -27,7 +27,13 @@ export type CuratedTextRole =
   | 'website'
   | 'disclosure'
   | 'credit'
-  | 'annotation';
+  | 'annotation'
+  | 'metric'
+  | 'metric-label'
+  | 'after-heading'
+  | 'before-label'
+  | 'after-label'
+  | 'after-caption';
 
 export interface CuratedTextDefinition {
   role: CuratedTextRole;

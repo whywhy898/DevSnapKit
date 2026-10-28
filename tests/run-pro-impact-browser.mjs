@@ -109,9 +109,9 @@ export async function run(){try{
  browser=await launchBrowser();
  for(const mode of ['free','invalid']){
   page=await fresh(mode);const before=await state(page),h=await history(page);await menu(page);
-  assert.equal(await page.$$eval('[data-template-gallery] article',nodes=>nodes.length),8);
+  assert.equal(await page.$$eval('[data-template-gallery] article',nodes=>nodes.length),12);
   const gallery=await page.$$eval('[data-template-gallery] article',nodes=>nodes.map(n=>({name:n.querySelector('button[aria-label^="Preview"]')?.getAttribute('aria-label')?.replace(/^Preview | template$/g,''),tier:n.querySelector('div.flex span:last-child')?.textContent})));
-  assert.deepEqual(gallery,[{name:'Editorial Honey',tier:'Free'},{name:'Paper Launch Duo',tier:'Free'},{name:'Calm Split',tier:'Free'},{name:'App Pair',tier:'Free'},{name:'Night Signal Duo',tier:'Pro'},{name:'Pocket Flow Duo',tier:'Pro'},{name:'Big Type Launch',tier:'Pro'},{name:'Cover Story',tier:'Pro'}]);
+  assert.deepEqual(gallery,[{name:'Editorial Honey',tier:'Free'},{name:'Paper Launch Duo',tier:'Free'},{name:'Calm Split',tier:'Free'},{name:'App Pair',tier:'Free'},{name:'Night Signal Duo',tier:'Pro'},{name:'Pocket Flow Duo',tier:'Pro'},{name:'Big Type Launch',tier:'Pro'},{name:'Cover Story',tier:'Pro'},{name:'Feature Spotlight',tier:'Pro'},{name:'Web & Mobile',tier:'Pro'},{name:'Metric Focus',tier:'Pro'},{name:'Before & After',tier:'Pro'}]);
   await page.click(`[aria-label="Preview ${config.name} template"]`);await page.waitForSelector('[data-template-preview][open]');await page.$eval('[data-template-preview] img',async n=>{await n.decode();if(!n.naturalWidth)throw Error('Preview image failed');});await page.keyboard.press('Escape');await page.waitForSelector('[data-template-preview]',{hidden:true});assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),`Preview ${config.name} template`);
   await page.click(`[aria-label="Apply ${config.name} template"]`);await page.waitForSelector('input[placeholder="DSK-XXXX-XXXX-XXXX"]',{visible:true});
   assert.deepEqual(await state(page),before);assert.deepEqual(await history(page),h);assert.notEqual(await page.evaluate(()=>localStorage.getItem('devsnapkit_pro_unlocked')),'true');

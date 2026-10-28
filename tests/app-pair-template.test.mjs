@@ -62,7 +62,7 @@ test('App Pair restore and reset preserve content, hidden source, deletions and 
 });
 
 test('catalog places App Pair after Calm as fourth Free and fresh demo uses shelf.example',()=>{
- const {CURATED_TEMPLATE_CATALOG:catalog,getCuratedTemplate}=load('templates/collection/catalog.ts');assert.deepEqual(plain(catalog.map(t=>t.id)),['editorial-honey','paper-launch-duo','calm-split','app-pair','night-signal-duo','pocket-flow-duo','studio-bridge','editorial-story']);assert.equal(catalog.filter(t=>t.tier==='free').length,4);assert.equal(catalog.filter(t=>t.tier==='pro').length,4);assert.equal(getCuratedTemplate('app-pair').tier,'free');
+ const {CURATED_TEMPLATE_CATALOG:catalog,getCuratedTemplate}=load('templates/collection/catalog.ts');assert.deepEqual(plain(catalog.slice(0,8).map(t=>t.id)),['editorial-honey','paper-launch-duo','calm-split','app-pair','night-signal-duo','pocket-flow-duo','studio-bridge','editorial-story']);assert.equal(catalog.filter(t=>t.tier==='free').length,4);assert.equal(catalog.filter(t=>t.tier==='pro').length,8);assert.equal(getCuratedTemplate('app-pair').tier,'free');
  const {canApplyCuratedTemplate}=load('templates/collection/access.ts');for(const unlocked of [false,true])assert.equal(canApplyCuratedTemplate('app-pair',unlocked),true);
  const app=fs.readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');assert.match(app,/id === 'app-pair' \? 'shelf\.example'/);
 });

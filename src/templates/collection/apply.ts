@@ -10,6 +10,10 @@ import { CALM_SPLIT, CALM_BRAND_MARK } from './definitions/calm-split';
 import { APP_PAIR, APP_PAIR_BRAND_MARK } from './definitions/app-pair';
 import { STUDIO_BRIDGE, STUDIO_BRAND_MARK } from './definitions/studio-bridge';
 import { EDITORIAL_STORY, EDITORIAL_STORY_BRAND_MARK } from './definitions/editorial-story';
+import { FEATURE_SPOTLIGHT } from './definitions/feature-spotlight';
+import { CODE_PREVIEW } from './definitions/code-preview';
+import { METRIC_FOCUS } from './definitions/metric-focus';
+import { BEFORE_AFTER } from './definitions/before-after';
 
 const templates = [
   { blueprint: PAPER_LAUNCH_DUO, brandMark: PAPER_BRAND_MARK, background: '#F6F3EC' },
@@ -19,6 +23,10 @@ const templates = [
   { blueprint: POCKET_FLOW_DUO, brandMark: POCKET_BRAND_MARK, background: '#F4E4D6' },
   { blueprint: STUDIO_BRIDGE, brandMark: STUDIO_BRAND_MARK, background: '#FF5B1F' },
   { blueprint: EDITORIAL_STORY, brandMark: EDITORIAL_STORY_BRAND_MARK, background: '#EEE7D9' },
+  { blueprint: FEATURE_SPOTLIGHT, background: '#F2EEE4' },
+  { blueprint: CODE_PREVIEW, background: '#E7EDAF' },
+  { blueprint: METRIC_FOCUS, background: '#F8F7F2' },
+  { blueprint: BEFORE_AFTER, background: '#E6E9CD' },
 ];
 const templateFor = (id: string | undefined) => templates.find(template => template.blueprint.id === id);
 const blueprintFor = (id: string | undefined) => templateFor(id)?.blueprint;
@@ -42,9 +50,9 @@ export function buildCuratedSnapshot(before: EditorSnapshot, id: string, prefix:
     compositionDocument: { ...createIndependentComposition(), templateId: paper.id, mediaLayout: 'independent', adaptiveMediaLayout: paper.singlePlacement ? 'auto' : 'manual',
       placements: structuredClone(paper.placements), ...(paper.singlePlacement ? { singlePlacement: structuredClone(paper.singlePlacement) } : {}), mediaPresentation: structuredClone(paper.mediaPresentation),
       detailVisible: !!imageSrc && !!secondarySrc && !hiddenSecondary, detailRadius: 12, detailBorder: 'none', detailShadow: '0 18px 36px #25281826',
-      objects: structuredClone([...(paper.cta ? [paper.cta] : []), template.brandMark]), decorations: structuredClone(paper.decorations),
+      objects: structuredClone([...(paper.cta ? [paper.cta] : []), ...(template.brandMark ? [template.brandMark] : [])]), decorations: structuredClone(paper.decorations),
       ...(paper.allowBleed !== undefined ? { allowBleed: paper.allowBleed } : {}),
-      order: [...layers.filter(layer => behind.has(layer.id)).map(layer => layer.id), 'main', 'secondary', 'brand-mark', ...(paper.cta ? ['cta'] : []), ...layers.filter(layer => !behind.has(layer.id)).map(layer => layer.id)], knownTextIds: layers.map(layer => layer.id),
+      order: [...layers.filter(layer => behind.has(layer.id)).map(layer => layer.id), 'main', 'secondary', ...(template.brandMark ? ['brand-mark'] : []), ...(paper.cta ? ['cta'] : []), ...layers.filter(layer => !behind.has(layer.id)).map(layer => layer.id)], knownTextIds: layers.map(layer => layer.id),
     },
     imageSrc, imageName: replaceMain ? paper.examples.main.name : before.imageName,
     primaryMediaOrigin: replaceMain ? { kind: 'builtin', sampleId: paper.examples.main.sampleId } : before.primaryMediaOrigin ?? { kind: 'unknown' },

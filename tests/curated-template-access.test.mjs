@@ -10,10 +10,10 @@ test('curated application denies unknown IDs and gates Night/Pocket while Honey 
   const { canApplyCuratedTemplate } = load('src/templates/collection/access.ts');
   for (const unlocked of [false, true]) {
     for (const id of ['editorial-honey', 'paper-launch-duo', 'calm-split', 'app-pair']) assert.equal(canApplyCuratedTemplate(id, unlocked), true, id);
-    for (const id of ['unknown', '', '__proto__', 'feature-spotlight']) assert.equal(canApplyCuratedTemplate(id, unlocked), false, id);
+    for (const id of ['unknown', '', '__proto__', 'unavailable-template']) assert.equal(canApplyCuratedTemplate(id, unlocked), false, id);
     assert.equal(canApplyCuratedTemplate('night-signal-duo', unlocked), unlocked);
     assert.equal(canApplyCuratedTemplate('pocket-flow-duo', unlocked), unlocked);
-    for (const id of ['studio-bridge','editorial-story']) assert.equal(canApplyCuratedTemplate(id, unlocked), unlocked);
+    for (const id of ['studio-bridge','editorial-story','feature-spotlight','code-preview','metric-focus','before-after']) assert.equal(canApplyCuratedTemplate(id, unlocked), unlocked);
   }
 });
 test('premium templates add one ability without changing free branding or existing paid IDs', () => {
@@ -27,12 +27,12 @@ test('premium templates add one ability without changing free branding or existi
 test('gallery lists only implemented designs with complete-image preview and separate application controls', () => {
   const { TemplateMenu } = load('src/templates/TemplateMenu.tsx');
   const html = renderToStaticMarkup(createElement(TemplateMenu, { onApply() {}, onDesignedApply() {}, disabled: false, busy: false }));
-  assert.equal((html.match(/<article/g) || []).length, 8);
-  for (const name of ['Editorial Honey', 'Paper Launch Duo', 'Calm Split', 'App Pair', 'Night Signal Duo', 'Pocket Flow Duo', 'Big Type Launch', 'Cover Story']) {
+  assert.equal((html.match(/<article/g) || []).length, 12);
+  for (const name of ['Editorial Honey', 'Paper Launch Duo', 'Calm Split', 'App Pair', 'Night Signal Duo', 'Pocket Flow Duo', 'Big Type Launch', 'Cover Story', 'Feature Spotlight', 'Web &amp; Mobile', 'Metric Focus', 'Before &amp; After']) {
     assert.ok(html.includes(`Apply ${name} template`), name);
     assert.ok(html.includes(`Preview ${name} template`), name);
   }
-  assert.equal((html.match(/object-contain/g) || []).length, 8);
+  assert.equal((html.match(/object-contain/g) || []).length, 12);
   for (const size of ['1600 × 1200', '1200 × 630', '1080 × 1080', '1080 × 1920']) assert.ok(html.includes(size), size);
   assert.match(html, />Pro</);
   assert.doesNotMatch(html, /Studio Bridge|Basic layouts|Apply Minimal|Apply Split/);
