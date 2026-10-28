@@ -2,8 +2,9 @@
 // Authenticates a license key using HMAC-SHA256 signature verification
 import { ConfigurationError, licenseCheck, requireSecret } from '../lib/security';
 import { CAPABILITY_POLICY_VERSION, FREE_FEATURES, PRO_FEATURES } from '../../shared/productCapabilities';
+import { verifyAdminProKey, type AdminProEnv } from '../lib/admin-pro';
 
-interface Env {
+interface Env extends AdminProEnv {
   DSK_SERVER_SECRET?: string;
 }
 
@@ -18,10 +19,10 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
 
   try {
     const body: any = await request.json().catch(() => ({}));
-    const { licenseKey } = body;
+    const licenseKey = body?.licenseKey;
 
     // Type validation: return 400 for non-strings or missing keys
-    if (!licenseKey || typeof licenseKey !== 'string') {
+    if (typeof licenseKey !== 'string' || !licenseKey.trim() || licenseKey.length > 256) {
       return new Response(
         JSON.stringify({ valid: false, error: 'License key is required and must be a valid string' }),
         { status: 400, headers: corsHeaders }
@@ -29,25 +30,19 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     }
 
     const clean = licenseKey.trim().toUpperCase();
-    // Ported from preview-admin/00b9dce. This public test credential is valid
-    // only on the selected preview origin; clients must still call this API.
-    const previewAdmin = clean === 'DSK-BOSS-2026-PRO1'
-      && new URL(request.url).origin === 'https://mockup-templates-v1.devsnapkit.pages.dev';
-    const secret = previewAdmin ? null : requireSecret(env, 'DSK_SERVER_SECRET');
+    const adminPro = await verifyAdminProKey(request, env, clean);
     const match = clean.match(/^DSK-([A-Z0-9]{4})-([A-Z0-9]{4})-([A-Z0-9]{4})$/);
-    if (!match) {
+    if (!adminPro && !match) {
       return new Response(
-        JSON.stringify({ valid: false, error: 'Malformed key format. Expected DSK-XXXX-XXXX-XXXX' }),
+        JSON.stringify({ valid: false, error: 'Invalid license key.' }),
         { status: 200, headers: corsHeaders }
       );
     }
 
-    const [, part1, part2, check] = match;
-
-    // Cryptographically compute expected HMAC checksum of part1 and part2
-    const expectedCheck = previewAdmin ? null : await licenseCheck(secret!, part1, part2);
-
-    if (!previewAdmin && check !== expectedCheck) {
+    // Customer licenses retain their existing signature verification.
+    const customerValid = adminPro || (match && match[3] === await licenseCheck(
+      requireSecret(env, 'DSK_SERVER_SECRET'), match[1], match[2]));
+    if (!customerValid) {
       return new Response(
         JSON.stringify({ 
           valid: false, 
@@ -57,7 +52,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
       );
     }
 
-    // A signed customer key or the explicitly scoped preview credential.
+    // A signed customer license or a server-configured administrator credential.
     return new Response(
       JSON.stringify({
         valid: true,

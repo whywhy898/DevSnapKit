@@ -8,12 +8,13 @@ export interface LicenseVerificationResult {
 }
 
 /**
- * Validates whether a license key matches the official format DSK-XXXX-XXXX-XXXX
+ * Syntax only. Entitlement is always decided by the server.
  */
 export function validateKeyFormat(rawKey: string): boolean {
   if (!rawKey) return false;
   const clean = rawKey.trim().toUpperCase();
-  return /^DSK-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(clean);
+  return /^DSK-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(clean)
+    || /^DSK-ADMIN-[A-Z0-9]{32,128}$/.test(clean);
 }
 
 /**
@@ -22,7 +23,7 @@ export function validateKeyFormat(rawKey: string): boolean {
 export async function verifyLicenseWithServer(licenseKey: string): Promise<LicenseVerificationResult> {
   const cleanKey = licenseKey.trim().toUpperCase();
   if (!validateKeyFormat(cleanKey)) {
-    return { valid: false, reason: 'Invalid format. Format must be DSK-XXXX-XXXX-XXXX.' };
+    return { valid: false, reason: 'Invalid license key format. Paste your complete license key.' };
   }
 
   try {
@@ -33,13 +34,13 @@ export async function verifyLicenseWithServer(licenseKey: string): Promise<Licen
     });
 
     const data = await res.json();
-    if (data.valid) {
+    if (res.ok && data?.valid === true) {
       return {
         valid: true,
         tier: data.tier || 'pro_lifetime',
       };
     } else {
-      return { valid: false, reason: data.error || 'License key is invalid or counterfeit.' };
+      return { valid: false, reason: data?.error || 'License key is invalid or verification failed.' };
     }
   } catch (err: any) {
     return { valid: false, reason: 'Unable to reach verification server. Please check your internet connection.' };

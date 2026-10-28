@@ -8,6 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test:security": "node --test tests/security*.test.mjs",
+    "test:license": "node --test tests/preview-admin-license.test.mjs tests/security.test.mjs",
+    "test:license:browser": "node --test tests/admin-pro-browser.test.mjs",
     "test:paypal": "node --test tests/paypal-webhook.test.mjs tests/paypal-recovery.test.mjs",
     "test:paypal:browser": "node --test tests/paypal-browser.test.mjs",
     "test:poster:v1": "node --test tests/poster-v1.test.mjs tests/poster-m1.test.mjs",

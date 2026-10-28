@@ -1062,10 +1062,9 @@ export default function App() {
           setIsProUnlocked(false);
         }
       }).catch(() => {
-        const saved = localStorage.getItem('devsnapkit_pro_unlocked');
-        if (saved === 'true') {
-          setIsProUnlocked(true);
-        }
+        // Cached UI flags are not proof of entitlement, including when offline.
+        localStorage.removeItem('devsnapkit_pro_unlocked');
+        setIsProUnlocked(false);
       });
     }
 
