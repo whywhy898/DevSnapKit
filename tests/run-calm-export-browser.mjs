@@ -71,6 +71,7 @@ try{
  // A bounds error must name the target/object and reject atomically; success
  // must produce the two real dimensions. Neither outcome claims an authored OG design.
  const ogOutcome=await observeOgBatch(await selectBatch(/Twitter \/ OG|Custom/));
+  await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(n=>n.getClientRects().length&&n.innerText.trim()==='Export 2 Sizes (1x)'&&!n.disabled));
  // Square and Custom are two distinct presets with identical dimensions.
  const selected=await selectBatch(/Square|Custom/);const batch=await downloads(2,()=>clickButton(page,'Export 2 Sizes (1x)'));assert.equal(new Set(batch.map(f=>f.file)).size,2,'Two distinct actual files');assert.deepEqual(batch.map(f=>[f.width,f.height]),[[1080,1080],[1080,1080]]);assert.ok(batch.every(f=>f.format==='png'));rows.push({scenario:'compatible-square-and-custom-two-preset-downloads-same-dimensions',precedingOgOutcome:ogOutcome,selected,files:batch,dimensionsAreIdentical:true,pass:true});
  assert.deepEqual(errors,[]);console.log(JSON.stringify({output,passed:true,scenarios:rows.length}));

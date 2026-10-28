@@ -10,7 +10,7 @@ const snapshot = page => page.evaluate(() => window.__mockupBaseline.snapshot);
 const paint = page => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 async function withPage(fn) { const browser = await launchBrowser(); try { const page = await preparePage(browser, url); await fn(page); } finally { await browser.close(); } }
 async function field(page, name, value) { const selector = `[data-canvas-text-controls] [aria-label="${name}"]`; await revealInspectorControl(page, selector); const el = await page.$(selector); assert.ok(el, `${name} exists`); await el.focus(); await page.keyboard.down('Control'); await page.keyboard.press('a'); await page.keyboard.up('Control'); await page.keyboard.type(value); await page.keyboard.press('Enter'); }
-async function undo(page) { await page.focus('[aria-label="Move text"]'); await page.keyboard.down('Control'); await page.keyboard.press('z'); await page.keyboard.up('Control'); await paint(page); }
+async function undo(page) { if (await page.$('[aria-label="Move text"]')) { await page.focus('[aria-label="Move text"]'); await page.keyboard.down('Control'); await page.keyboard.press('z'); await page.keyboard.up('Control'); } else await clickButton(page, 'Undo'); await paint(page); }
 async function fixture(page, recovery = false) {
   await clickButton(page, 'Add text'); await finishTextEditing(page);
   await page.evaluate(recovery => { const s = window.__mockupBaseline.snapshot, l = s.textDocument.layers[0]; window.__mockupBaseline.apply({ aspectRatioId: 'custom', customCanvasSize: { width: 1600, height: 1200 }, textDocument: { version: 1, layers: [{ ...l, content: recovery ? 'MMMMMMMMMMMM\nMMMMMMMMMMMM\nMMMMMMMMMMMM' : 'A title that reflows when its width changes', centerX: .5, centerY: recovery ? .2 : .5, widthRatio: recovery ? .6875 : .3, fontSize: recovery ? 80 : 48 }] } }); }, recovery);
@@ -85,7 +85,7 @@ test('T4 recovered A to Twitter uses A; valid intermediate and history clear sta
   await clickButton(page, '1:1'); await paint(page); await page.click('[data-text-size-recovery]'); await paint(page);
   await clickButton(page, 'Twitter'); await paint(page);
   assert.match(await page.$eval('[data-text-size-recovery]', el => el.textContent), /1600×1200/);
-  await clickButton(page, 'Frame'); await paint(page); await clickButton(page, 'Text'); await paint(page);
+  await clickButton(page, 'Frame'); await paint(page); await clickButton(page, 'Text'); await page.select('[aria-label="Current text"]', original.layers[0].id); await paint(page);
   assert.match(await page.$eval('[data-text-size-recovery]', el => el.textContent), /1600×1200/);
   // Cancel a geometry draft must not be mistaken for Undo/Redo navigation.
   await field(page, 'Text x', 'Infinity'); await discardTextChanges(page);
@@ -131,7 +131,7 @@ test('T4 Auto upload recovery names image action and later edits use exact Custo
 test('T4 Auto starter preset recovery accurately names the preset action and retains text ids', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await (await page.$('[aria-label="Main screenshot file"]')).uploadFile(path.resolve('../../output/devsnapkit/honeywerank-original.png'));await page.waitForFunction(()=>window.__mockupBaseline.snapshot.imageName==='honeywerank-original.png');await new Promise(r=>setTimeout(r,200));
   await clickButton(page,'Add text');await finishTextEditing(page);await page.evaluate(()=>{const layer=window.__mockupBaseline.snapshot.textDocument.layers[0];window.__mockupBaseline.apply({textDocument:{version:1,layers:[{...layer,content:'A\nB\nC',fontSize:100,centerY:.22,widthRatio:.6}]}});});await page.evaluate(()=>document.fonts.ready);await paint(page);assert.equal(await page.$('[data-text-layout-errors]'),null);
-  const before=await snapshot(page),size=await page.$eval('#studio-canvas',el=>({width:el.offsetWidth,height:el.offsetHeight}));await clickButton(page,'Frame');await page.click('button[title=\'Load "Code Terminal" sample image\']');await page.waitForSelector('[data-text-size-recovery]');
+  const before=await snapshot(page),size=await page.$eval('#studio-canvas',el=>({width:el.offsetWidth,height:el.offsetHeight}));await clickButton(page,'Frame');await page.click('.inspector-advanced summary');await clickButton(page,'Code Terminal');await page.waitForSelector('[data-text-size-recovery]');
   assert.match(await page.$eval('[data-text-size-recovery]',el=>el.textContent),new RegExp(`Undo preset change.*${size.width}×${size.height}`));await page.click('[data-text-size-recovery]');await paint(page);await paint(page);assert.equal((await snapshot(page)).imageName,before.imageName);assert.deepEqual((await snapshot(page)).textDocument,before.textDocument);assert.equal(await page.$('[data-text-layout-errors]'),null);
 }));
 test('T4 movement cannot run with other tools; Escape, scroll, Inspector and export end transactions', { skip: !url, timeout: 60000 }, () => withPage(async page => {
@@ -140,7 +140,7 @@ test('T4 movement cannot run with other tools; Escape, scroll, Inspector and exp
   await start();await page.keyboard.press('Escape');await page.mouse.up();await paint(page);assert.deepEqual((await snapshot(page)).textDocument,initial);
   await start();await page.evaluate(()=>window.dispatchEvent(new Event('scroll')));await page.mouse.up();await paint(page);assert.deepEqual((await snapshot(page)).textDocument,initial);
   await start(); await clickButton(page,'Frame');await page.mouse.up();await paint(page);assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),false);
-  await clickButton(page,'Text');await paint(page); await start(); await clickButton(page,'Export');await page.mouse.up();await paint(page);assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),false);
+  await clickButton(page,'Text');await page.select('[aria-label="Current text"]', initial.layers[0].id);await paint(page); await start(); await clickButton(page,'Export');await page.mouse.up();await paint(page);assert.equal(await page.evaluate(()=>window.__mockupBaseline.history.inTransaction),false);
 }));
 test('T4 camera, background, frame, duo, presets and reset retain independent text above artwork', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await fixture(page); const initial=(await snapshot(page)).textDocument;
@@ -149,10 +149,10 @@ test('T4 camera, background, frame, duo, presets and reset retain independent te
     const el=await page.$(`[aria-label="${label}"]`);await el.focus();await page.keyboard.down('Control');await page.keyboard.press('a');await page.keyboard.up('Control');await page.keyboard.type(value);await page.keyboard.press('Tab');
     assert.deepEqual((await snapshot(page)).textDocument,initial);
   }
-  await page.focus('[aria-label="Move text"]');await page.keyboard.press('2');await paint(page);assert.equal((await snapshot(page)).layoutMode,'duo');assert.deepEqual((await snapshot(page)).textDocument,initial);
-  await clickButton(page,'Frame');await clickButton(page,'Safari Browser');await paint(page);assert.deepEqual((await snapshot(page)).textDocument,initial);
+  await clickButton(page,'Text');await page.select('[aria-label="Current text"]', initial.layers[0].id);await page.focus('[aria-label="Move text"]');await page.keyboard.press('2');await paint(page);assert.equal((await snapshot(page)).layoutMode,'duo');assert.deepEqual((await snapshot(page)).textDocument,initial);
+  await clickButton(page,'Frame');await page.$eval('[data-device-styles]', el => { if (!el.open) el.querySelector('summary').click(); });await clickButton(page,'Safari Browser');await paint(page);assert.deepEqual((await snapshot(page)).textDocument,initial);
   await clickButton(page,'Canvas');await clickButton(page,'Solid');await paint(page);
-  await clickButton(page,'Floating Tilt');await paint(page);assert.equal((await snapshot(page)).layoutPreset,'float');
+  await clickButton(page,'Frame');await page.click('[aria-label="Select Image 1"]');await page.click('[data-3d-angles] button[title^="Floating Tilt"]');await paint(page);assert.equal((await snapshot(page)).layoutPreset,'float');
   assert.deepEqual((await snapshot(page)).textDocument,initial);
   assert.ok(await page.$eval('[data-canvas-text-layer]',el=>Number(getComputedStyle(el).zIndex)>=40));
   await page.$eval('button[title="Reset default styling; canvas text is preserved"]',el=>el.click());await paint(page);assert.deepEqual((await snapshot(page)).textDocument,initial);

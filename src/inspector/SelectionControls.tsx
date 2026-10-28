@@ -6,9 +6,9 @@ import { ObjectControls } from '../composition/ObjectControls';
 import { ImageControls } from './ImageControls';
 import { resolveImageSlots } from './model';
 
-export function SelectionControls({ document: doc, texts, selected, size, tab, layoutMode, imageSrc, secondarySrc, imageName, secondaryName, angleControls, onSelect, onChange, onStart, onFinish, onIndependent, onReplace, onRestore, onRemoveDetail, onAddButton, onResetTemplate, onDuplicateText }: {
+export function SelectionControls({ document: doc, texts, selected, size, tab, layoutMode, imageSrc, secondarySrc, imageName, secondaryName, angleControls, starterControls, onSelect, onChange, onStart, onFinish, onIndependent, onReplace, onRestore, onRemoveDetail, onAddButton, onResetTemplate, onDuplicateText }: {
   document: CompositionDocument | null; texts: CanvasTextDocument; selected: string | null; size: { width: number; height: number }; context: TemplateContext | null;
-  tab: string; layoutMode: 'single' | 'duo'; imageSrc: string; secondarySrc: string | null; imageName: string; secondaryName: string; angleControls: ReactNode;
+  tab: string; layoutMode: 'single' | 'duo'; imageSrc: string; secondarySrc: string | null; imageName: string; secondaryName: string; angleControls: ReactNode; starterControls: ReactNode;
   onSelect: (id: string) => void; onChange: (doc: CompositionDocument) => void; onStart: () => void; onFinish: () => void;
   onIndependent: () => void; onReplace: (slot: 'main' | 'secondary') => void; onRestore: () => void; onRemoveDetail: () => void;
   onAddButton: () => void; onResetTemplate: () => void; onDuplicateText: (id: string) => void; customLogo?: boolean;
@@ -22,7 +22,8 @@ export function SelectionControls({ document: doc, texts, selected, size, tab, l
       </div>)}
       {doc && <button type="button" className="inspector-quiet" onClick={() => onChange({ ...doc, detailVisible: !doc.detailVisible, ...(doc.detailVisible ? {} : { hiddenIds: doc.hiddenIds.filter(id => id !== 'secondary') }) })}>{doc.detailVisible ? 'Hide Image 2' : 'Enable Image 2'}</button>}
     </section>
-    {doc ? <ImageControls key={image} document={doc} selected={image} size={size} onChange={onChange} onStart={onStart} onFinish={onFinish} onRestore={onRestore} onResetTemplate={onResetTemplate} onIndependent={onIndependent}>{image === 'main' && angleControls}{(image === 'secondary' || (doc.mediaLayout === 'legacy' && doc.detailVisible)) && <button type="button" onClick={onRemoveDetail}>Remove detail</button>}</ImageControls> : <details><summary>Advanced</summary><button type="button" onClick={onIndependent}>Independent two-slot layout</button>{angleControls}</details>}
+    {image === 'main' && (!selected || selected === 'main') && doc?.mediaLayout !== 'independent' && angleControls}
+    {doc ? <ImageControls key={image} document={doc} selected={image} size={size} onChange={onChange} onStart={onStart} onFinish={onFinish} onRestore={onRestore} onResetTemplate={onResetTemplate} onIndependent={onIndependent}>{image === 'main' && starterControls}{(image === 'secondary' || (doc.mediaLayout === 'legacy' && doc.detailVisible)) && <button type="button" onClick={onRemoveDetail}>Remove detail</button>}</ImageControls> : <details className="inspector-advanced"><summary>Advanced</summary><button type="button" onClick={onIndependent}>Independent two-slot layout</button>{starterControls}</details>}
     </>}
     {tab === 'background' && <><button type="button" className="inspector-add" onClick={onAddButton}>Add button</button><ObjectControls document={doc} selected={selected} size={size} onChange={onChange} onStart={onStart} onFinish={onFinish} /></>}
     {tab === 'text' && selected && texts.layers.some(layer => layer.id === selected) && <button type="button" className="inspector-add" onClick={() => onDuplicateText(selected)}>Duplicate text</button>}

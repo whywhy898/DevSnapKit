@@ -384,7 +384,7 @@ test('T5 mobile 360/390/430 complete native composition, styles, positioning, hi
       await page.keyboard.press('2'); await page.waitForFunction(() => window.__mockupBaseline.snapshot.layoutMode === 'duo');
       await (await page.$('input[aria-label="Second screenshot file"]')).uploadFile(path.resolve('../../output/devsnapkit/honeywerank-platforms.png'));
       await page.waitForFunction(() => window.__mockupBaseline.snapshot.secondaryName === 'honeywerank-platforms.png');
-      await page.focus('[aria-label="Move text"]'); await page.keyboard.press('1'); await clickButton(page, 'Frame'); await clickButton(page, 'Text');
+      await page.focus('[aria-label="Move text"]'); await page.keyboard.press('1'); await clickButton(page, 'Frame'); await clickButton(page, 'Text'); await page.select('[aria-label="Current text"]', id);
       assert.deepEqual((await snapshot(page)).snapshot.textDocument, documentBeforeDelete);
       // Rotation changes the real container width while retaining the text draft.
       await clickButton(page, 'Edit text'); await page.setViewport({ width: 850, height: width, deviceScaleFactor: 1 }); await paint(page);

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 import AdminDashboard from './AdminDashboard.tsx';
 import './index.css';
+import './editor-evolution.css';
 
 function RootRouter() {
   const [currentPath, setCurrentPath] = useState<string>(() => window.location.pathname);

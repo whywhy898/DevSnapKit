@@ -50,7 +50,9 @@ test('template browsing participates in the text editor focus boundary before au
 test('gallery dismissal invalidates only its request and stale completion cannot release newer admission', () => {
   const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
   assert.match(app, /const dismissTemplateGallery = \(\) => \{\s*templateRequest\.current\+\+;/);
-  assert.match(app, /if \(e\.key === 'Escape' && showDemoTemplatesMenu\) \{[^}]*dismissTemplateGallery\(\); return;/);
+  assert.match(app, /if \(showDemoTemplatesMenu\) return;/);
+  const menu = fs.readFileSync(new URL('../src/templates/TemplateMenu.tsx', import.meta.url), 'utf8');
+  assert.match(menu, /onCancel=\{event => \{ event\.preventDefault\(\); onClose\?\.\(\); \}\}/);
   assert.match(app, /finally \{ if \(request === templateRequest\.current\) \{ applyingTemplate\.current = false; setPreparingTemplate\(false\); \} \}/);
   assert.match(app, /showDemoTemplatesMenu \? dismissTemplateGallery\(\) : setShowDemoTemplatesMenu\(true\)/);
 });

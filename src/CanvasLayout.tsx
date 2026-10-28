@@ -15,21 +15,35 @@ export function CanvasStage({ width, height, children, freezePreviewWhileEditing
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    const parent = el.parentElement;
     const update = () => setSize(prev => {
-      const next = { width: el.clientWidth, height: el.clientHeight };
+      const desktop = window.matchMedia('(min-width: 1024px)').matches;
+      let availableHeight = Math.max(280, window.innerHeight * .65);
+      if (desktop && parent) {
+        const styles = getComputedStyle(parent);
+        const siblings = [...parent.children].filter(node => node !== el && node instanceof HTMLElement && getComputedStyle(node).position !== 'absolute');
+        const used = siblings.reduce((total, node) => {
+          const child = node as HTMLElement, css = getComputedStyle(child);
+          return total + child.offsetHeight + (parseFloat(css.marginTop) || 0) + (parseFloat(css.marginBottom) || 0);
+        }, 0);
+        availableHeight = Math.max(1, parent.clientHeight - used - (parseFloat(styles.paddingTop) || 0) - (parseFloat(styles.paddingBottom) || 0));
+      }
+      const next = { width: el.clientWidth, height: availableHeight };
       return close(prev.width, next.width) && close(prev.height, next.height) ? prev : next;
     });
     update();
     const observer = new ResizeObserver(update);
     observer.observe(el);
-    return () => observer.disconnect();
+    if (parent) { observer.observe(parent); [...parent.children].forEach(child => { if (child !== el) observer.observe(child); }); }
+    window.addEventListener('resize', update);
+    return () => { observer.disconnect(); window.removeEventListener('resize', update); };
   }, []);
   const calculated = Math.min(1, Math.max(1, size.width - 32) / width, Math.max(1, size.height - 32) / height);
   const frozen = useRef({ width: size.width, scale: calculated, editing: false });
   if (!freezePreviewWhileEditing || !frozen.current.editing || !close(frozen.current.width, size.width)) frozen.current = { width: size.width, scale: calculated, editing: freezePreviewWhileEditing };
   const scale = freezePreviewWhileEditing ? frozen.current.scale : calculated;
   return (
-    <div ref={ref} data-canvas-stage onClick={event => { if (!(event.target as HTMLElement).closest('[data-text-editor-ui]')) onDeselect?.(); }} className="relative flex-1 min-h-0 w-full flex items-center justify-center overflow-auto" style={{ minHeight: freezePreviewWhileEditing ? Math.min(height * scale + 32, 500) : undefined }}>
+    <div ref={ref} data-canvas-stage onClick={event => { if (!(event.target as HTMLElement).closest('[data-text-editor-ui]')) onDeselect?.(); }} className="relative flex-none min-h-0 w-full flex items-center justify-center overflow-auto" style={{ height: height * scale + 32, minHeight: freezePreviewWhileEditing ? Math.min(height * scale + 32, 500) : undefined }}>
       <div className="relative shrink-0" style={{ width: width * scale, height: height * scale, '--canvas-preview-scale': scale } as React.CSSProperties}>
         {children}
       </div>

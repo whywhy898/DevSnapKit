@@ -83,7 +83,7 @@ test('UX screenshot hover upload works across frame variants with text and expli
     assert.equal(await chooserDuring(page, () => pictureClick(2)), true, 'Second screenshot has its own upload area');
     rows.push({ layoutMode: 'duo', slot: 2, opened: true });
     await button(page, 'Frame');
-    assert.equal(await chooserDuring(page, () => click(page, 'button[title="Open Media Picker to replace Slot 2"]')), true, 'The explicit second-slot replacement remains available');
+    assert.equal(await chooserDuring(page, () => click(page, 'button[aria-label="Replace Image 2"]')), true, 'The explicit second-slot replacement remains available');
     assert.equal(await chooserDuring(page, () => click(page, 'button[title="Upload screenshot from computer"]')), true, 'Explicit Replace Image remains available');
     await fs.mkdir(output, { recursive: true }); await fs.writeFile(path.join(output, 'image-interaction.json'), JSON.stringify(rows, null, 2));
   } finally { await browser.close(); }

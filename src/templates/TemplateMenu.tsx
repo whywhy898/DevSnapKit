@@ -1,30 +1,82 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Layers3, Lock } from 'lucide-react';
 import { CURATED_TEMPLATE_CATALOG } from './collection/catalog';
 import type { CuratedTemplateId } from './collection/types';
 import type { MockupTemplate } from './types';
+import { groupTemplates } from './templateGroups';
 import { TemplatePreview } from './TemplatePreview';
 
-/** The legacy factory remains available to saved projects; recommendations are curated. */
-export function TemplateMenu({ onDesignedApply, disabled, busy }: { onApply: (template: MockupTemplate) => void; onDesignedApply?: (id: CuratedTemplateId) => void; disabled: boolean; busy: boolean }) {
-  const [preview, setPreview] = useState<typeof CURATED_TEMPLATE_CATALOG[number] | null>(null);
-  return <div data-template-gallery data-text-editor-ui aria-label="Template gallery" className="starter-demo-popover absolute bottom-full mb-2 left-0 w-80 max-w-[calc(100vw-2rem)] max-h-[min(38rem,70dvh)] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/80 rounded-xl p-3 shadow-2xl z-50 backdrop-blur-xl">
-    <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 mb-2">Templates</div>
-    {busy && <p role="status" className="mb-2 text-xs text-indigo-200">Preparing artwork…</p>}
-    <div className="grid gap-3">{CURATED_TEMPLATE_CATALOG.map(template => <article key={template.id} className="min-w-0 rounded-lg overflow-hidden border border-white/15 bg-slate-950 text-slate-100">
-      <button type="button" aria-label={`Preview ${template.name} template`} onClick={() => setPreview(template)} className="block w-full cursor-pointer hover:bg-slate-800 focus-visible:outline focus-visible:outline-indigo-400">
-        <img src={template.thumbnail} width={template.width} height={template.height} alt={`${template.name} exported in DevSnapKit`} className="w-full h-36 object-contain" />
-      </button>
-      <div className="p-3">
-        <div className="flex justify-between gap-2 text-sm font-semibold"><span>{template.name}</span><span className={template.tier === 'free' ? 'text-emerald-300' : 'text-amber-300'}>{template.tier === 'free' ? 'Free' : 'Pro'}</span></div>
-        <p className="text-[10px] text-slate-400 mt-1">{template.width} × {template.height}</p>
-        <p className="text-xs text-slate-300 mt-2">{template.description}</p>
-        <div className="flex flex-wrap gap-2 mt-3">
-          <button type="button" onClick={() => setPreview(template)} className="rounded border border-slate-600 px-2.5 py-1.5 text-xs hover:bg-slate-800">Preview</button>
-          <button type="button" disabled={disabled || !onDesignedApply} aria-label={`Apply ${template.name} template`} onClick={() => onDesignedApply?.(template.id)} className="rounded bg-indigo-500 px-2.5 py-1.5 text-xs font-semibold hover:bg-indigo-400 disabled:opacity-50">Use template</button>
-        </div>
+type Template = typeof CURATED_TEMPLATE_CATALOG[number];
+const groups = groupTemplates(CURATED_TEMPLATE_CATALOG);
+
+export function TemplateMenu({ onDesignedApply, onClose, suspended = false, isProUnlocked = false, disabled, busy, error }: {
+  onApply?: (template: MockupTemplate) => void; onDesignedApply?: (id: CuratedTemplateId) => void;
+  onClose?: () => void; suspended?: boolean; isProUnlocked?: boolean; disabled: boolean; busy: boolean; error?: string;
+}) {
+  const [preview, setPreview] = useState<Template | null>(null);
+  const [filter, setFilter] = useState('all');
+  const dialog = useRef<HTMLDialogElement>(null);
+  const trigger = useRef<HTMLElement | null>(null);
+  const lastCard = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    trigger.current = document.querySelector<HTMLElement>('[data-template-trigger]') ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    return () => { if (trigger.current?.isConnected) trigger.current.focus(); };
+  }, []);
+  useEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+    if (suspended) {
+      if (element.open) element.close();
+      requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-pro-modal] button[title="Close"]')?.focus());
+      return;
+    }
+    if (!element.open) element.showModal();
+    if (lastCard.current?.isConnected) lastCard.current.focus();
+  }, [suspended]);
+
+  const content = <dialog ref={dialog} data-template-gallery data-text-editor-ui aria-labelledby="template-gallery-title"
+    onCancel={event => { event.preventDefault(); onClose?.(); }}
+    onKeyDown={event => event.stopPropagation()}
+    onClick={event => { if (event.target === event.currentTarget) onClose?.(); }}
+    className="template-gallery">
+    <div className="template-gallery-shell">
+      <header className="template-gallery-header">
+        <div className="template-gallery-heading"><span className="template-gallery-icon"><Layers3 size={21} /></span><div><h2 id="template-gallery-title">Templates</h2><p>Find a starting point for your next visual.</p></div></div>
+        <button type="button" className="template-gallery-close" aria-label="Close template gallery" onClick={onClose}><X size={19} /></button>
+      </header>
+      <div className="template-filters" aria-label="Filter templates by aspect ratio">
+        <button type="button" data-template-filter="all" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All</button>
+        {groups.map(group => <button key={group.key} type="button" data-template-filter={group.key} aria-pressed={filter === group.key} onClick={() => setFilter(group.key)}>{group.key}</button>)}
       </div>
-    </article>)}</div>
-    <p className="text-[10px] text-slate-400 mt-3">Keeps your screenshots, replaces styling and text. Undo to return to your previous canvas. Demo screenshots use illustrative data.</p>
+      {busy && <p role="status" className="template-gallery-status">Preparing artwork…</p>}
+      {error && <p role="alert" className="template-gallery-error">{error}</p>}
+      <div className="template-gallery-scroll">
+        {!groups.some(group => filter === 'all' || group.key === filter) && <p className="template-gallery-note">No templates in this size yet. <button type="button" onClick={() => setFilter('all')}>View all templates</button></p>}
+        {groups.filter(group => filter === 'all' || group.key === filter).map(group => <section className="template-group" key={group.key}>
+          <div className="template-group-heading"><h3>{group.key}</h3><span>{group.items.length} {group.items.length === 1 ? 'template' : 'templates'}</span></div>
+          <div className="template-gallery-grid">{group.items.map(template => <article className="template-card" key={template.id}>
+            <button type="button" aria-label={`Preview ${template.name} template`} onClick={() => setPreview(template)} className="template-card-image">
+              <img className="object-contain" src={template.thumbnail} width={template.width} height={template.height} alt={`${template.name} exported in DevSnapKit`} loading="lazy" />
+            </button>
+            <div className="template-card-body">
+              <div className="flex justify-between gap-2 text-sm font-semibold"><span>{template.name}</span><span className={template.tier === 'free' ? 'template-tier-free' : 'template-tier-pro'}>{template.tier === 'free' ? 'Free' : 'Pro'}</span></div>
+              <p className="template-card-meta">{template.width} × {template.height}</p>
+              <p className="template-card-description">{template.description}</p>
+              <div className="template-card-actions">
+                <button type="button" onClick={() => setPreview(template)}>Preview</button>
+                <button type="button" disabled={disabled || !onDesignedApply} aria-label={`Apply ${template.name} template`} onClick={event => { lastCard.current = event.currentTarget; onDesignedApply?.(template.id); }}>
+                  {template.tier === 'pro' && !isProUnlocked ? <><Lock size={13} /> Unlock with Pro</> : 'Use template'}
+                </button>
+              </div>
+            </div>
+          </article>)}</div>
+        </section>)}
+      </div>
+      <p className="template-gallery-note">Keeps your screenshots, replaces styling and text. Undo to return to your previous canvas.</p>
+    </div>
     {preview && <TemplatePreview template={preview} onClose={() => setPreview(null)} />}
-  </div>;
+  </dialog>;
+  return typeof document === 'undefined' ? content : createPortal(content, document.body);
 }

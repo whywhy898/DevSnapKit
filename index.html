@@ -60,11 +60,19 @@
           var saved = localStorage.getItem('shotcraft_theme_mode');
           var mode = (saved === 'dark') ? 'dark' : 'light';
           document.documentElement.classList.add('theme-' + mode);
-        } catch(e) {}
+          if (mode === 'dark') document.documentElement.classList.add('dark');
+        } catch(e) { document.documentElement.classList.add('theme-light'); }
       })();
     </script>
   </head>
-  <body class="theme-light antialiased selection:bg-indigo-500 selection:text-white">
+  <body class="antialiased selection:bg-indigo-500 selection:text-white">
+    <script>
+      (function() {
+        var dark = document.documentElement.classList.contains('theme-dark');
+        document.body.classList.add(dark ? 'theme-dark' : 'theme-light');
+        if (dark) document.body.classList.add('dark');
+      })();
+    </script>
     <div id="root"></div>
     <nav aria-label="Screenshot tools" style="padding:10px 16px;text-align:center;font-size:12px;background:#f7f8f4;color:#475569;">
       <a href="/screenshot-beautifier/">Explore the screenshot beautifier ↗</a>

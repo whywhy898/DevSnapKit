@@ -186,7 +186,7 @@ function get3DTransformForPreset(preset: LayoutPreset): string {
   }
 }
 
-// Live 3D Perspective Card (used in right rail and inspector)
+// Live 3D perspective preview in the inspector.
 const Live3DPerspectiveCard: React.FC<{
   presetId: LayoutPreset;
   name: string;
@@ -205,7 +205,6 @@ const Live3DPerspectiveCard: React.FC<{
   selectedPattern: string;
   isActive: boolean;
   onClick: () => void;
-  layout?: 'rail' | 'inspector';
 }> = ({
   presetId,
   name,
@@ -224,7 +223,6 @@ const Live3DPerspectiveCard: React.FC<{
   selectedPattern,
   isActive,
   onClick,
-  layout = 'inspector',
 }) => {
   const bgData = getMiniBgClassAndStyle(
     bgType,
@@ -242,9 +240,8 @@ const Live3DPerspectiveCard: React.FC<{
   return (
     <button
       onClick={onClick}
-      className={`group flex flex-col items-center w-full rounded-xl border transition-all cursor-pointer active:scale-[0.98] ${
-        layout === 'rail' ? 'p-1.5' : 'p-2'
-      } ${
+      aria-pressed={isActive}
+      className={`group flex flex-col items-center w-full rounded-xl border transition-all cursor-pointer active:scale-[0.98] p-2 ${
         isActive
           ? 'bg-[#eef2ff] border-indigo-300 ring-1 ring-indigo-300 dark:bg-[#242746] dark:border-indigo-500/50 dark:ring-indigo-500/30 shadow-md'
           : 'bg-[#f8fafc] border-slate-200/80 hover:border-slate-300 hover:bg-slate-200/60 dark:bg-[#151726] dark:border-white/[0.08] dark:hover:border-white/20 dark:hover:bg-[#1e2136]'
@@ -349,7 +346,7 @@ const Live3DPerspectiveCard: React.FC<{
       </div>
 
       {/* Preset Subtitle (Inspector only) */}
-      {layout === 'inspector' && subtitle && (
+      {subtitle && (
         <div className="w-full text-center px-1 text-[10px] text-slate-600 dark:text-white/50 truncate -mt-0.5 mb-0.5">
           {subtitle}
         </div>
@@ -1743,7 +1740,7 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (exportLock.current) { e.preventDefault(); return; }
       if (studioMode !== 'mockup') return;
-      if (e.key === 'Escape' && showDemoTemplatesMenu) { e.preventDefault(); dismissTemplateGallery(); return; }
+      if (showDemoTemplatesMenu) return;
       if (isEditable(e.target) || e.isComposing) return;
 
       if (e.key === 'Escape') {
@@ -1977,7 +1974,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
       {...(isExporting ? { inert: '' } : {})} aria-busy={isExporting} className={`min-h-screen ${themeMode === 'light' ? 'theme-light bg-slate-50 text-slate-900' : 'theme-dark bg-slate-950 text-slate-100'} flex flex-col font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-200`}>
       
       {/* Top Navbar (Edge-to-Edge Desktop Studio Header) */}
-      <header className="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40">
+      <header className="editor-header border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40">
         <div className="w-full px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 relative">
           
           {/* Left: Brand */}
@@ -2007,26 +2004,25 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           <div className="flex items-center gap-2 shrink-0 z-10">
             {/* Subscription & License Combo Pill */}
             {!isProUnlocked ? (
-              <div className="h-8 inline-flex items-center rounded-lg border border-amber-500/35 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 dark:from-amber-500/15 dark:to-orange-500/15 shadow-xs overflow-hidden transition-all hover:border-amber-500/50">
+              <div className="pro-header-actions">
                 {/* Pro CTA Segment */}
                 <button
                   type="button"
                   onClick={() => setShowProModal(true)}
-                  className="h-full px-2.5 flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 hover:bg-amber-500/10 transition-colors cursor-pointer active:scale-[0.98]"
+                  className="pro-upgrade-button"
                   title={productCopy.tooltip}
                 >
-                  <Zap className="w-3.5 h-3.5 fill-amber-500 dark:fill-amber-300 text-amber-500 dark:text-amber-300" />
-                  <span>Pro ($1)</span>
+                  <Sparkles size={15} />
+                  <span className="pro-upgrade-label">Upgrade to Pro</span><span className="pro-price">$1</span>
                 </button>
 
                 {/* Hairline Divider inside combo */}
-                <div className="h-3.5 w-[1px] bg-amber-500/30 shrink-0" />
 
                 {/* Key / License Segment */}
                 <button
                   type="button"
                   onClick={() => { setClaimModalTab('key'); setShowClaimModal(true); }}
-                  className="h-full px-2 sm:px-2.5 flex items-center gap-1 text-xs font-medium text-amber-800/80 dark:text-amber-300/80 hover:text-amber-950 dark:hover:text-amber-100 hover:bg-amber-500/10 transition-colors cursor-pointer active:scale-[0.98]"
+                  className="pro-key-button"
                   title="Activate or Redeem License Key"
                 >
                   <KeyRound className="w-3.5 h-3.5" />
@@ -2081,7 +2077,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
       {studioMode === 'poster' && <PosterEditor isProUnlocked={isProUnlocked} onRequestPro={() => setShowProModal(true)} />}
       <div hidden={studioMode !== 'mockup'}>
       {/* Main Studio Workspace - Edge-to-Edge Shots.so Layout */}
-      <main className="flex-1 w-full flex flex-col lg:flex-row lg:h-[calc(100vh-64px)] lg:overflow-hidden bg-[#08090d]">
+      <main className="studio-workspace flex-1 w-full flex flex-col lg:flex-row lg:h-[calc(100vh-64px)] lg:overflow-hidden bg-[#08090d]">
         
         {/* Left: Expansive Studio Canvas Viewport */}
         <section 
@@ -2111,7 +2107,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
           
           {/* Top Canvas Action Bar: History & Shortcuts (F1/F2) */}
-          <div className="relative shrink-0 mb-1 flex items-center gap-1 px-1.5 py-1 rounded-xl bg-[#0c0d14]/85 backdrop-blur-xl border border-white/10 shadow-lg z-20">
+          <div data-canvas-toolbar className="relative shrink-0 mb-1 flex items-center gap-1 px-1.5 py-1 rounded-xl bg-[#0c0d14]/85 backdrop-blur-xl border border-white/10 shadow-lg z-20">
             <button type="button" aria-label="Add text" disabled={isExporting || textDocument.layers.length >= 20}
               onClick={() => { setSidebarTab('text'); textEditor.add(); }}
               className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1 text-xs disabled:opacity-40"
@@ -2328,7 +2324,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
           {/* Floating Bottom Studio Dock */}
           </CanvasStage>
-          <div className="mt-2 flex flex-nowrap items-center justify-center gap-2 z-20 shrink-0 max-w-full" style={{ flexWrap: 'wrap' }}>
+          <div data-canvas-dock className="mt-2 flex flex-nowrap items-center justify-center gap-2 z-20 shrink-0 max-w-full" style={{ flexWrap: 'wrap' }}>
             {/* Independent slots are not the legacy paired-device layouts. */}
             {compositionDocument?.mediaLayout === 'independent' ? <div data-independent-media-status className="flex items-center gap-2 rounded-xl border border-white/15 bg-black/40 px-2 h-9 text-xs text-white">
               <span>{compositionDocument.detailVisible && !compositionDocument.hiddenIds.includes('secondary') ? 'Main + detail' : 'Main only'}</span>
@@ -2389,10 +2385,11 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 data-text-editor-ui
                 type="button"
                 onClick={() => showDemoTemplatesMenu ? dismissTemplateGallery() : setShowDemoTemplatesMenu(true)}
-                className="h-full px-2 rounded-r-xl border border-white/15 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 hover:text-white transition-all cursor-pointer flex items-center justify-center gap-1 text-xs font-semibold"
+                className="template-trigger"
                 title="Templates"
                 aria-label="Templates"
               >
+                <span className="template-trigger-previews" aria-hidden="true"><img src="/designed/editorial-honey.webp" alt="" /><img src="/designed/collection/paper-launch-duo.webp" alt="" /></span>
                 <span>Templates</span>
                 <ChevronDown className={`w-3 h-3 transition-transform ${showDemoTemplatesMenu ? 'rotate-180' : ''}`} />
               </button>
@@ -2400,8 +2397,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               {/* Starter Demo Dropdown Popover */}
               {showDemoTemplatesMenu && (
                 <>
-                  <div data-template-dismiss data-text-editor-ui className="fixed inset-0 z-40" onPointerDown={event => event.preventDefault()} onClick={dismissTemplateGallery} />
-                  <TemplateMenu onApply={handleApplyTemplate} onDesignedApply={handleApplyDesignedTemplate} disabled={isExporting || preparingTemplate || assetBusy} busy={preparingTemplate || assetBusy} />
+                  <TemplateMenu onApply={handleApplyTemplate} onDesignedApply={handleApplyDesignedTemplate} onClose={dismissTemplateGallery} suspended={showProModal || showClaimModal || showSuccessModal} isProUnlocked={isProUnlocked} disabled={isExporting || preparingTemplate || assetBusy} busy={preparingTemplate || assetBusy} error={textError} />
                 </>
               )}
             </div>
@@ -2502,45 +2498,6 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             />
         </section>
 
-        {/* Middle-Right: Dedicated Shots.so-Style Live 3D Perspective Rail (Desktop & Laptop) */}
-        {compositionDocument?.mediaLayout !== 'independent' && (!selectedCompositionObject || selectedCompositionObject === 'main') && <aside className="hidden lg:flex flex-col w-[130px] xl:w-[140px] 2xl:w-[155px] shrink-0 lg:my-3 lg:mr-2 lg:rounded-2xl border border-white/[0.08] bg-[#0c0d14]/90 backdrop-blur-2xl p-2.5 space-y-2.5 overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/15 max-h-[calc(100vh-64px-24px)] shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-20">
-          <div className="flex items-center gap-1.5 px-1 pb-1.5 border-b border-white/[0.06]">
-            <Compass className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-white/80 whitespace-nowrap">
-              3D Angles
-            </span>
-          </div>
-          <div className="space-y-2 flex-1">
-            {LAYOUT_PRESETS.map((p) => (
-              <Live3DPerspectiveCard
-                key={p.id}
-                presetId={p.id}
-                name={p.name}
-                subtitle={p.subtitle}
-                imageSrc={imageSrc}
-                secondarySrc={secondarySrc || undefined}
-                layoutMode={layoutMode}
-                duoLayout={duoLayout}
-                bgType={bgType}
-                gradient={gradient}
-                solidColor={solidColor}
-                isCustomGradient={isCustomGradient}
-                customGradColor1={customGradColor1}
-                customGradColor2={customGradColor2}
-                customGradAngle={customGradAngle}
-                selectedPattern={selectedPattern}
-                isActive={layoutPreset === p.id}
-                onClick={() => {
-                  if (compositionDocument && selectedCompositionObject && selectedCompositionObject !== 'main') return;
-                  setLayoutPreset(p.id);
-                  trackEvent('preset_change', { layout: p.id, type: 'layout' });
-                }}
-                layout="rail"
-              />
-            ))}
-          </div>
-        </aside>}
-
         {/* Right: Customization Controls Panel with Segmented Inspector */}
         <aside className="studio-inspector w-full lg:w-[360px] xl:w-[380px] 2xl:w-[420px] shrink-0 lg:my-3 lg:mr-3 lg:rounded-2xl border-l lg:border border-white/[0.08] bg-[#0c0d14]/90 backdrop-blur-2xl flex flex-col lg:h-[calc(100vh-64px-24px)] p-4 sm:p-5 overflow-y-auto overflow-x-hidden space-y-5 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
           
@@ -2618,7 +2575,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           </div>
 
           <SelectionControls context={templateContext} tab={sidebarTab} layoutMode={layoutMode} imageSrc={imageSrc} secondarySrc={secondarySrc} imageName={imageName} secondaryName={secondaryName} angleControls={<>              {/* 3D Perspective & Angles Selector (Shown in Inspector only on smaller screens where dedicated side rail is hidden) */}
-              <div className="space-y-2.5">
+              <div data-3d-angles className="inspector-angle-card space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
                     <Compass className="w-3.5 h-3.5 text-indigo-400" />
@@ -2655,15 +2612,13 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                           setLayoutPreset(p.id);
                           trackEvent('preset_change', { layout: p.id, type: 'layout' });
                         }}
-                        layout="inspector"
                       />
                     );
                   })}
                 </div>
               </div>
 
-          <div className="space-y-2"><h4>Quick starter demos</h4><div className="flex flex-wrap gap-2">{MOCKUP_PRESETS.map(preset => <button key={preset.id} type="button" onClick={() => handleApplyPreset(preset)}>{preset.name}</button>)}</div></div>
-</>} document={compositionDocument} texts={textDocument} selected={selectedObject || textEditor.activeId} size={canvasLogicalSize} customLogo={isProUnlocked && !!logoDataUrl} onSelect={selectObject} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit}
+</>} starterControls={<div className="space-y-2"><h4>Quick starter demos</h4><div className="flex flex-wrap gap-2">{MOCKUP_PRESETS.map(preset => <button key={preset.id} type="button" onClick={() => handleApplyPreset(preset)}>{preset.name}</button>)}</div></div>} document={compositionDocument} texts={textDocument} selected={selectedObject || textEditor.activeId} size={canvasLogicalSize} customLogo={isProUnlocked && !!logoDataUrl} onSelect={selectObject} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit}
             onIndependent={() => { if (textEditor.finish()) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), ...(aspectRatio.id === 'auto' ? { aspectRatioId: 'custom', customCanvasSize: { ...canvasLogicalSize } } : {}), compositionDocument: compositionDocument ? { ...compositionDocument, mediaLayout: 'independent' } : createIndependentComposition() }); }}
             onAddButton={() => { if (!textEditor.finish()) return; const document = compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: layoutMode === 'duo' }; const id = crypto.randomUUID(); changeComposition({ ...document, objects: [...document.objects, { id, name: 'Button', kind: 'button', frame: { centerX: .5, centerY: .8, widthRatio: .25, heightRatio: .07, rotation: 0 }, text: 'Get started', fill: '#272617', color: '#ffffff', fontSize: 20, radius: 8, padding: 16, autoWidth: false, arrow: true }], order: [...document.order, id] }); setSelectedObject(id); }}
             onResetTemplate={() => {
@@ -2752,7 +2707,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
               {compositionDocument?.mediaLayout !== 'independent' && <>
               {/* Mockup Zoom & Position (Shots.so Alignment: Entire Mockup Scaling & Pan) */}
-              <div className="space-y-3 p-3 rounded-2xl bg-white/[0.03] border border-white/10 shadow-sm">
+              <div data-mockup-camera className="space-y-3 p-3 rounded-2xl bg-white/[0.03] border border-white/10 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-white/50">Mockup Zoom & Position</label>
@@ -4244,7 +4199,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
       {/* Pro Lifetime License Modal (with PayPal Integration) */}
       {showProModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+        <div data-pro-modal role="dialog" aria-modal="true" aria-label="Upgrade to Pro" className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl md:max-w-2xl lg:max-w-3xl w-full p-5 sm:p-6 shadow-2xl relative my-auto">
             
             <button
@@ -4351,10 +4306,10 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
       {/* Pro License Activation & Claim Modal */}
       {showClaimModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div data-claim-modal role="dialog" aria-modal="true" aria-label="License activation" className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-indigo-500/40 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl relative">
             <button
-              onClick={() => setShowClaimModal(false)}
+              onClick={() => setShowClaimModal(false)} aria-label="Close license dialog" autoFocus
               className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -4515,6 +4470,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
             <button
               onClick={() => setShowSuccessModal(false)}
+              autoFocus
               className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm py-2.5 rounded-xl transition-all cursor-pointer"
             >
               Start Creating Mockups
