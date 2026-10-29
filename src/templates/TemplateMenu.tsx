@@ -16,8 +16,13 @@ export function TemplateMenu({ onDesignedApply, onClose, suspended = false, isPr
   const [preview, setPreview] = useState<Template | null>(null);
   const [filter, setFilter] = useState('all');
   const dialog = useRef<HTMLDialogElement>(null);
+  const galleryScroll = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const lastCard = useRef<HTMLElement | null>(null);
+  const chooseFilter = (value: string) => {
+    setFilter(value);
+    if (galleryScroll.current) galleryScroll.current.scrollTop = 0;
+  };
 
   useEffect(() => {
     trigger.current = document.querySelector<HTMLElement>('[data-template-trigger]') ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
@@ -46,13 +51,13 @@ export function TemplateMenu({ onDesignedApply, onClose, suspended = false, isPr
         <button type="button" className="template-gallery-close" aria-label="Close template gallery" onClick={onClose}><X size={19} /></button>
       </header>
       <div className="template-filters" aria-label="Filter templates by aspect ratio">
-        <button type="button" data-template-filter="all" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All</button>
-        {groups.map(group => <button key={group.key} type="button" data-template-filter={group.key} aria-pressed={filter === group.key} onClick={() => setFilter(group.key)}>{group.key}</button>)}
+        <button type="button" data-template-filter="all" aria-pressed={filter === 'all'} onClick={() => chooseFilter('all')}>All</button>
+        {groups.map(group => <button key={group.key} type="button" data-template-filter={group.key} aria-pressed={filter === group.key} onClick={() => chooseFilter(group.key)}>{group.key}</button>)}
       </div>
       {busy && <p role="status" className="template-gallery-status">Preparing artwork…</p>}
       {error && <p role="alert" className="template-gallery-error">{error}</p>}
-      <div className="template-gallery-scroll">
-        {!groups.some(group => filter === 'all' || group.key === filter) && <p className="template-gallery-note">No templates in this size yet. <button type="button" onClick={() => setFilter('all')}>View all templates</button></p>}
+      <div ref={galleryScroll} className="template-gallery-scroll">
+        {!groups.some(group => filter === 'all' || group.key === filter) && <p className="template-gallery-note">No templates in this size yet. <button type="button" onClick={() => chooseFilter('all')}>View all templates</button></p>}
         {groups.filter(group => filter === 'all' || group.key === filter).map(group => <section className="template-group" key={group.key}>
           <div className="template-group-heading"><h3>{group.key}</h3><span>{group.items.length} {group.items.length === 1 ? 'template' : 'templates'}</span></div>
           <div className="template-gallery-grid">{group.items.map(template => <article className="template-card" key={template.id}>

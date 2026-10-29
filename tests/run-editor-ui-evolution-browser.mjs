@@ -37,6 +37,9 @@ try {
   assert.ok(parseFloat(selectedBorder.width) >= 2, `selected 3D angle has a visible outline: ${JSON.stringify(selectedBorder)}`);
   await clickButton(page, 'Templates');
   await page.waitForSelector('dialog[data-template-gallery][open]', { timeout: 5000 });
+  const galleryHeight = await page.$eval('[data-template-gallery]', el => el.getBoundingClientRect().height);
+  const openingAnimation = await page.$eval('[data-template-gallery]', el => getComputedStyle(el).animationName);
+  assert.equal(openingAnimation, 'template-gallery-enter', 'template library opens with an entrance animation');
   if (process.env.UI_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.UI_SCREENSHOT_DIR, 'gallery.png') });
   assert.equal(await page.$eval('[data-template-filter="all"]', el => el.getAttribute('aria-pressed')), 'true');
   assert.equal(await page.$$eval('[data-template-gallery] article', xs => xs.length), 12);
@@ -47,6 +50,7 @@ try {
   assert.ok(portrait >= 140, `portrait thumbnail must be readable, got ${portrait}px`);
   if (process.env.UI_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.UI_SCREENSHOT_DIR, 'gallery-portrait.png') });
   await page.click('[data-template-filter="1:1"]');
+  assert.ok(Math.abs((await page.$eval('[data-template-gallery]', el => el.getBoundingClientRect().height)) - galleryHeight) < 1, 'gallery height remains stable when filtering');
   assert.equal(await page.$$eval('[data-template-gallery] article', xs => xs.length), 2);
   await page.click('[data-template-filter="all"]');
   await page.click('[aria-label="Preview Editorial Honey template"]');
@@ -76,16 +80,20 @@ try {
   assert.ok(await page.$eval('[data-3d-angles] button[aria-pressed="true"]', el => parseFloat(getComputedStyle(el).borderTopWidth) >= 2), 'dark theme selected 3D angle is visible');
   if (process.env.UI_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.UI_SCREENSHOT_DIR, 'editor-dark.png') });
   const mobile = await preparePage(browser, origin + '/?editor=1', { viewport: { width:360, height:844, deviceScaleFactor:1 } });
+  await mobile.emulateMediaFeatures([{ name:'prefers-reduced-motion', value:'reduce' }]);
   const overflow = await mobile.evaluate(() => ({width:document.body.scrollWidth, nodes:[...document.querySelectorAll('body *')].filter(el=>el.getBoundingClientRect().right>innerWidth+1).slice(0,8).map(el=>`${el.tagName}.${el.className}`)}));
   assert.equal(overflow.width, 360, `mobile body does not overflow: ${overflow.nodes.join(', ')}`);
   if (await mobile.$('[aria-label="Switch to Dark theme"]')) await mobile.click('[aria-label="Switch to Dark theme"]');
   assert.equal(await mobile.evaluate(() => document.documentElement.classList.contains('theme-dark')), true);
   await mobile.click('[data-template-trigger]');
   await mobile.waitForSelector('dialog[data-template-gallery][open]');
+  assert.equal(await mobile.$eval('[data-template-gallery]', el => getComputedStyle(el).animationName), 'none', 'reduced motion disables the opening animation');
+  const mobileHeight = await mobile.$eval('[data-template-gallery]', el => el.getBoundingClientRect().height);
   assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth), 360, 'mobile page does not overflow');
   assert.ok(await mobile.$eval('dialog[data-template-gallery]', el => el.getBoundingClientRect().right <= innerWidth));
   if (process.env.UI_SCREENSHOT_DIR) await mobile.screenshot({ path: path.join(process.env.UI_SCREENSHOT_DIR, 'gallery-mobile-dark.png') });
   await mobile.click('[data-template-filter="9:16"]');
+  assert.ok(Math.abs((await mobile.$eval('[data-template-gallery]', el => el.getBoundingClientRect().height)) - mobileHeight) < 1, 'mobile gallery height remains fixed');
   await mobile.$eval('[data-template-gallery] article img', img => img.decode());
   const mobilePortrait = await mobile.$eval('[data-template-gallery] article img', img => { const r=img.getBoundingClientRect(); return Math.min(r.width, r.height * img.naturalWidth / img.naturalHeight); });
   assert.ok(mobilePortrait >= 100, `portrait thumbnail remains legible on mobile: ${mobilePortrait}px`);
