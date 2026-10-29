@@ -7,7 +7,7 @@ const url = process.env.TEST_UI_URL;
 const output = path.resolve('../../output/devsnapkit/canvas-text-v1/inspector-polish');
 const paint = page => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 async function click(page, selector) { const el = await page.$(selector); assert.ok(el, selector); await el.evaluate(n => n.scrollIntoView({ block: 'center' })); await el.click(); await paint(page); }
-async function textTab(page) { const el = await page.evaluateHandle(() => [...document.querySelectorAll('[data-inspector-tabs] button')].find(n => n.textContent.trim() === 'Text')); await el.asElement().click(); await paint(page); }
+async function textTab(page) { await clickButton(page, 'Text'); await paint(page); }
 
 test('Polish normal editing has no confirmation buttons and applies through real Inspector navigation', { skip: !url, timeout: 60000 }, async () => {
   const browser = await launchBrowser();

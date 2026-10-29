@@ -13,6 +13,7 @@ import type { CuratedTemplateId } from './templates/collection/types';
 import type { CompositionDocument } from './composition/types';
 import { createIndependentComposition, compositionFrame, moveCompositionObject, secondaryRequired, boxOutsideCanvas } from './composition/document';
 import { SelectionControls } from './inspector/SelectionControls';
+import { ObjectControls } from './composition/ObjectControls';
 import { ElementPicker } from './inspector/ElementPicker';
 import { inspectorTabFor } from './inspector/model';
 import { BrandControls } from './inspector/BrandControls';
@@ -657,6 +658,7 @@ export default function App() {
 
   // Interactive UI States
   const [sidebarTab, setSidebarTab] = useState<'style' | 'background' | 'text' | 'brand' | 'export'>(() => entryParams.get('tool') === 'text' ? 'text' : 'style');
+  const [elementSection, setElementSection] = useState<'text' | 'buttons' | 'decor'>('text');
   const [copied, setCopied] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [showProModal, setShowProModal] = useState<boolean>(false);
@@ -892,17 +894,24 @@ export default function App() {
   const selectedCompositionObject = selectedObject || textEditor.activeId;
   const switchInspectorTab = (tab: typeof sidebarTab) => {
     leaveBrandEdit();
+    finishCompositionEdit();
     if (!textEditor.finish()) return;
-    if (tab === 'text') setSelectedObject(null);
+    if (tab === 'text' && elementSection === 'text') setSelectedObject(null);
     if (tab === 'style' && selectedCompositionObject && !['main', 'secondary'].includes(selectedCompositionObject)) { textEditor.select(null); setSelectedObject('main'); }
     setSidebarTab(tab);
   };
   const selectObject = (id: string) => {
     leaveBrandEdit();
+    finishCompositionEdit();
     if (!textEditor.finish()) return;
     setSidebarTab(inspectorTabFor(id, textDocument, compositionDocument));
-    if (textDocument.layers.some(layer => layer.id === id)) { setSelectedObject(null); textEditor.select(id); setSidebarTab('text'); }
-    else { textEditor.select(null); setSelectedObject(id === 'secondary' && compositionDocument?.mediaLayout === 'legacy' ? 'main' : id); }
+    if (textDocument.layers.some(layer => layer.id === id)) { setSelectedObject(null); textEditor.select(id); setElementSection('text'); setSidebarTab('text'); }
+    else {
+      const node = [...(compositionDocument?.objects || []), ...(compositionDocument?.decorations || [])].find(item => item.id === id);
+      if (node?.kind === 'button') setElementSection('buttons');
+      else if (node?.kind === 'shape' && node.shape !== 'mark') setElementSection('decor');
+      textEditor.select(null); setSelectedObject(id === 'secondary' && compositionDocument?.mediaLayout === 'legacy' ? 'main' : id);
+    }
   };
   const changeComposition = (document: CompositionDocument) => {
     if (selectedObject && !['main', 'secondary'].includes(selectedObject) && ![...document.objects, ...document.decorations].some(node => node.id === selectedObject)) setSelectedObject(null);
@@ -2077,7 +2086,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           {/* Top Canvas Action Bar: History & Shortcuts (F1/F2) */}
           <div data-canvas-toolbar className="relative shrink-0 mb-1 flex items-center gap-1 px-1.5 py-1 rounded-xl bg-[#0c0d14]/85 backdrop-blur-xl border border-white/10 shadow-lg z-20">
             <button type="button" aria-label="Add text" disabled={isExporting || textDocument.layers.length >= 20}
-              onClick={() => { setSidebarTab('text'); textEditor.add(); }}
+              onClick={() => { finishCompositionEdit(); setSelectedObject(null); setElementSection('text'); setSidebarTab('text'); textEditor.add(); }}
               className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1 text-xs disabled:opacity-40"
               title="Add text to the canvas"><Type className="w-4 h-4" /><span className="text-[11px] font-medium">Add text</span></button>
             <div className="h-3.5 w-px bg-white/10 mx-0.5" />
@@ -2285,10 +2294,10 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           <CanvasTextOverlay compositionHitTargets={!!compositionDocument} document={compositionDocument ? { ...textDocument, layers: textDocument.layers.filter(layer => !compositionDocument.hiddenIds.includes(layer.id)) } : textDocument} size={canvasLogicalSize} activeId={textEditor.activeId} editingId={textEditor.editingId}
             onArtworkHit={id => { if (!textEditor.finish()) return; selectObject(id); if (id === 'main' || id === 'secondary') (id === 'main' ? fileInputRef : secondaryFileInputRef).current?.click(); }}
             recoveryMessage={textEditor.session?.error || (textEditor.session?.composing ? textEditor.message : '')}
-            issues={textLayout.issues} onGestureStart={(id, kind, scale) => { const token = textEditor.beginGesture(id, kind, scale); if (token !== false) { setSelectedObject(null); setSidebarTab('text'); } return token; }} onGestureMove={textEditor.moveGesture}
+            issues={textLayout.issues} onGestureStart={(id, kind, scale) => { finishCompositionEdit(); const token = textEditor.beginGesture(id, kind, scale); if (token !== false) { setSelectedObject(null); setElementSection('text'); setSidebarTab('text'); } return token; }} onGestureMove={textEditor.moveGesture}
             onGestureActive={textEditor.hasGesture}
             draft={textEditor.session?.kind === 'content' ? textEditor.session.value : ''} light={themeMode === 'light'}
-            onEdit={id => { setSelectedObject(null); setSidebarTab('text'); textEditor.edit(id); }} onChange={textEditor.change} onDone={textEditor.finish} onCancel={textEditor.cancel} onDeselect={() => textEditor.select(null)} />
+            onEdit={id => { finishCompositionEdit(); setSelectedObject(null); setElementSection('text'); setSidebarTab('text'); textEditor.edit(id); }} onChange={textEditor.change} onDone={textEditor.finish} onCancel={textEditor.cancel} onDeselect={() => textEditor.select(null)} />
 
           {/* Floating Bottom Studio Dock */}
           </CanvasStage>
@@ -2513,9 +2522,9 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               <span>Canvas</span>
             </button>
 
-            <button type="button" onClick={() => switchInspectorTab('text')}
+            <button type="button" data-elements-tab onClick={() => switchInspectorTab('text')}
               className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer active:scale-[0.98] ${sidebarTab === 'text' ? 'bg-white/10 text-white border border-white/15 shadow-sm' : 'text-white/50 hover:text-white hover:bg-white/[0.04]'}`}>
-              <Type className="w-3.5 h-3.5" /><span>Text</span>
+              <Layers className="w-3.5 h-3.5" /><span>Elements</span>
             </button>
             <button
               onClick={() => switchInspectorTab('brand')}
@@ -2542,7 +2551,13 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             </button>
           </div>
 
-          <SelectionControls context={templateContext} tab={sidebarTab} layoutMode={layoutMode} imageSrc={imageSrc} secondarySrc={secondarySrc} imageName={imageName} secondaryName={secondaryName} angleControls={<>              {/* 3D Perspective & Angles Selector (Shown in Inspector only on smaller screens where dedicated side rail is hidden) */}
+          {sidebarTab === 'text' && <div className="elements-panel" data-elements-sections>
+            <div className="elements-panel-heading"><div><h3>Elements</h3><p>Customize the details of your visual.</p></div><Layers size={19} aria-hidden="true" /></div>
+            <div className="elements-tabs" role="group" aria-label="Element type">
+              {([['text', 'Text'], ['buttons', 'Buttons'], ['decor', 'Decor']] as const).map(([section, label]) => <button type="button" key={section} data-element-section={section} aria-pressed={elementSection === section} onClick={() => { finishCompositionEdit(); if (!textEditor.finish()) return; if (section === 'text') setSelectedObject(null); else textEditor.select(null); setElementSection(section); }}>{label}</button>)}
+            </div>
+          </div>}
+          <SelectionControls context={templateContext} tab={sidebarTab === 'text' && elementSection !== 'text' ? '' : sidebarTab} layoutMode={layoutMode} imageSrc={imageSrc} secondarySrc={secondarySrc} imageName={imageName} secondaryName={secondaryName} angleControls={<>              {/* 3D Perspective & Angles Selector (Shown in Inspector only on smaller screens where dedicated side rail is hidden) */}
               <details data-3d-angles className="inspector-angle-card">
                 <summary className="inspector-angle-summary">
                   <span className="inspector-angle-heading"><Compass size={15} /><span>3D Perspective &amp; Angles</span></span>
@@ -2584,7 +2599,6 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
 </>} starterControls={<div className="space-y-2"><h4>Quick starter demos</h4><div className="flex flex-wrap gap-2">{MOCKUP_PRESETS.map(preset => <button key={preset.id} type="button" onClick={() => handleApplyPreset(preset)}>{preset.name}</button>)}</div></div>} document={compositionDocument} texts={textDocument} selected={selectedObject || textEditor.activeId} size={canvasLogicalSize} customLogo={isProUnlocked && !!logoDataUrl} onSelect={selectObject} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit}
             onIndependent={() => { if (textEditor.finish()) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), ...(aspectRatio.id === 'auto' ? { aspectRatioId: 'custom', customCanvasSize: { ...canvasLogicalSize } } : {}), compositionDocument: compositionDocument ? { ...compositionDocument, mediaLayout: 'independent' } : createIndependentComposition() }); }}
-            onAddButton={() => { if (!textEditor.finish()) return; const document = compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: layoutMode === 'duo' }; const id = crypto.randomUUID(); changeComposition({ ...document, objects: [...document.objects, { id, name: 'Button', kind: 'button', frame: { centerX: .5, centerY: .8, widthRatio: .25, heightRatio: .07, rotation: 0 }, text: 'Get started', fill: '#272617', color: '#ffffff', fontSize: 20, radius: 8, padding: 16, autoWidth: false, arrow: true }], order: [...document.order, id] }); setSelectedObject(id); }}
             onResetTemplate={() => {
               if (!compositionDocument?.templateId || !window.confirm('Reset all template text, screenshots and design settings to the original demo? You can Undo this change.')) return;
               const id = compositionDocument.templateId;
@@ -2600,11 +2614,23 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               const copy = validateText({ ...layer, id: crypto.randomUUID(), centerX: Math.max(layer.widthRatio / 2, Math.min(1 - layer.widthRatio / 2, layer.centerX + 24 / canvasLogicalSize.width)), centerY: below + half <= 1 ? below : above - half >= 0 ? above : Math.max(half, Math.min(1 - half, layer.centerY + 24 / canvasLogicalSize.height)) });
               const composition = before.compositionDocument;
               flushSync(() => { editorHistory.applyCommand({ ...before, textDocument: { ...before.textDocument, layers: [...before.textDocument.layers, copy] }, compositionDocument: composition ? { ...composition, knownTextIds: [...new Set([...(composition.knownTextIds || []), copy.id])], order: [...composition.order, copy.id] } : composition }); });
-              setSelectedObject(null); textEditor.select(copy.id); setSidebarTab('text');
+              setSelectedObject(null); textEditor.select(copy.id); setElementSection('text'); setSidebarTab('text');
             }}
             onReplace={slot => (slot === 'main' ? fileInputRef : secondaryFileInputRef).current?.click()} onRestore={handleRestoreTemplateLayout}
             onRemoveDetail={() => { if (textEditor.finish() && compositionDocument) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } }); }} />
-          <div hidden={sidebarTab !== 'text'}>
+          {sidebarTab === 'text' && elementSection !== 'text' && <section className="elements-object-panel">
+            <div className="elements-object-heading"><div><h3>{elementSection === 'buttons' ? 'Buttons' : 'Decorations'}</h3><p>{elementSection === 'buttons' ? 'Add and customize a call to action.' : 'Customize decorative elements from your template.'}</p></div>
+              {elementSection === 'buttons' && <button type="button" className="elements-add" onClick={() => { finishCompositionEdit(); if (!textEditor.finish()) return; const document = compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: layoutMode === 'duo' }; const id = crypto.randomUUID(); changeComposition({ ...document, objects: [...document.objects, { id, name: 'Button', kind: 'button', frame: { centerX: .5, centerY: .8, widthRatio: .25, heightRatio: .07, rotation: 0 }, text: 'Get started', fill: '#272617', color: '#ffffff', fontSize: 20, radius: 8, padding: 16, autoWidth: false, arrow: true }], order: [...document.order, id] }); textEditor.select(null); setSelectedObject(id); }}>Add button</button>}
+            </div>
+            {(() => {
+              const items = [...(compositionDocument?.objects || []), ...(compositionDocument?.decorations || [])].filter(node => elementSection === 'buttons' ? node.kind === 'button' : node.kind === 'shape' && node.shape !== 'mark');
+              const current = items.find(node => node.id === selectedObject);
+              return <><label className="elements-select-label">Selected {elementSection === 'buttons' ? 'button' : 'decoration'}<select aria-label={elementSection === 'buttons' ? 'Current button' : 'Current decoration'} value={current?.id || ''} onChange={event => { if (event.target.value) selectObject(event.target.value); else setSelectedObject(null); }}><option value="">Choose an element</option>{items.map(node => <option value={node.id} key={node.id}>{node.name}</option>)}</select></label>
+                {current ? <ObjectControls document={compositionDocument} selected={current.id} size={canvasLogicalSize} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit} /> : <p className="elements-empty">{items.length ? 'Select an element above or on the canvas to edit it.' : elementSection === 'buttons' ? 'Add a button to start customizing it.' : 'Apply a template with decorations to edit them here.'}</p>}
+              </>;
+            })()}
+          </section>}
+          <div hidden={sidebarTab !== 'text' || elementSection !== 'text'} className="elements-text-panel">
             <TextControls document={textDocument} editor={textEditor} disabled={isExporting} />
             {(customBrandWatermark !== '' || editingLegacyBrandText) && <section data-legacy-brand-text className="brand-controls" aria-label="Saved brand text">
               <h3 className="text-xs font-semibold mb-2">Saved brand text</h3>

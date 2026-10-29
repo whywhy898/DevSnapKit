@@ -13,7 +13,10 @@ let server,browser;const results=[],errors=[];
 async function settle(page){await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.querySelectorAll('#studio-canvas img')].map(i=>i.decode()));});await pause(700);}
 async function editRole(page,role,value){
   const id=await page.evaluate(role=>window.__mockupBaseline.snapshot.textDocument.layers.find(l=>l.id.endsWith('-'+role)).id,role);
-  await page.click(`[data-text-hit="${id}"]`);await page.waitForSelector('[aria-label="Text content"]');await page.focus('[aria-label="Text content"]');
+  await page.click(`[data-text-hit="${id}"]`);
+  await pause(200);
+  if (!await page.$('[aria-label="Text content"]')) { assert.equal(await page.$eval('[aria-label="Current text"]', el => el.value), id); await clickButton(page, 'Edit text'); }
+  await page.waitForSelector('[aria-label="Text content"]');await page.focus('[aria-label="Text content"]');
   await page.keyboard.down('Control');await page.keyboard.press('A');await page.keyboard.up('Control');await page.keyboard.type(value);await finishTextEditing(page);await settle(page);
 }
 async function replaceTitleSegment(page,oldText,newText){
@@ -77,7 +80,7 @@ try{
   await (await page.$('[aria-label="Second screenshot file"]')).uploadFile(referenceCard);
   await page.waitForFunction(()=>window.__mockupBaseline.snapshot.imageName==='honeywerank-original.png'&&window.__mockupBaseline.snapshot.secondaryName==='honeywerank-workflow-card-reference.png');await settle(page);
   await editRole(page,'brand','HoneyWeRank');await editRole(page,'badge','Join the waitlist');
-  const headline=await page.evaluate(()=>window.__mockupBaseline.snapshot.templateContext.textRoles.headline);await page.click(`[data-text-hit="${headline}"]`);await page.waitForSelector('[aria-label="Text content"]');
+  const headline=await page.evaluate(()=>window.__mockupBaseline.snapshot.templateContext.textRoles.headline);await page.click(`[data-text-hit="${headline}"]`);if(!await page.$('[aria-label="Text content"]')){assert.equal(await page.$eval('[aria-label="Current text"]',el=>el.value),headline);await clickButton(page,'Edit text');}await page.waitForSelector('[aria-label="Text content"]');
   await replaceTitleSegment(page,'Make room','Be the');await replaceTitleSegment(page,'for your','brand AI');await replaceTitleSegment(page,'next idea.','recommends.');await finishTextEditing(page);await settle(page);
   const emphasized=await page.evaluate(()=>window.__mockupBaseline.snapshot.textDocument.layers.find(n=>n.id===window.__mockupBaseline.snapshot.templateContext.textRoles.headline).runs);assert.ok(emphasized.some(r=>r.text.includes('recommends.')&&r.font==='gelasio'&&r.italic));
   await editRole(page,'description','Content. Publishing. Backlinks.\nA sweeter way to get discovered.');

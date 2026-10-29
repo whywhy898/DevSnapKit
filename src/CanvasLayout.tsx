@@ -126,6 +126,7 @@ export function FittedScene({ width, height, paddingX, paddingY, basisWidth, zoo
       const savedTransforms = scaledAncestors.map(node => node.style.transform);
       scaledAncestors.forEach(node => { node.style.transform = 'none'; });
       let next: Bounds | undefined;
+      let natural: SceneSize | undefined;
       try {
       const anchor = el.getBoundingClientRect();
       // The origin itself is never projected: this removes preview/fit/camera scaling.
@@ -140,13 +141,30 @@ export function FittedScene({ width, height, paddingX, paddingY, basisWidth, zoo
       const right = Math.max(...rects.map(r => r.right));
       const bottom = Math.max(...rects.map(r => r.bottom));
       next = { x: (left - anchor.left) / unitScale, y: (top - anchor.top) / unitScale, width: (right - left) / unitScale, height: (bottom - top) / unitScale };
+      // Auto canvas dimensions follow the unprojected composition. Perspective
+      // still has its own measured bounds above for fitting inside that canvas.
+      const projectionNode = el.querySelector<HTMLElement>('[data-scene-projection]');
+      if (projectionNode) {
+        const transform = projectionNode.style.transform;
+        try {
+          projectionNode.style.transform = 'none';
+          const flatRects = [...el.querySelectorAll<HTMLElement>('[data-scene-slot], [data-scene-slot] div')]
+            .filter(node => !node.closest('[data-export-ignore="true"]'))
+            .map(node => node.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0);
+          if (flatRects.length) natural = {
+            width: (Math.max(...flatRects.map(r => r.right)) - Math.min(...flatRects.map(r => r.left))) / unitScale,
+            height: (Math.max(...flatRects.map(r => r.bottom)) - Math.min(...flatRects.map(r => r.top))) / unitScale,
+          };
+        } finally { projectionNode.style.transform = transform; }
+      }
       } finally {
         scaledAncestors.forEach((node, index) => { node.style.transform = savedTransforms[index]; });
       }
       if (!next) return;
       const measured = next;
       setBounds(prev => Object.keys(measured).every(k => close(prev[k as keyof Bounds], measured[k as keyof Bounds])) ? prev : measured);
-      onNaturalSize({ width: Math.ceil(measured.width - 0.001), height: Math.ceil(measured.height - 0.001) });
+      const autoBounds = natural ?? measured;
+      onNaturalSize({ width: Math.ceil(autoBounds.width - 0.001), height: Math.ceil(autoBounds.height - 0.001) });
     };
     const schedule = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(measure); };
     const observer = new ResizeObserver(schedule);

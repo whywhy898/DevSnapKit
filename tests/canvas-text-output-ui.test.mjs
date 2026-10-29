@@ -101,7 +101,7 @@ test('T5 export lock blocks captured old range input, keyboard, paste and Inspec
     await page.evaluate(() => {
       const dt = new DataTransfer(); dt.items.add(new File(['bad'], 'queued.png', { type: 'image/png' }));
       window.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }));
-      [...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Text').click();
+      document.querySelector('[data-elements-tab]').click();
     });
     await paint(page);
     assert.deepEqual(await snapshot(page), before, 'Ongoing controls cannot mutate the frozen editor while fonts wait');

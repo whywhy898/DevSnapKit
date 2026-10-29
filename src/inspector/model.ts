@@ -6,7 +6,7 @@ export function inspectorTabFor(id: string, texts: CanvasTextDocument, doc: Comp
   if (id === 'main' || id === 'secondary') return 'style' as const;
   if (texts.layers.some(layer => layer.id === id)) return 'text' as const;
   const node = [...(doc?.objects || []), ...(doc?.decorations || [])].find(node => node.id === id);
-  return node?.kind === 'shape' && node.shape === 'mark' ? 'brand' as const : 'background' as const;
+  return node?.kind === 'shape' && node.shape === 'mark' ? 'brand' as const : 'text' as const;
 }
 
 export function resolveImageSlots(doc: CompositionDocument | null, layout: 'single' | 'duo', main: string, secondary: string | null) {

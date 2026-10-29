@@ -2,16 +2,15 @@ import type { ReactNode } from 'react';
 import type { CompositionDocument } from '../composition/types';
 import type { CanvasTextDocument } from '../text/types';
 import type { TemplateContext } from '../templates/types';
-import { ObjectControls } from '../composition/ObjectControls';
 import { ImageControls } from './ImageControls';
 import { resolveImageSlots } from './model';
 
-export function SelectionControls({ document: doc, texts, selected, size, tab, layoutMode, imageSrc, secondarySrc, imageName, secondaryName, angleControls, starterControls, onSelect, onChange, onStart, onFinish, onIndependent, onReplace, onRestore, onRemoveDetail, onAddButton, onResetTemplate, onDuplicateText }: {
+export function SelectionControls({ document: doc, texts, selected, size, tab, layoutMode, imageSrc, secondarySrc, imageName, secondaryName, angleControls, starterControls, onSelect, onChange, onStart, onFinish, onIndependent, onReplace, onRestore, onRemoveDetail, onResetTemplate, onDuplicateText }: {
   document: CompositionDocument | null; texts: CanvasTextDocument; selected: string | null; size: { width: number; height: number }; context: TemplateContext | null;
   tab: string; layoutMode: 'single' | 'duo'; imageSrc: string; secondarySrc: string | null; imageName: string; secondaryName: string; angleControls: ReactNode; starterControls: ReactNode;
   onSelect: (id: string) => void; onChange: (doc: CompositionDocument) => void; onStart: () => void; onFinish: () => void;
   onIndependent: () => void; onReplace: (slot: 'main' | 'secondary') => void; onRestore: () => void; onRemoveDetail: () => void;
-  onAddButton: () => void; onResetTemplate: () => void; onDuplicateText: (id: string) => void; customLogo?: boolean;
+  onResetTemplate: () => void; onDuplicateText: (id: string) => void; customLogo?: boolean;
 }) {
   const slots = resolveImageSlots(doc, layoutMode, imageSrc, secondarySrc), image = selected === 'secondary' ? 'secondary' : 'main';
   return <div className="inspector-selection">
@@ -25,7 +24,6 @@ export function SelectionControls({ document: doc, texts, selected, size, tab, l
     {image === 'main' && (!selected || selected === 'main') && doc?.mediaLayout !== 'independent' && angleControls}
     {doc ? <ImageControls key={image} document={doc} selected={image} size={size} onChange={onChange} onStart={onStart} onFinish={onFinish} onRestore={onRestore} onResetTemplate={onResetTemplate} onIndependent={onIndependent}>{image === 'main' && starterControls}{(image === 'secondary' || (doc.mediaLayout === 'legacy' && doc.detailVisible)) && <button type="button" onClick={onRemoveDetail}>Remove detail</button>}</ImageControls> : <details className="inspector-advanced"><summary>Advanced</summary><button type="button" onClick={onIndependent}>Independent two-slot layout</button>{starterControls}</details>}
     </>}
-    {tab === 'background' && <><button type="button" className="inspector-add" onClick={onAddButton}>Add button</button><ObjectControls document={doc} selected={selected} size={size} onChange={onChange} onStart={onStart} onFinish={onFinish} /></>}
     {tab === 'text' && selected && texts.layers.some(layer => layer.id === selected) && <button type="button" className="inspector-add" onClick={() => onDuplicateText(selected)}>Duplicate text</button>}
   </div>;
 }

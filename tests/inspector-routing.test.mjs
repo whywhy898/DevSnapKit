@@ -12,7 +12,7 @@ const texts = { layers: [{ id: 'headline', content: '😀'.repeat(40) }, { id: '
 const doc = { mediaLayout: 'independent', detailVisible: true, hiddenIds: ['secondary', 'empty'], order: ['main', 'secondary', 'headline'], objects: [{ id: 'cta', kind: 'button', name: 'Button' }, { id: 'logo', kind: 'shape', shape: 'mark', name: 'Mark' }], decorations: [{ id: 'line', kind: 'shape', shape: 'line', name: 'Rule' }] };
 test('selection routes image, text, button, decoration and mark to the five existing panes', () => {
   assert.equal(typeof api.inspectorTabFor, 'function');
-  for (const [id, tab] of [['main','style'],['secondary','style'],['headline','text'],['empty','text'],['cta','background'],['line','background'],['logo','brand']]) assert.equal(api.inspectorTabFor(id, texts, doc), tab);
+  for (const [id, tab] of [['main','style'],['secondary','style'],['headline','text'],['empty','text'],['cta','text'],['line','text'],['logo','brand']]) assert.equal(api.inspectorTabFor(id, texts, doc), tab);
 });
 test('one slot resolver lists independent detail even in single layout and counts real sources', () => {
   assert.equal(typeof api.resolveImageSlots, 'function');
