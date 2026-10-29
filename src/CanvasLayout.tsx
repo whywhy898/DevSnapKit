@@ -43,7 +43,7 @@ export function CanvasStage({ width, height, children, freezePreviewWhileEditing
   if (!freezePreviewWhileEditing || !frozen.current.editing || !close(frozen.current.width, size.width)) frozen.current = { width: size.width, scale: calculated, editing: freezePreviewWhileEditing };
   const scale = freezePreviewWhileEditing ? frozen.current.scale : calculated;
   return (
-    <div ref={ref} data-canvas-stage onClick={event => { if (!(event.target as HTMLElement).closest('[data-text-editor-ui]')) onDeselect?.(); }} className="relative flex-none min-h-0 w-full flex items-center justify-center overflow-auto" style={{ height: height * scale + 32, minHeight: freezePreviewWhileEditing ? Math.min(height * scale + 32, 500) : undefined }}>
+    <div ref={ref} data-canvas-stage onClick={event => { if (!(event.target as HTMLElement).closest('[data-text-editor-ui]')) onDeselect?.(); }} className="relative flex-none min-h-0 w-full flex items-center justify-center overflow-visible" style={{ height: height * scale + 32, minHeight: freezePreviewWhileEditing ? Math.min(height * scale + 32, 500) : undefined }}>
       <div className="relative shrink-0" style={{ width: width * scale, height: height * scale, '--canvas-preview-scale': scale } as React.CSSProperties}>
         {children}
       </div>

@@ -152,7 +152,7 @@ test('T4 camera, background, frame, duo, presets and reset retain independent te
   await clickButton(page,'Text');await page.select('[aria-label="Current text"]', initial.layers[0].id);await page.focus('[aria-label="Move text"]');await page.keyboard.press('2');await paint(page);assert.equal((await snapshot(page)).layoutMode,'duo');assert.deepEqual((await snapshot(page)).textDocument,initial);
   await clickButton(page,'Frame');await page.$eval('[data-device-styles]', el => { if (!el.open) el.querySelector('summary').click(); });await clickButton(page,'Safari Browser');await paint(page);assert.deepEqual((await snapshot(page)).textDocument,initial);
   await clickButton(page,'Canvas');await clickButton(page,'Solid');await paint(page);
-  await clickButton(page,'Frame');await page.click('[aria-label="Select Image 1"]');await page.click('[data-3d-angles] button[title^="Floating Tilt"]');await paint(page);assert.equal((await snapshot(page)).layoutPreset,'float');
+  await clickButton(page,'Frame');await page.click('[aria-label="Select Image 1"]');await page.click('[data-3d-angles] summary');await page.click('[data-3d-angles] button[title^="Floating Tilt"]');await paint(page);assert.equal((await snapshot(page)).layoutPreset,'float');
   assert.deepEqual((await snapshot(page)).textDocument,initial);
   assert.ok(await page.$eval('[data-canvas-text-layer]',el=>Number(getComputedStyle(el).zIndex)>=40));
   await page.$eval('button[title="Reset default styling; canvas text is preserved"]',el=>el.click());await paint(page);assert.deepEqual((await snapshot(page)).textDocument,initial);

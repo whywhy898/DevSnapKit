@@ -43,7 +43,7 @@ test('template browsing participates in the text editor focus boundary before au
   assert.match(html, /data-text-editor-ui/);
   const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
   assert.match(app, /<button\s+data-template-trigger\s+data-text-editor-ui/);
-  assert.match(app, /closest\('\[data-template-trigger\], \[data-template-gallery\], \[data-template-preview\], \[data-template-dismiss\]'\)/);
+  assert.match(app, /closest\('\[data-template-trigger\], \[data-template-gallery\], \[data-template-preview\]'\)/);
   const preview = fs.readFileSync(new URL('../src/templates/TemplatePreview.tsx', import.meta.url), 'utf8');
   assert.match(preview, /<dialog data-template-preview data-text-editor-ui/);
 });

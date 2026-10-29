@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { X, Layers3, Lock } from 'lucide-react';
 import { CURATED_TEMPLATE_CATALOG } from './collection/catalog';
 import type { CuratedTemplateId } from './collection/types';
-import type { MockupTemplate } from './types';
 import { groupTemplates } from './templateGroups';
 import { TemplatePreview } from './TemplatePreview';
 
@@ -11,7 +10,7 @@ type Template = typeof CURATED_TEMPLATE_CATALOG[number];
 const groups = groupTemplates(CURATED_TEMPLATE_CATALOG);
 
 export function TemplateMenu({ onDesignedApply, onClose, suspended = false, isProUnlocked = false, disabled, busy, error }: {
-  onApply?: (template: MockupTemplate) => void; onDesignedApply?: (id: CuratedTemplateId) => void;
+  onDesignedApply?: (id: CuratedTemplateId) => void;
   onClose?: () => void; suspended?: boolean; isProUnlocked?: boolean; disabled: boolean; busy: boolean; error?: string;
 }) {
   const [preview, setPreview] = useState<Template | null>(null);
@@ -57,7 +56,7 @@ export function TemplateMenu({ onDesignedApply, onClose, suspended = false, isPr
         {groups.filter(group => filter === 'all' || group.key === filter).map(group => <section className="template-group" key={group.key}>
           <div className="template-group-heading"><h3>{group.key}</h3><span>{group.items.length} {group.items.length === 1 ? 'template' : 'templates'}</span></div>
           <div className="template-gallery-grid">{group.items.map(template => <article className="template-card" key={template.id}>
-            <button type="button" aria-label={`Preview ${template.name} template`} onClick={() => setPreview(template)} className="template-card-image">
+            <button type="button" aria-label={`Preview ${template.name} template`} onClick={() => setPreview(template)} className={`template-card-image ${template.height > template.width ? 'is-portrait' : template.height === template.width ? 'is-square' : 'is-landscape'}`}>
               <img className="object-contain" src={template.thumbnail} width={template.width} height={template.height} alt={`${template.name} exported in DevSnapKit`} loading="lazy" />
             </button>
             <div className="template-card-body">

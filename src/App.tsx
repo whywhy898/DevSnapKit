@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { flushSync } from 'react-dom';
-import type { PrimaryMediaOrigin, TemplateContext, MockupTemplate } from './templates/types';
-import { buildTemplateSnapshot, restoreTemplateLayout, releaseTemplateMediaRegion } from './templates/apply';
+import type { PrimaryMediaOrigin, TemplateContext } from './templates/types';
+import { restoreTemplateLayout, releaseTemplateMediaRegion } from './templates/apply';
 import { getTemplate } from './templates/catalog';
 import { equalValues } from './editorHistory';
 import { TemplateMenu } from './templates/TemplateMenu';
@@ -25,7 +25,7 @@ import {
   Lock, Zap, ShieldCheck, 
   CheckCircle2, RefreshCw, KeyRound,
   Layers, Trash2, Image as ImageIcon, Sparkles, Palette,
-  ChevronDown, Shuffle, Box, Compass,
+  ChevronDown, ArrowUpRight, Shuffle, Box, Compass,
   Smartphone, Laptop, Monitor, RotateCw, Plus, X,
   Wand2, Sun, Moon, Pipette, Flame, Grid,
   Globe, AppWindow, Square, FileText, Mail, Receipt,
@@ -241,13 +241,14 @@ const Live3DPerspectiveCard: React.FC<{
     <button
       onClick={onClick}
       aria-pressed={isActive}
-      className={`group flex flex-col items-center w-full rounded-xl border transition-all cursor-pointer active:scale-[0.98] p-2 ${
+      className={`angle-option group relative flex flex-col items-center w-full rounded-xl border transition-all cursor-pointer active:scale-[0.98] p-2 ${
         isActive
           ? 'bg-[#eef2ff] border-indigo-300 ring-1 ring-indigo-300 dark:bg-[#242746] dark:border-indigo-500/50 dark:ring-indigo-500/30 shadow-md'
           : 'bg-[#f8fafc] border-slate-200/80 hover:border-slate-300 hover:bg-slate-200/60 dark:bg-[#151726] dark:border-white/[0.08] dark:hover:border-white/20 dark:hover:bg-[#1e2136]'
       }`}
       title={subtitle ? `${name} — ${subtitle}` : name}
     >
+      {isActive && <span className="angle-selected-mark" aria-hidden="true"><Check size={12} /></span>}
       {/* 3D Mini Viewport */}
       <div
         className={`w-full aspect-[16/10] rounded-lg overflow-hidden flex items-center justify-center p-2 relative preserve-3d border border-white/10 ${bgData.className} group-hover:scale-[1.02] transition-transform duration-200`}
@@ -994,7 +995,7 @@ export default function App() {
   const guardEditorAction = (event: React.SyntheticEvent) => {
     // Viewing designs and denied application must leave in-progress edits untouched.
     // Authorized application finishes the edit explicitly after resource admission.
-    if ((event.target as HTMLElement).closest('[data-template-trigger], [data-template-gallery], [data-template-preview], [data-template-dismiss]')) return;
+    if ((event.target as HTMLElement).closest('[data-template-trigger], [data-template-gallery], [data-template-preview]')) return;
     if (exportLock.current) { event.preventDefault(); event.stopPropagation(); return; }
     if (event.type === 'pointerdown') {
       if (!(event.target as HTMLElement).closest('[data-brand-controls], [data-legacy-brand-text]')) leaveBrandEdit();
@@ -1867,39 +1868,6 @@ export default function App() {
     finally { if (request === templateRequest.current) { applyingTemplate.current = false; setPreparingTemplate(false); } }
   };
 
-  const handleApplyTemplate = async (template: MockupTemplate) => {
-    if (applyingTemplate.current || exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) {
-      setTextError('Finish the current image, canvas, or export operation before applying a template.'); return;
-    }
-    applyingTemplate.current = true;
-    setPreparingTemplate(true);
-    try {
-      // Decode the real sample; image geometry must never depend on catalog guesses.
-      const sampleSource = MOCKUP_PRESETS.find(item => item.id === template.sampleId);
-      if (!sampleSource) throw new Error('Template sample missing');
-      const sample = await decodeArtworkImage(sampleSource.svgDataUri);
-      if (exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) {
-        setTextError('Finish the current operation before applying a template.'); return;
-      }
-      let valid = false;
-      flushSync(() => { valid = textEditor.finish(); });
-      if (!valid || editorHistory.isInTransaction()) return;
-      const before = editorHistory.getLatestSnapshot();
-      const previousRoles = before.templateContext?.id === template.id ? before.templateContext.textRoles : null;
-      const unchanged = previousRoles && equalValues(before, buildTemplateSnapshot(before, template, previousRoles));
-      const roles = unchanged && previousRoles ? previousRoles : { headline: crypto.randomUUID(), description: crypto.randomUUID() };
-      const next = buildTemplateSnapshot(before, template, roles);
-      if (editorHistory.applyCommand(next)) {
-        if (before.primaryMediaOrigin?.kind === 'builtin') setImageNaturalSize({ width: sample.naturalWidth, height: sample.naturalHeight });
-        setDimensionError(''); setTextError('');
-      }
-      setSidebarTab('style');
-      setShowDemoTemplatesMenu(false);
-    } catch {
-      setTextError('The template screenshot could not be prepared. Try again.');
-    } finally { applyingTemplate.current = false; setPreparingTemplate(false); }
-  };
-
   const handleRestoreTemplateLayout = () => {
     if (applyingTemplate.current || exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) return;
     let valid = false;
@@ -2369,17 +2337,18 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               </button>
             </div>}
 
-            {/* Replace Image & Starter Demo Picker */}
+            {/* Replace Image and the template gallery are separate actions. */}
             <div className="relative flex items-center shrink-0 h-9">
               <button 
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-xl bg-white/[0.08] hover:bg-white/[0.14] text-white text-xs font-semibold border-y border-l border-r-0 border-white/15 backdrop-blur-md transition-all shadow-lg hover:shadow-indigo-500/10 cursor-pointer active:scale-[0.98] h-full"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-white text-xs font-semibold border border-white/15 backdrop-blur-md transition-all shadow-lg hover:shadow-indigo-500/10 cursor-pointer active:scale-[0.98] h-full"
                 title="Upload screenshot from computer"
               >
                 <Upload className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Replace Image</span>
               </button>
+            </div>
               <button
                 data-template-trigger
                 data-text-editor-ui
@@ -2391,16 +2360,15 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               >
                 <span className="template-trigger-previews" aria-hidden="true"><img src="/designed/editorial-honey.webp" alt="" /><img src="/designed/collection/paper-launch-duo.webp" alt="" /></span>
                 <span>Templates</span>
-                <ChevronDown className={`w-3 h-3 transition-transform ${showDemoTemplatesMenu ? 'rotate-180' : ''}`} />
+                <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
 
               {/* Starter Demo Dropdown Popover */}
               {showDemoTemplatesMenu && (
                 <>
-                  <TemplateMenu onApply={handleApplyTemplate} onDesignedApply={handleApplyDesignedTemplate} onClose={dismissTemplateGallery} suspended={showProModal || showClaimModal || showSuccessModal} isProUnlocked={isProUnlocked} disabled={isExporting || preparingTemplate || assetBusy} busy={preparingTemplate || assetBusy} error={textError} />
+                  <TemplateMenu onDesignedApply={handleApplyDesignedTemplate} onClose={dismissTemplateGallery} suspended={showProModal || showClaimModal || showSuccessModal} isProUnlocked={isProUnlocked} disabled={isExporting || preparingTemplate || assetBusy} busy={preparingTemplate || assetBusy} error={textError} />
                 </>
               )}
-            </div>
             
             <div className="h-4 w-[1px] bg-white/10 hidden sm:block shrink-0" />
 
@@ -2575,18 +2543,14 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           </div>
 
           <SelectionControls context={templateContext} tab={sidebarTab} layoutMode={layoutMode} imageSrc={imageSrc} secondarySrc={secondarySrc} imageName={imageName} secondaryName={secondaryName} angleControls={<>              {/* 3D Perspective & Angles Selector (Shown in Inspector only on smaller screens where dedicated side rail is hidden) */}
-              <div data-3d-angles className="inspector-angle-card space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
-                    <Compass className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>3D Perspective & Angles</span>
-                  </label>
-                  <span className="text-[11px] text-white/40 font-mono capitalize">
-                    {LAYOUT_PRESETS.find(p => p.id === layoutPreset)?.name}
-                  </span>
-                </div>
+              <details data-3d-angles className="inspector-angle-card">
+                <summary className="inspector-angle-summary">
+                  <span className="inspector-angle-heading"><Compass size={15} /><span>3D Perspective &amp; Angles</span></span>
+                  <span className="inspector-angle-current">{LAYOUT_PRESETS.find(p => p.id === layoutPreset)?.name}</span>
+                  <ChevronDown size={15} className="inspector-angle-chevron" aria-hidden="true" />
+                </summary>
 
-                <div className="grid grid-cols-2 gap-2.5 w-full min-w-0">
+                <div className="grid grid-cols-2 gap-2.5 w-full min-w-0 inspector-angle-grid">
                   {LAYOUT_PRESETS.map((p) => {
                     const isActive = layoutPreset === p.id;
                     return (
@@ -2616,7 +2580,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                     );
                   })}
                 </div>
-              </div>
+              </details>
 
 </>} starterControls={<div className="space-y-2"><h4>Quick starter demos</h4><div className="flex flex-wrap gap-2">{MOCKUP_PRESETS.map(preset => <button key={preset.id} type="button" onClick={() => handleApplyPreset(preset)}>{preset.name}</button>)}</div></div>} document={compositionDocument} texts={textDocument} selected={selectedObject || textEditor.activeId} size={canvasLogicalSize} customLogo={isProUnlocked && !!logoDataUrl} onSelect={selectObject} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit}
             onIndependent={() => { if (textEditor.finish()) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), ...(aspectRatio.id === 'auto' ? { aspectRatioId: 'custom', customCanvasSize: { ...canvasLogicalSize } } : {}), compositionDocument: compositionDocument ? { ...compositionDocument, mediaLayout: 'independent' } : createIndependentComposition() }); }}
