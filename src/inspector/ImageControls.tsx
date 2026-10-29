@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CompositionDocument, MediaSlot } from '../composition/types';
 import { compositionFrame, moveCompositionObject } from '../composition/document';
+import { FrameAccordion } from './FrameAccordion';
 
 export function GeometryInput({ label, value, disabled = false, min, max, step, onCommit }: { label: string; value: number; disabled?: boolean; min?: number; max?: number; step?: number | 'any'; onCommit: (value: number) => void }) {
   const [draft, setDraft] = useState(String(value));
@@ -40,15 +41,15 @@ export function ImageControls({ document: doc, selected, size, onChange, onStart
       <button type="button" onClick={() => onChange({ ...doc, detailBorder: doc.detailBorder === 'none' ? '1px solid #d9d1ad' : 'none' })}>{doc.detailBorder === 'none' ? 'Add border' : 'Remove border'}</button>
       <button type="button" onClick={() => onChange({ ...doc, detailShadow: doc.detailShadow === 'none' ? '0 12px 28px #00000026' : 'none' })}>{doc.detailShadow === 'none' ? 'Add shadow' : 'Remove shadow'}</button>
     </fieldset>}
-    <details data-image-advanced><summary>Advanced</summary><div className="inspector-advanced-content">
+    <FrameAccordion>
       {independent && <fieldset className="inspector-two-column" onFocusCapture={onStart} onBlurCapture={end}>{(['centerX','centerY','widthRatio','heightRatio'] as const).map(key => <label key={`${selected}-${key}`}>{({ centerX: 'Center X', centerY: 'Center Y', widthRatio: 'Width', heightRatio: 'Height' })[key]}<GeometryInput label={`Object ${key}`} value={Math.round(frame[key] * (key === 'centerY' || key === 'heightRatio' ? size.height : size.width))} onCommit={value => { if (key.startsWith('center') || value > 0) patch({ [key]: value / (key === 'centerY' || key === 'heightRatio' ? size.height : size.width) }); }} /></label>)}
         <label>Rotation (°)<GeometryInput label="Object rotation" value={frame.rotation} min={-180} max={180} step="any" onCommit={value => { if (Number.isFinite(value) && value >= -180 && value <= 180) patch({ rotation: value }); }} /></label>
       </fieldset>}
-      <label><input aria-label="Allow image bleed" type="checkbox" checked={doc.allowBleed} onChange={event => onChange({ ...doc, allowBleed: event.target.checked })} /> Allow image bleed</label>
-      <button type="button" onClick={() => independent ? onChange({ ...doc, mediaLayout: 'legacy' }) : onIndependent()}>{independent ? 'Use layout presets' : 'Independent two-slot layout'}</button>
+      <label className="advanced-check"><input aria-label="Allow image bleed" type="checkbox" checked={doc.allowBleed} onChange={event => onChange({ ...doc, allowBleed: event.target.checked })} /> <span>Allow images beyond the canvas edge</span></label>
+      <div className="advanced-option"><strong>Image placement</strong><p>{independent ? 'Images can be moved and resized separately.' : 'Position and resize each image separately on the canvas.'}</p><button className="advanced-action" type="button" onClick={() => independent ? onChange({ ...doc, mediaLayout: 'legacy' }) : onIndependent()}>{independent ? 'Use layout presets' : 'Independent two-slot layout'}</button></div>
       <button type="button" onClick={() => { if (window.confirm('Restore the template layout? You can Undo this change.')) onRestore(); }}>Restore layout</button>
       {doc.templateId && <button type="button" onClick={onResetTemplate}>Reset template</button>}
       {children}
-    </div></details>
+    </FrameAccordion>
   </div>;
 }

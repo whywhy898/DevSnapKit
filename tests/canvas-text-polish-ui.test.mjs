@@ -14,15 +14,15 @@ test('Polish normal editing has no confirmation buttons and applies through real
   try {
     const page = await preparePage(browser, url);
     await click(page, '[aria-label="Add text"]'); await page.type('[aria-label="Text content"]', 'Applied automatically'); await paint(page);
-    const initial = await page.evaluate(() => ({ mode: !!document.querySelector('[aria-label="Studio mode"]'), poster: !!document.querySelector('[data-poster-artwork]'), confirmations: [...document.querySelectorAll('[data-text-editor-ui] button')].filter(n => n.getClientRects().length && ['Done', 'Cancel'].includes(n.textContent.trim())).map(n => n.textContent.trim()), deletion: getComputedStyle(document.querySelector('[aria-label="Delete text"]')).backgroundColor, alignIcon: !!document.querySelector('[aria-label="Align left"] svg'), palette: !!document.querySelector('[data-text-color-control]') }));
-    assert.deepEqual(initial, { mode: false, poster: false, confirmations: [], deletion: 'rgb(220, 38, 38)', alignIcon: true, palette: true });
+    const initial = await page.evaluate(() => ({ mode: !!document.querySelector('[aria-label="Studio mode"]'), poster: !!document.querySelector('[data-poster-artwork]'), confirmations: [...document.querySelectorAll('[data-text-editor-ui] button')].filter(n => n.getClientRects().length && ['Done', 'Cancel'].includes(n.textContent.trim())).map(n => n.textContent.trim()), deletion: getComputedStyle(document.querySelector('[aria-label="Delete text"]')).color, alignIcon: !!document.querySelector('[aria-label="Align left"] svg'), palette: !!document.querySelector('[data-text-color-control]') }));
+    assert.deepEqual(initial, { mode: false, poster: false, confirmations: [], deletion: 'rgb(223, 56, 86)', alignIcon: true, palette: true });
     assert.equal(await page.$('[data-text-edit-dock]'), null);
     await textTab(page);
     assert.equal(await page.$('[aria-label="Text content"]'), null);
     assert.equal(await page.$eval('[data-canvas-text]', n => n.textContent), 'Applied automatically');
     assert.equal(await page.evaluate(() => window.__mockupBaseline.history.inTransaction), false);
-    const deletion = await page.$eval('[aria-label="Delete text"]', n => ({ red: getComputedStyle(n).backgroundColor, icon: !!n.querySelector('svg') }));
-    assert.ok(deletion.icon); assert.equal(deletion.red, 'rgb(220, 38, 38)');
+    const deletion = await page.$eval('[aria-label="Delete text"]', n => ({ red: getComputedStyle(n).color, icon: !!n.querySelector('svg') }));
+    assert.ok(deletion.icon); assert.equal(deletion.red, 'rgb(223, 56, 86)');
     await click(page, '[aria-label="Delete text"]'); assert.equal(await page.$('[data-canvas-text]'), null);
     await click(page, 'button[title="Undo (Ctrl+Z / ⌘Z)"]'); assert.equal(await page.$eval('[data-canvas-text]', n => n.textContent), 'Applied automatically');
   } finally { await browser.close(); }

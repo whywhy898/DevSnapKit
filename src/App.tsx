@@ -2597,14 +2597,28 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 </div>
               </details>
 
-</>} starterControls={<div className="space-y-2"><h4>Quick starter demos</h4><div className="flex flex-wrap gap-2">{MOCKUP_PRESETS.map(preset => <button key={preset.id} type="button" onClick={() => handleApplyPreset(preset)}>{preset.name}</button>)}</div></div>} document={compositionDocument} texts={textDocument} selected={selectedObject || textEditor.activeId} size={canvasLogicalSize} customLogo={isProUnlocked && !!logoDataUrl} onSelect={selectObject} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit}
+</>} starterControls={<div className="advanced-option advanced-starters"><strong>Quick starter demos</strong><p>Replace Image 1 with a sample screenshot.</p><div className="advanced-starter-grid">{MOCKUP_PRESETS.map(preset => <button key={preset.id} type="button" title={`Replace Image 1 with the ${preset.name} sample`} onClick={() => handleApplyPreset(preset)}>{preset.name}</button>)}</div></div>} document={compositionDocument} selected={selectedObject || textEditor.activeId} size={canvasLogicalSize} customLogo={isProUnlocked && !!logoDataUrl} onSelect={selectObject} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit}
             onIndependent={() => { if (textEditor.finish()) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), ...(aspectRatio.id === 'auto' ? { aspectRatioId: 'custom', customCanvasSize: { ...canvasLogicalSize } } : {}), compositionDocument: compositionDocument ? { ...compositionDocument, mediaLayout: 'independent' } : createIndependentComposition() }); }}
             onResetTemplate={() => {
               if (!compositionDocument?.templateId || !window.confirm('Reset all template text, screenshots and design settings to the original demo? You can Undo this change.')) return;
               const id = compositionDocument.templateId;
               if (isCuratedTemplateAvailable(id)) void handleApplyDesignedTemplate(id, true);
             }}
-            onDuplicateText={id => {
+            onReplace={slot => (slot === 'main' ? fileInputRef : secondaryFileInputRef).current?.click()} onRestore={handleRestoreTemplateLayout}
+            onRemoveDetail={() => { if (textEditor.finish() && compositionDocument) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } }); }} />
+          {sidebarTab === 'text' && elementSection !== 'text' && <section className="elements-object-panel">
+            <div className="elements-object-heading"><div><h3>{elementSection === 'buttons' ? 'Buttons' : 'Decorations'}</h3><p>{elementSection === 'buttons' ? 'Add and customize a call to action.' : 'Customize decorative elements from your template.'}</p></div></div>
+              {elementSection === 'buttons' && <button type="button" className="elements-add" onClick={() => { finishCompositionEdit(); if (!textEditor.finish()) return; const document = compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: layoutMode === 'duo' }; const id = crypto.randomUUID(); changeComposition({ ...document, objects: [...document.objects, { id, name: 'Button', kind: 'button', frame: { centerX: .5, centerY: .8, widthRatio: .25, heightRatio: .07, rotation: 0 }, text: 'Get started', fill: '#272617', color: '#ffffff', fontSize: 20, radius: 8, padding: 16, autoWidth: false, arrow: true }], order: [...document.order, id] }); textEditor.select(null); setSelectedObject(id); }}><Plus size={16} aria-hidden="true" /> Add button</button>}
+            {(() => {
+              const items = [...(compositionDocument?.objects || []), ...(compositionDocument?.decorations || [])].filter(node => elementSection === 'buttons' ? node.kind === 'button' : node.kind === 'shape' && node.shape !== 'mark');
+              const current = items.find(node => node.id === selectedObject);
+              return <><label className="elements-select-label">Selected {elementSection === 'buttons' ? 'button' : 'decoration'}<select aria-label={elementSection === 'buttons' ? 'Current button' : 'Current decoration'} value={current?.id || ''} onChange={event => { if (event.target.value) selectObject(event.target.value); else setSelectedObject(null); }}><option value="">Choose an element</option>{items.map(node => <option value={node.id} key={node.id}>{node.name}</option>)}</select></label>
+                {current ? <ObjectControls document={compositionDocument} selected={current.id} size={canvasLogicalSize} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit} /> : <p className="elements-empty">{items.length ? 'Select an element above or on the canvas to edit it.' : elementSection === 'buttons' ? 'Add a button to start customizing it.' : 'Apply a template with decorations to edit them here.'}</p>}
+              </>;
+            })()}
+          </section>}
+          <div hidden={sidebarTab !== 'text' || elementSection !== 'text'} className="elements-text-panel">
+            <TextControls document={textDocument} editor={textEditor} disabled={isExporting} onDuplicateText={id => {
               if (!textEditor.finish() || textDocument.layers.length >= 20) return;
               const before = editorHistory.getLatestSnapshot(), layer = before.textDocument.layers.find(item => item.id === id); if (!layer) return;
               const node = [...(canvasRef.current?.querySelectorAll<HTMLElement>('[data-canvas-text]') || [])].find(item => item.dataset.canvasText === id);
@@ -2615,23 +2629,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               const composition = before.compositionDocument;
               flushSync(() => { editorHistory.applyCommand({ ...before, textDocument: { ...before.textDocument, layers: [...before.textDocument.layers, copy] }, compositionDocument: composition ? { ...composition, knownTextIds: [...new Set([...(composition.knownTextIds || []), copy.id])], order: [...composition.order, copy.id] } : composition }); });
               setSelectedObject(null); textEditor.select(copy.id); setElementSection('text'); setSidebarTab('text');
-            }}
-            onReplace={slot => (slot === 'main' ? fileInputRef : secondaryFileInputRef).current?.click()} onRestore={handleRestoreTemplateLayout}
-            onRemoveDetail={() => { if (textEditor.finish() && compositionDocument) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } }); }} />
-          {sidebarTab === 'text' && elementSection !== 'text' && <section className="elements-object-panel">
-            <div className="elements-object-heading"><div><h3>{elementSection === 'buttons' ? 'Buttons' : 'Decorations'}</h3><p>{elementSection === 'buttons' ? 'Add and customize a call to action.' : 'Customize decorative elements from your template.'}</p></div>
-              {elementSection === 'buttons' && <button type="button" className="elements-add" onClick={() => { finishCompositionEdit(); if (!textEditor.finish()) return; const document = compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: layoutMode === 'duo' }; const id = crypto.randomUUID(); changeComposition({ ...document, objects: [...document.objects, { id, name: 'Button', kind: 'button', frame: { centerX: .5, centerY: .8, widthRatio: .25, heightRatio: .07, rotation: 0 }, text: 'Get started', fill: '#272617', color: '#ffffff', fontSize: 20, radius: 8, padding: 16, autoWidth: false, arrow: true }], order: [...document.order, id] }); textEditor.select(null); setSelectedObject(id); }}>Add button</button>}
-            </div>
-            {(() => {
-              const items = [...(compositionDocument?.objects || []), ...(compositionDocument?.decorations || [])].filter(node => elementSection === 'buttons' ? node.kind === 'button' : node.kind === 'shape' && node.shape !== 'mark');
-              const current = items.find(node => node.id === selectedObject);
-              return <><label className="elements-select-label">Selected {elementSection === 'buttons' ? 'button' : 'decoration'}<select aria-label={elementSection === 'buttons' ? 'Current button' : 'Current decoration'} value={current?.id || ''} onChange={event => { if (event.target.value) selectObject(event.target.value); else setSelectedObject(null); }}><option value="">Choose an element</option>{items.map(node => <option value={node.id} key={node.id}>{node.name}</option>)}</select></label>
-                {current ? <ObjectControls document={compositionDocument} selected={current.id} size={canvasLogicalSize} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit} /> : <p className="elements-empty">{items.length ? 'Select an element above or on the canvas to edit it.' : elementSection === 'buttons' ? 'Add a button to start customizing it.' : 'Apply a template with decorations to edit them here.'}</p>}
-              </>;
-            })()}
-          </section>}
-          <div hidden={sidebarTab !== 'text' || elementSection !== 'text'} className="elements-text-panel">
-            <TextControls document={textDocument} editor={textEditor} disabled={isExporting} />
+            }} />
             {(customBrandWatermark !== '' || editingLegacyBrandText) && <section data-legacy-brand-text className="brand-controls" aria-label="Saved brand text">
               <h3 className="text-xs font-semibold mb-2">Saved brand text</h3>
               <input aria-label="Saved brand text" type="text" className="w-full rounded border bg-transparent p-2 text-xs"
@@ -2935,7 +2933,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 </div>
               )}
 
-              <details data-device-styles className="inspector-device-styles"><summary>Device styles</summary>
+              <details data-device-styles className="inspector-device-styles inspector-frame-card"><summary className="inspector-frame-summary"><Box size={16} aria-hidden="true" /><span>Device styles</span><ChevronDown size={15} className="inspector-frame-chevron" aria-hidden="true" /></summary><div className="inspector-device-content">
               {/* Curated Layout Presets (1-Click Aesthetic Compositions) */}
               {compositionDocument?.mediaLayout !== 'independent' && <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -3138,7 +3136,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 </div>
               </div>
 
-              </details>
+              </div></details>
               {/* Window Title or Browser URL Input */}
               {windowTheme !== 'none' && windowTheme !== 'phone-clay' && (
                 <div className="space-y-1.5">
