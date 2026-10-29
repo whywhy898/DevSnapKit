@@ -27,6 +27,13 @@ try {
   assert.equal(await page.$eval('[data-canvas-stage]', el => getComputedStyle(el).overflow), 'visible', 'canvas shadow is not clipped into a gray strip');
   const dockGap = await page.evaluate(() => document.querySelector('[data-template-trigger]').getBoundingClientRect().left - document.querySelector('button[title="Upload screenshot from computer"]').getBoundingClientRect().right);
   assert.ok(dockGap >= 8, `template entry needs its own space, got ${dockGap}px`);
+  const templateEntry = await page.$eval('[data-template-trigger]', el => ({ animation:getComputedStyle(el).animationName, images:[...el.querySelectorAll('img')].map(img => ({ width:img.getBoundingClientRect().width, height:img.getBoundingClientRect().height, loaded:img.naturalWidth > 0 })) }));
+  assert.equal(templateEntry.images.length, 3, 'template entry showcases three real designs');
+  assert.ok(templateEntry.images.every(img => img.loaded && img.width >= 34 && img.height >= 42), `template previews are larger and loaded: ${JSON.stringify(templateEntry.images)}`);
+  assert.equal(templateEntry.animation, 'template-rainbow-flow', 'template entry has a moving rainbow border');
+  const borderStart = await page.$eval('[data-template-trigger]', el => getComputedStyle(el).backgroundPosition);
+  await new Promise(resolve => setTimeout(resolve, 250));
+  assert.notEqual(await page.$eval('[data-template-trigger]', el => getComputedStyle(el).backgroundPosition), borderStart, 'rainbow border visibly moves');
   assert.equal(await page.$$eval('[data-3d-angles]', xs => xs.filter(x => x.getClientRects().length).length), 1, 'Frame has one visible 3D section');
   assert.equal(await page.$eval('[data-3d-angles]', el => !!(el.compareDocumentPosition(document.querySelector('[data-mockup-camera]')) & Node.DOCUMENT_POSITION_FOLLOWING)), true, '3D precedes camera controls');
   assert.ok(await page.$eval('[data-media-surface] img', el => el.currentSrc.includes('/designed/examples/collection/folio-workspace.svg') && el.naturalWidth === 1000), 'initial canvas uses the borderless workspace example');
@@ -193,6 +200,9 @@ try {
   assert.equal(overflow.width, 360, `mobile body does not overflow: ${overflow.nodes.join(', ')}`);
   if (await mobile.$('[aria-label="Switch to Dark theme"]')) await mobile.click('[aria-label="Switch to Dark theme"]');
   assert.equal(await mobile.evaluate(() => document.documentElement.classList.contains('theme-dark')), true);
+  assert.equal(await mobile.$eval('[data-template-trigger]', el => getComputedStyle(el).animationName), 'none', 'reduced motion disables the rainbow animation');
+  assert.ok(await mobile.$eval('.template-trigger-previews', el => el.getBoundingClientRect().width > 0), 'mobile still shows the template previews');
+  if (process.env.UI_SCREENSHOT_DIR) { await mobile.$eval('[data-template-trigger]', el => el.scrollIntoView({ block:'center' })); await mobile.screenshot({ path: path.join(process.env.UI_SCREENSHOT_DIR, 'mobile-template-entry.png') }); }
   await mobile.click('[data-template-trigger]');
   await mobile.waitForSelector('dialog[data-template-gallery][open]');
   assert.equal(await mobile.$eval('[data-template-gallery]', el => getComputedStyle(el).animationName), 'none', 'reduced motion disables the opening animation');
@@ -206,6 +216,14 @@ try {
   const mobilePortrait = await mobile.$eval('[data-template-gallery] article img', img => { const r=img.getBoundingClientRect(); return Math.min(r.width, r.height * img.naturalWidth / img.naturalHeight); });
   assert.ok(mobilePortrait >= 100, `portrait thumbnail remains legible on mobile: ${mobilePortrait}px`);
   await mobile.close();
+  const responsive = await preparePage(browser, origin + '/?editor=1', { viewport: { width:320, height:844, deviceScaleFactor:1 } });
+  for (const width of [320, 390, 768, 1024, 1280]) {
+    await responsive.setViewport({ width, height:844, deviceScaleFactor:1 });
+    await new Promise(resolve => setTimeout(resolve, 150));
+    assert.equal(await responsive.evaluate(() => document.documentElement.scrollWidth), width, `no horizontal overflow at ${width}px`);
+    assert.ok(await responsive.$eval('[data-template-trigger]', el => { const r=el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.width > 0; }), `template entry fits at ${width}px`);
+  }
+  await responsive.close();
   const mobileEdit = await preparePage(browser, origin + '/?editor=1', { viewport: { width:360, height:844, deviceScaleFactor:1 } });
   await mobileEdit.click('[data-elements-tab]');
   await mobileEdit.click('[aria-label="Add another text"]');
@@ -223,6 +241,12 @@ try {
     await new Promise(resolve => setTimeout(resolve, 200));
     assert.deepEqual(await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight })), beforeRounding, `corner rounding ${label} keeps Auto canvas stable`);
   }
+  const autoPadding = Number(await sizingPage.$eval('[aria-label="Canvas padding"]', el => el.value));
+  await sizingPage.focus('[aria-label="Canvas padding"]');
+  await sizingPage.keyboard.down('Control'); await sizingPage.keyboard.press('A'); await sizingPage.keyboard.up('Control');
+  await sizingPage.keyboard.type(String(autoPadding + 12)); await sizingPage.keyboard.press('Enter');
+  await new Promise(resolve => setTimeout(resolve, 400));
+  assert.deepEqual(await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight })), { width:beforeRounding.width + 24, height:beforeRounding.height + 24 }, 'Auto adds padding to both sides of the canvas');
   await sizingPage.click('[data-device-styles] > summary');
   await sizingPage.click('[data-device-styles] button[title="Stack 2"]');
   await new Promise(resolve => setTimeout(resolve, 650));
@@ -253,6 +277,17 @@ try {
   await sizingPage.click('[data-frame-advanced] button[title="Replace Image 1 with the Mobile App sample"]');
   await new Promise(resolve => setTimeout(resolve, 700));
   assert.notDeepEqual(await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight })), beforeSample, 'new image still updates the Auto canvas');
+  await clickButton(sizingPage, 'Twitter');
+  await new Promise(resolve => setTimeout(resolve, 300));
+  const fixedCanvas = await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight }));
+  assert.deepEqual(fixedCanvas, { width:1200, height:630 }, 'Twitter uses its fixed export dimensions');
+  const fixedInner = await sizingPage.$eval('[data-scene-inner]', el => el.offsetWidth);
+  await sizingPage.focus('[aria-label="Canvas padding"]');
+  await sizingPage.keyboard.down('Control'); await sizingPage.keyboard.press('A'); await sizingPage.keyboard.up('Control');
+  await sizingPage.keyboard.type('160'); await sizingPage.keyboard.press('Enter');
+  await new Promise(resolve => setTimeout(resolve, 400));
+  assert.deepEqual(await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight })), fixedCanvas, 'Twitter canvas remains fixed when padding changes');
+  assert.ok(await sizingPage.$eval('[data-scene-inner]', el => el.offsetWidth) < fixedInner, 'fixed ratio padding changes the available artwork area');
   await sizingPage.close();
   const initialTheme = await browser.newPage();
   await initialTheme.evaluateOnNewDocument(() => {

@@ -2379,9 +2379,9 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 title="Templates"
                 aria-label="Templates"
               >
-                <span className="template-trigger-previews" aria-hidden="true"><img src="/designed/editorial-honey.webp" alt="" /><img src="/designed/collection/paper-launch-duo.webp" alt="" /></span>
-                <span>Templates</span>
-                <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
+                <span className="template-trigger-previews" aria-hidden="true"><img src="/designed/collection/studio-bridge.webp" alt="" /><img src="/designed/collection/app-pair.webp" alt="" /><img src="/designed/collection/editorial-story.webp" alt="" /></span>
+                <span className="template-trigger-copy"><strong>Templates</strong><small>Find your starting point</small></span>
+                <span className="template-trigger-explore" aria-hidden="true">Explore <ArrowUpRight size={14} /></span>
               </button>
 
               {/* Starter Demo Dropdown Popover */}

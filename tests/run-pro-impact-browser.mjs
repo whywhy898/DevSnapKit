@@ -16,8 +16,8 @@ const rows=[],errors=[],networkFailures=[],dialogs=[];let browser,server,page;
 export function setBrowser(value){browser=value;}
 export {clickButton,state,history,settle,fresh,menu,apply,fill,png,capture,fixtures};
 async function clickButton(p,label){
- await p.waitForFunction(label=>[...document.querySelectorAll('button')].some(n=>n.getClientRects().length&&n.innerText.replace(/\s+/g,' ').trim()===label),{},label);
- const handle=await p.evaluateHandle(label=>[...document.querySelectorAll('button')].find(n=>n.getClientRects().length&&n.innerText.replace(/\s+/g,' ').trim()===label),label);
+ await p.waitForFunction(label=>[...document.querySelectorAll('button')].some(n=>n.getClientRects().length&&(n.innerText.replace(/\s+/g,' ').trim()===label||n.getAttribute('aria-label')===label)),{},label);
+ const handle=await p.evaluateHandle(label=>[...document.querySelectorAll('button')].find(n=>n.getClientRects().length&&(n.innerText.replace(/\s+/g,' ').trim()===label||n.getAttribute('aria-label')===label)),label);
  await handle.asElement().click();await handle.dispose();await pause(100);
 }
 const state=p=>p.evaluate(()=>window.__mockupBaseline.snapshot);
