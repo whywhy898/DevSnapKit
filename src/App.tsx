@@ -2359,7 +2359,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             </div>}
 
             {/* Replace Image and the template gallery are separate actions. */}
-            <div className="relative flex items-center shrink-0 h-9">
+            <div className="dock-replace relative flex items-center shrink-0 h-9">
               <button 
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -2394,13 +2394,22 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             <div className="h-4 w-[1px] bg-white/10 hidden sm:block shrink-0" />
 
             {/* Quick Aspect Switcher (Budgeted width for zero overflow) */}
-            <div className="relative flex items-center bg-black/40 border border-white/10 p-0.5 rounded-xl backdrop-blur-md shrink-0 h-9">
+            <div className="dock-aspect-switcher relative flex items-center bg-black/40 border border-white/10 p-0.5 rounded-xl backdrop-blur-md shrink-0 h-9">
+              <div className="dock-aspect-options">
               {ASPECT_RATIOS.slice(0, 4).map((opt) => (
                 <button
                   key={opt.id}
                   onClick={() => {
                     setAspectRatio(opt);
                     setShowDockMoreRatios(false);
+                  }}
+                  onFocus={(event) => {
+                    const container = event.currentTarget.parentElement;
+                    if (!container) return;
+                    const bounds = container.getBoundingClientRect();
+                    const button = event.currentTarget.getBoundingClientRect();
+                    if (button.right > bounds.right) container.scrollLeft += button.right - bounds.right + 2;
+                    else if (button.left < bounds.left) container.scrollLeft -= bounds.left - button.left + 2;
                   }}
                   className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     aspectRatio.id === opt.id
@@ -2412,6 +2421,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                   {opt.shortLabel || opt.label}
                 </button>
               ))}
+              </div>
 
               {/* More / Social Media Presets Popover (F6) */}
               <div className="relative">

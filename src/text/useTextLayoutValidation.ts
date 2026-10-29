@@ -34,7 +34,7 @@ export function useTextLayoutValidation(root: React.RefObject<HTMLDivElement>, s
         node && layer.content.trim() ? textHorizontalExtent(node, previewScale) : undefined);
       if (issue) next[layer.id] = issue;
     }
-    setIssues(old => JSON.stringify(old) === JSON.stringify(next) ? old : next);
+    if (JSON.stringify(issues) !== JSON.stringify(next)) setIssues(next);
     const valid = !Object.keys(next).length, before = previous.current;
     const navigated = before && before.navigation !== history.navigationRevision;
     const changedSize = before && (before.size.width !== size.width || before.size.height !== size.height);
