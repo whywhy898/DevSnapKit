@@ -1,6 +1,7 @@
 // Cloudflare Pages Function: /api/admin/stats
 // Returns aggregated metrics, traffic trends, and real-time orders for the Admin Dashboard
 import { requireSecret, verifyAdminToken } from '../../lib/security';
+import { readSeoFunnel } from '../../lib/seo-funnel';
 
 interface Env {
   ADMIN_SECRET?: string;
@@ -333,6 +334,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
       topCountries,
       topReferrers,
       recentVisits,
+      seoFunnel: await readSeoFunnel(env.DB),
     }), {
       status: 200,
       headers: corsHeaders,

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import SeoFunnel from './SeoFunnel';
+import type { SeoFunnelData } from '../functions/lib/seo-funnel';
 import { 
   DollarSign, Users, Activity, ShoppingCart, 
   RefreshCw, Globe, 
@@ -9,6 +11,7 @@ import {
 } from 'lucide-react';
 
 interface StatsData {
+  seoFunnel?: SeoFunnelData;
   timestamp: string;
   system: {
     storageEngine: string;
@@ -621,6 +624,8 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+
+            {stats && <SeoFunnel data={stats.seoFunnel} />}
 
             {/* 14-Day Traffic & Activity Trend Visualizer */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl">

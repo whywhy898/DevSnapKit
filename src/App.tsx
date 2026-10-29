@@ -1588,6 +1588,7 @@ export default function App() {
         const filename = `devsnap-${target.id}-${Date.now()}.${format}`;
         const blob = await session.rasterize(i);
         if (blob) {
+          trackEvent('export_image', { format, scale: context.scale, aspect: target.id, method: 'batch' });
           const downloadUrl = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.download = filename;
