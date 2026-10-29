@@ -18,7 +18,8 @@
     "test:canvas-text:v1:browser": "node tests/run-canvas-text-browser.mjs",
     "test:text:v1": "npm run test:canvas-text:v1",
     "test:text:v1:browser": "npm run test:canvas-text:v1:browser",
-    "test:seo": "node --test tests/seo-landing-pages.test.mjs tests/seo-landing-assets.test.mjs",
+    "test:seo": "node --test tests/seo-landing-pages.test.mjs tests/seo-landing-assets.test.mjs tests/seo-attribution.test.mjs tests/seo-funnel.test.mjs",
+    "test:seo:attribution:browser": "node tests/run-seo-attribution-browser.mjs",
     "test:seo:browser": "node tests/run-seo-browser.mjs",
     "test:seo:entry:browser": "node tests/run-seo-entry-browser.mjs"
   },
