@@ -16,6 +16,7 @@ const rows=[],errors=[],networkFailures=[],dialogs=[];let browser,server,page;
 export function setBrowser(value){browser=value;}
 export {clickButton,state,history,settle,fresh,menu,apply,fill,png,capture,fixtures};
 async function clickButton(p,label){
+ if(label==='Text'&&await p.$('[data-elements-tab]')){await p.$eval('[data-elements-tab]',n=>n.click());await p.$eval('[data-element-section="text"]',n=>n.click());await pause(100);return;}
  await p.waitForFunction(label=>[...document.querySelectorAll('button')].some(n=>n.getClientRects().length&&(n.innerText.replace(/\s+/g,' ').trim()===label||n.getAttribute('aria-label')===label)),{},label);
  const handle=await p.evaluateHandle(label=>[...document.querySelectorAll('button')].find(n=>n.getClientRects().length&&(n.innerText.replace(/\s+/g,' ').trim()===label||n.getAttribute('aria-label')===label)),label);
  await handle.asElement().click();await handle.dispose();await pause(100);

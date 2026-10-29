@@ -1,12 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { legacyPosterUrl } from './helpers/browser.mjs';
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-const puppeteer = require('puppeteer-core');
+import { legacyPosterUrl, launchBrowser } from './helpers/browser.mjs';
 
 test('ordinary editor omits Poster while the retained legacy URL opens its renderer', async () => {
-  const browser = await puppeteer.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--no-sandbox', '--no-proxy-server'] });
+  const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
     const url = process.env.TEST_UI_URL || 'http://127.0.0.1:5179/?editor=1';

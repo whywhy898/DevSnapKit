@@ -33,6 +33,7 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.evaluateOnNewDocument((name, order) => {
       localStorage.setItem('devsnapkit_welcome_dismissed', 'true');
+      localStorage.setItem('devsnapkit_welcome_seen', '1');
       if (name === 'reload-recovery') localStorage.setItem('devsnapkit_pending_paypal_order', order);
       window.paypal = { Buttons: config => ({ render(container) {
         const button = document.createElement('button'); button.textContent = 'Test PayPal checkout';
@@ -60,7 +61,7 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
     if (name !== 'reload-recovery') {
       const welcome = await page.$('button');
       if (welcome) await page.keyboard.press('Escape');
-      await page.evaluate(() => [...document.querySelectorAll('button')].find(b => /Pro \(\$1\)/.test(b.textContent))?.click());
+      await page.click('.pro-upgrade-button');
       await clickButton(page, 'Test PayPal checkout');
     }
     if (name === 'creation-error') {

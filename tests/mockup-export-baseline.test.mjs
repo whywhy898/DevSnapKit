@@ -41,6 +41,7 @@ test('old Mockup downloads: single, duo, browser, phone and transparent PNG alph
       } else if (scenario === 'browser' || scenario === 'phone') {
         await page.click('button[title="Single shot (1 image)"]');
         await clickButton(page, 'Frame');
+        if (!await page.$eval('[data-device-styles]', el => el.open)) await page.click('[data-device-styles] > summary');
         await clickButton(page, scenario === 'browser' ? 'Safari Browser' : 'iPhone 17 Pro\nPopular');
       }
       const downloaded = await exportCurrent(page, `${scenario}.png`);
@@ -49,6 +50,7 @@ test('old Mockup downloads: single, duo, browser, phone and transparent PNG alph
       results.push({ scenario, ...downloaded, width: metadata.width, height: metadata.height });
     }
     await clickButton(page, 'Frame');
+    if (!await page.$eval('[data-device-styles]', el => el.open)) await page.click('[data-device-styles] > summary');
     await clickButton(page, 'Borderless\nDefault');
     await clickButton(page, 'Canvas');
     await clickButton(page, 'Alpha');

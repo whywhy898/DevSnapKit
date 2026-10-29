@@ -1,11 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-const puppeteer = require('puppeteer-core');
+import { launchBrowser } from './helpers/browser.mjs';
 
 test('admin UI stores only a token and removes legacy saved passwords', { skip: !process.env.TEST_UI_URL }, async () => {
-  const browser = await puppeteer.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--no-sandbox', '--no-proxy-server'] });
+  const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
     const password = 'qa-browser-password-never-persist';
