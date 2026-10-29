@@ -524,6 +524,7 @@ export default function App() {
   const [dimensionError, setDimensionError] = useState('');
   const aspectOptions = useMemo(() => [...ASPECT_RATIOS, customAspect(customCanvasSize)], [customCanvasSize]);
   const [naturalSceneSize, setNaturalSceneSize] = useState<SceneSize>({ width: 1024, height: 600 });
+  const autoCanvasHold = useRef<{ size: SceneSize; image: string; secondary: string | null; theme: WindowTheme; mode: 'single' | 'duo'; duo: DuoLayoutType; hidden: boolean; padding: number } | null>(null);
   const handleNaturalSceneSize = useCallback((size: SceneSize) => {
     if (frozenArtwork.current) return;
     setNaturalSceneSize(prev => prev.width === size.width && prev.height === size.height ? prev : size);
@@ -781,6 +782,7 @@ export default function App() {
   ]);
 
   const handleRestoreSnapshot = useCallback((snap: EditorSnapshot) => {
+    if (autoCanvasHold.current) autoCanvasHold.current.padding = snap.padding;
     logoRequestSerial.current++;
     logoUploadRequested.current = Boolean(snap.logoDataUrl);
     setLogoError('');
@@ -882,12 +884,20 @@ export default function App() {
     };
   }, [aspectRatio.id, padding, windowTheme, imageSrc, layoutPreset, cornerStyle]);
 
-  const canonicalAutoW = naturalSceneSize.width + 2 * padding;
-  const canonicalAutoH = naturalSceneSize.height + 2 * padding;
+  // Style presets can change the measured artwork bounds and padding. Keep the
+  // current Auto canvas for those changes, but release it when the source,
+  // layout, device or manually controlled padding changes.
+  const heldAuto = autoCanvasHold.current;
+  if (heldAuto && (aspectRatio.id !== 'auto' || heldAuto.image !== imageSrc || heldAuto.secondary !== secondarySrc || heldAuto.theme !== windowTheme || heldAuto.mode !== layoutMode || heldAuto.duo !== duoLayout || heldAuto.hidden !== hideMockup || heldAuto.padding !== padding)) autoCanvasHold.current = null;
+  const canonicalAutoW = autoCanvasHold.current?.size.width ?? naturalSceneSize.width + 2 * padding;
+  const canonicalAutoH = autoCanvasHold.current?.size.height ?? naturalSceneSize.height + 2 * padding;
   const canvasLogicalSize = getCanonicalDimensions(
     aspectRatio.id, 1, 0, 0, canonicalAutoW, canonicalAutoH,
     customCanvasSize.width, customCanvasSize.height
   );
+  const preserveAutoCanvas = (nextPadding = padding) => {
+    if (aspectRatio.id === 'auto') autoCanvasHold.current = { size: { ...canvasLogicalSize }, image: imageSrc, secondary: secondarySrc, theme: windowTheme, mode: layoutMode, duo: duoLayout, hidden: hideMockup, padding: nextPadding };
+  };
   const effectivePaddingX = Math.min(padding, Math.max(0, (canvasLogicalSize.width - 120) / 2));
   const effectivePaddingY = Math.min(padding, Math.max(0, (canvasLogicalSize.height - 120) / 2));
   const textEditor = useCanvasTextEditor(currentSnapshot, setTextDocument, canvasLogicalSize, { beginTransaction, commitTransaction, cancelTransaction }, canvasRef);
@@ -1700,6 +1710,7 @@ export default function App() {
 
   // Handle Reset to Default Studio Styling
   const handleReset = () => {
+    autoCanvasHold.current = null;
     if (compositionDocument?.templateId && isCuratedTemplateAvailable(compositionDocument.templateId)) {
       let valid = false; flushSync(() => { valid = textEditor.finish(); });
       if (valid && !editorHistory.isInTransaction()) editorHistory.applyCommand(resetCuratedStyles(editorHistory.getLatestSnapshot())); return;
@@ -2607,7 +2618,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             onReplace={slot => (slot === 'main' ? fileInputRef : secondaryFileInputRef).current?.click()} onRestore={handleRestoreTemplateLayout}
             onRemoveDetail={() => { if (textEditor.finish() && compositionDocument) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } }); }} />
           {sidebarTab === 'text' && elementSection !== 'text' && <section className="elements-object-panel">
-            <div className="elements-object-heading"><div><h3>{elementSection === 'buttons' ? 'Buttons' : 'Decorations'}</h3><p>{elementSection === 'buttons' ? 'Add and customize a call to action.' : 'Customize decorative elements from your template.'}</p></div></div>
+            {elementSection === 'decor' && <div className="elements-object-heading"><div><h3>Decorations</h3><p>Customize decorative elements from your template.</p></div></div>}
               {elementSection === 'buttons' && <button type="button" className="elements-add" onClick={() => { finishCompositionEdit(); if (!textEditor.finish()) return; const document = compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: layoutMode === 'duo' }; const id = crypto.randomUUID(); changeComposition({ ...document, objects: [...document.objects, { id, name: 'Button', kind: 'button', frame: { centerX: .5, centerY: .8, widthRatio: .25, heightRatio: .07, rotation: 0 }, text: 'Get started', fill: '#272617', color: '#ffffff', fontSize: 20, radius: 8, padding: 16, autoWidth: false, arrow: true }], order: [...document.order, id] }); textEditor.select(null); setSelectedObject(id); }}><Plus size={16} aria-hidden="true" /> Add button</button>}
             {(() => {
               const items = [...(compositionDocument?.objects || []), ...(compositionDocument?.decorations || [])].filter(node => elementSection === 'buttons' ? node.kind === 'button' : node.kind === 'shape' && node.shape !== 'mark');
@@ -2959,10 +2970,12 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                             flushSync(() => { valid = textEditor.finish(); });
                             if (!valid || editorHistory.isInTransaction()) return;
                             const next = releaseTemplateMediaRegion(editorHistory.getLatestSnapshot());
+                            preserveAutoCanvas(p.padding);
                             editorHistory.applyCommand({ ...next, activeCuratedLayout: p.id, layoutPreset: p.layout, cornerStyle: p.corner, padding: p.padding, shadowLevel: p.shadow });
                             trackEvent('preset_change', { curated: p.id, type: 'curated_composition' });
                             return;
                           }
+                          preserveAutoCanvas(p.padding);
                           setActiveCuratedLayout(p.id);
                           setLayoutPreset(p.layout);
                           setCornerStyle(p.corner);
@@ -3022,6 +3035,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                       <button
                         key={c.id}
                         onClick={() => {
+                          preserveAutoCanvas();
                           setCornerStyle(c.id);
                           trackEvent('preset_change', { cornerStyle: c.id, type: 'corner' });
                         }}

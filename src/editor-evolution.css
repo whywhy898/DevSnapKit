@@ -67,8 +67,10 @@
 .elements-object-panel [data-object-properties] input[type="range"] { width:100%; accent-color:#7565f2; }
 .elements-object-panel [data-object-properties] button { padding:8px 10px; border:1px solid var(--editor-border); border-radius:8px; background:var(--editor-surface); color:var(--editor-text); font-size:11px; font-weight:650; cursor:pointer; }
 .elements-text-panel [data-canvas-text-controls] { color:var(--editor-text); }
-.elements-text-panel [data-canvas-text-controls] fieldset { padding:14px; border:1px solid var(--editor-border); border-radius:12px; background:var(--editor-soft); }
-.elements-text-heading, .element-object-title { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.element-text-properties { display:flex; flex-direction:column; gap:16px; padding:15px; border:1px solid var(--editor-border); border-radius:13px; background:var(--editor-soft); }
+.element-text-properties h3 { margin:7px 0 0; color:var(--editor-text); font-size:13px; font-weight:750; }
+.elements-text-panel [data-canvas-text-controls] fieldset { padding:0; border:0; background:transparent; }
+.element-object-title { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
 .elements-object-panel [data-object-properties] .element-object-title h3 { margin:7px 0 13px; }
 .element-actions { display:flex; align-items:center; gap:5px; flex:none; }
 .element-actions .element-action, .elements-object-panel [data-object-properties] .element-actions .element-action { display:grid; place-items:center; width:34px; height:34px; padding:0; border:1px solid var(--editor-border); border-radius:8px; background:var(--editor-surface); cursor:pointer; }

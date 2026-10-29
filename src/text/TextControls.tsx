@@ -18,16 +18,13 @@ export function TextControls({ document, editor, disabled, onDuplicateText, expo
       onKeyDown={event => { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') { if (editor.finish()) event.currentTarget.blur(); } if (event.key === 'Escape') { editor.cancel(); event.currentTarget.blur(); } }} />
   </label>;
   return <div data-canvas-text-controls data-text-editor-ui data-export-ignore="true" className="w-full min-w-0 space-y-5" aria-label="Canvas text controls">
-    <div className="elements-text-heading">
-      <div><h3 className="text-sm font-bold text-white">Text</h3><p className="mt-1 text-xs leading-relaxed text-white/50">Click a text box on the canvas to edit it.</p></div>
-      {active && <div className="element-actions"><button type="button" className="element-action element-duplicate" aria-label="Duplicate text" title="Duplicate text" disabled={disabled || document.layers.length >= 20} onClick={() => onDuplicateText(active.id)}><Copy size={16} aria-hidden="true" /><span className="sr-only">Duplicate text</span></button><button type="button" aria-label="Delete text" title="Delete text" className="element-action element-delete" onClick={editor.remove}><Trash2 size={16} aria-hidden="true" /><span className="sr-only">Delete text</span></button></div>}
-    </div>
     <button type="button" aria-label="Add another text" disabled={disabled || document.layers.length >= 20} onClick={editor.add} className="elements-add"><Plus size={16} aria-hidden="true" /> Add text</button>
     <label className="flex flex-col gap-1.5 text-xs text-white/60">Selected text
     <select aria-label="Current text" className={field + ' w-full'} value={editor.activeId ?? ''} onChange={event => editor.select(event.target.value || null)}>
       <option value="">No text selected</option>{document.layers.map((layer, i) => <option value={layer.id} key={layer.id}>{i + 1}. {layer.content.trim().slice(0, 24) || '(empty)'}</option>)}
     </select></label>
-    {active && <>
+    {active && <section data-text-properties className="element-text-properties">
+      <div className="element-object-title"><h3>Text</h3><div className="element-actions"><button type="button" className="element-action element-duplicate" aria-label="Duplicate text" title="Duplicate text" disabled={disabled || document.layers.length >= 20} onClick={() => onDuplicateText(active.id)}><Copy size={16} aria-hidden="true" /><span className="sr-only">Duplicate text</span></button><button type="button" aria-label="Delete text" title="Delete text" className="element-action element-delete" onClick={editor.remove}><Trash2 size={16} aria-hidden="true" /><span className="sr-only">Delete text</span></button></div></div>
       <div className="flex flex-wrap gap-2">
       {editor.editingId !== active.id && <button type="button" aria-label="Edit text" className={button} onClick={() => editor.edit(active.id)}>Edit text</button>}
       </div>
@@ -84,7 +81,7 @@ export function TextControls({ document, editor, disabled, onDuplicateText, expo
       {numericOrColor('width', 'Text box width')}
       <p className="text-[11px] leading-relaxed text-white/50">Measured in canvas pixels. Drag the handles to move or reflow text. Arrow keys move 1 px; Shift moves 10 px.</p>
       </fieldset>
-    </>}
+    </section>}
     {!active && <p className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm leading-relaxed text-white/60">Use Add text to create a title or caption, or select an existing text box above.</p>}
     {document.layers.length >= 20 && <p className="w-full text-xs text-amber-300">Maximum 20 text boxes. Delete a box before adding another.</p>}
     {editor.message && <p role={session?.error || session?.composing ? 'alert' : 'status'} className="w-full text-xs text-amber-300 whitespace-pre-wrap">{editor.message}</p>}

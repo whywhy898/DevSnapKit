@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
-import { launchBrowser, preparePage, clickButton } from './helpers/browser.mjs';
+import { launchBrowser, preparePage, clickButton, downloadPng } from './helpers/browser.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -39,6 +41,21 @@ try {
   assert.ok(await page.$eval('[data-mockup-camera]', el => el.getBoundingClientRect().bottom <= innerHeight), 'camera settings visible initially');
   await page.click('[data-device-styles] > summary');
   assert.ok(await page.$eval('[data-device-styles] .inspector-device-content', el => el.getClientRects().length > 0), 'device options remain inside the expanded card');
+  const initialStyleCanvas = await page.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight }));
+  await page.click('[data-device-styles] button[title="Stack 2"]');
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const cornerStyleCanvas = await page.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight }));
+  await page.$eval('[data-device-styles] .inspector-device-content > div:first-child', el => [...el.querySelectorAll('button')].find(b => b.textContent.includes('3D Right Tilt')).click());
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const curatedStyleCanvas = await page.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight }));
+  assert.deepEqual({cornerStyleCanvas,curatedStyleCanvas}, {cornerStyleCanvas:initialStyleCanvas,curatedStyleCanvas:initialStyleCanvas}, 'corner styles and curated compositions do not resize Auto canvas');
+  for (const group of ['[data-device-styles] .inspector-device-content > div:nth-child(2) button', '[data-device-styles] .inspector-device-content > div:first-child button']) {
+    for (const button of await page.$$(group)) {
+      await button.click();
+      await new Promise(resolve => setTimeout(resolve, 120));
+      assert.deepEqual(await page.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight })), initialStyleCanvas, `Auto canvas stays stable across ${await button.evaluate(el => el.textContent.trim())}`);
+    }
+  }
   if (process.env.UI_SCREENSHOT_DIR) { await page.$eval('[data-device-styles] summary', el => el.scrollIntoView({ block:'start' })); await page.screenshot({ path: path.join(process.env.UI_SCREENSHOT_DIR, 'frame-device.png') }); }
   await page.click('[data-device-styles] > summary');
   await page.click('[data-3d-angles] summary');
@@ -64,6 +81,7 @@ try {
   assert.ok(await page.$('[data-elements-sections]'));
   await page.click('[data-element-section="buttons"]');
   assert.ok(await page.$eval('[data-element-section="buttons"]', el => el.getAttribute('aria-pressed') === 'true'));
+  assert.equal(await page.$eval('.elements-object-panel', el => el.firstElementChild?.textContent.trim()), 'Add button', 'button section starts with Add button');
   const addWidth = await page.$eval('.elements-object-panel .elements-add', el => ({ button: el.getBoundingClientRect().width, panel: el.parentElement.getBoundingClientRect().width }));
   assert.ok(addWidth.button >= addWidth.panel - 2, 'Add button occupies its own full row');
   await clickButton(page, 'Add button');
@@ -92,11 +110,13 @@ try {
   await clickButton(page, 'Undo');
   const textAddWidth = await page.$eval('[aria-label="Add another text"]', el => ({ button:el.getBoundingClientRect().width, panel:el.parentElement.getBoundingClientRect().width }));
   assert.ok(textAddWidth.button >= textAddWidth.panel - 2, 'Add text occupies its own full row');
+  assert.equal(await page.$eval('[data-canvas-text-controls]', el => el.firstElementChild?.getAttribute('aria-label')), 'Add another text', 'text section starts with Add text');
   await page.click('[aria-label="Add another text"]');
   await page.waitForSelector('[aria-label="Text content"]');
   await page.$eval('[data-element-section="text"]', el => el.click());
-  assert.ok(await page.$('.elements-text-heading [aria-label="Duplicate text"] svg'));
-  assert.ok(await page.$('.elements-text-heading [aria-label="Delete text"] svg'));
+  assert.ok(await page.$('[data-text-properties] .element-object-title [aria-label="Duplicate text"] svg'));
+  assert.ok(await page.$('[data-text-properties] .element-object-title [aria-label="Delete text"] svg'));
+  if (process.env.UI_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.UI_SCREENSHOT_DIR, 'elements-text.png') });
   const textCount = await page.$$eval('[aria-label="Current text"] option', xs => xs.length);
   await page.click('[aria-label="Duplicate text"]');
   assert.equal(await page.$$eval('[aria-label="Current text"] option', xs => xs.length), textCount + 1, 'duplicate icon creates a text copy');
@@ -170,6 +190,44 @@ try {
   const mobilePortrait = await mobile.$eval('[data-template-gallery] article img', img => { const r=img.getBoundingClientRect(); return Math.min(r.width, r.height * img.naturalWidth / img.naturalHeight); });
   assert.ok(mobilePortrait >= 100, `portrait thumbnail remains legible on mobile: ${mobilePortrait}px`);
   await mobile.close();
+  const sizingPage = await preparePage(browser, origin + '/?editor=1', { viewport: { width:1440, height:900, deviceScaleFactor:1 } });
+  const beforeRounding = await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight }));
+  for (const label of ['Sharp', 'Round', 'Curved']) {
+    await clickButton(sizingPage, label);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    assert.deepEqual(await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight })), beforeRounding, `corner rounding ${label} keeps Auto canvas stable`);
+  }
+  await sizingPage.click('[data-device-styles] > summary');
+  await sizingPage.click('[data-device-styles] button[title="Stack 2"]');
+  await new Promise(resolve => setTimeout(resolve, 650));
+  const beforePadding = await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight }));
+  await sizingPage.$eval('[data-device-styles] .inspector-device-content > div:first-child', el => [...el.querySelectorAll('button')].find(b => b.textContent.includes('3D Right Tilt')).click());
+  await new Promise(resolve => setTimeout(resolve, 650));
+  assert.deepEqual(await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight })), beforePadding, 'curated padding does not resize Auto canvas');
+  await clickButton(sizingPage, 'Undo'); await new Promise(resolve => setTimeout(resolve, 300));
+  assert.deepEqual(await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight })), beforePadding, 'undoing a style keeps Auto canvas stable');
+  await clickButton(sizingPage, 'Redo'); await new Promise(resolve => setTimeout(resolve, 300));
+  assert.deepEqual(await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight })), beforePadding, 'redoing a style keeps Auto canvas stable');
+  await clickButton(sizingPage, 'Download');
+  await clickButton(sizingPage, '1x Web');
+  const exportDir = await fs.mkdtemp(path.join(os.tmpdir(), 'devsnapkit-style-export-'));
+  const exportLabel = `Download 1x (${beforePadding.width}×${beforePadding.height})`;
+  const exported = await downloadPng(sizingPage, exportDir, 'canvas.png', () => clickButton(sizingPage, exportLabel));
+  const png = await fs.readFile(exported.path);
+  assert.deepEqual({ width:png.readUInt32BE(16), height:png.readUInt32BE(20) }, beforePadding, 'Auto export dimensions match the stable canvas');
+  await sizingPage.focus('[aria-label="Canvas padding"]');
+  await sizingPage.keyboard.down('Control'); await sizingPage.keyboard.press('A'); await sizingPage.keyboard.up('Control');
+  await sizingPage.keyboard.type('120'); await sizingPage.keyboard.press('Enter');
+  await new Promise(resolve => setTimeout(resolve, 500));
+  assert.notDeepEqual(await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight })), beforePadding, 'manual padding still updates the Auto canvas');
+  await sizingPage.click('[data-device-styles] button[title="Card"]');
+  await new Promise(resolve => setTimeout(resolve, 350));
+  const beforeSample = await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight }));
+  await sizingPage.click('[data-frame-advanced] summary');
+  await sizingPage.click('[data-frame-advanced] button[title="Replace Image 1 with the Mobile App sample"]');
+  await new Promise(resolve => setTimeout(resolve, 700));
+  assert.notDeepEqual(await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight })), beforeSample, 'new image still updates the Auto canvas');
+  await sizingPage.close();
   const initialTheme = await browser.newPage();
   await initialTheme.evaluateOnNewDocument(() => {
     localStorage.setItem('shotcraft_theme_mode', 'dark');
