@@ -499,11 +499,11 @@ const CuratedThumbnail: React.FC<{
 export default function App() {
   // Entry presets are read once; subsequent user edits and history own the state.
   const [entryParams] = useState(() => new URLSearchParams(window.location.search));
-  // Preset Template State (default to Social Launch 'social')
-  const initialPreset = MOCKUP_PRESETS.find(p => p.id === 'social') || MOCKUP_PRESETS[0];
+  // A clean, borderless product screenshot demonstrates the editor on first load.
+  const initialPreset = MOCKUP_PRESETS.find(p => p.id === 'workspace') || MOCKUP_PRESETS[0];
   const [selectedPreset, setSelectedPreset] = useState<string>(initialPreset.id);
   const [imageSrc, setImageSrc] = useState<string>(initialPreset.svgDataUri);
-  const [imageName, setImageName] = useState<string>('social-launch.svg');
+  const [imageName, setImageName] = useState<string>('folio-workspace.svg');
   const [templateContext, setTemplateContext] = useState<TemplateContext | null>(null);
   const [compositionDocument, setCompositionDocument] = useState<CompositionDocument | null>(null);
   const [secondaryMediaOrigin, setSecondaryMediaOrigin] = useState<PrimaryMediaOrigin>({ kind: 'unknown' });
@@ -659,6 +659,7 @@ export default function App() {
 
   // Interactive UI States
   const [sidebarTab, setSidebarTab] = useState<'style' | 'background' | 'text' | 'brand' | 'export'>(() => entryParams.get('tool') === 'text' ? 'text' : 'style');
+  const [anglesOpen, setAnglesOpen] = useState(true);
   const [elementSection, setElementSection] = useState<'text' | 'buttons' | 'decor'>('text');
   const [copied, setCopied] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
@@ -2568,8 +2569,8 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               {([['text', 'Text'], ['buttons', 'Buttons'], ['decor', 'Decor']] as const).map(([section, label]) => <button type="button" key={section} data-element-section={section} aria-pressed={elementSection === section} onClick={() => { finishCompositionEdit(); if (!textEditor.finish()) return; if (section === 'text') setSelectedObject(null); else textEditor.select(null); setElementSection(section); }}>{label}</button>)}
             </div>
           </div>}
-          <SelectionControls context={templateContext} tab={sidebarTab === 'text' && elementSection !== 'text' ? '' : sidebarTab} layoutMode={layoutMode} imageSrc={imageSrc} secondarySrc={secondarySrc} imageName={imageName} secondaryName={secondaryName} angleControls={<>              {/* 3D Perspective & Angles Selector (Shown in Inspector only on smaller screens where dedicated side rail is hidden) */}
-              <details data-3d-angles className="inspector-angle-card">
+          {sidebarTab === 'style' && <SelectionControls context={templateContext} tab={sidebarTab} layoutMode={layoutMode} imageSrc={imageSrc} secondarySrc={secondarySrc} imageName={imageName} secondaryName={secondaryName} angleControls={<>              {/* 3D Perspective & Angles Selector (Shown in Inspector only on smaller screens where dedicated side rail is hidden) */}
+              <details data-3d-angles className="inspector-angle-card" open={anglesOpen} onToggle={event => setAnglesOpen(event.currentTarget.open)}>
                 <summary className="inspector-angle-summary">
                   <span className="inspector-angle-heading"><Compass size={15} /><span>3D Perspective &amp; Angles</span></span>
                   <span className="inspector-angle-current">{LAYOUT_PRESETS.find(p => p.id === layoutPreset)?.name}</span>
@@ -2616,7 +2617,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               if (isCuratedTemplateAvailable(id)) void handleApplyDesignedTemplate(id, true);
             }}
             onReplace={slot => (slot === 'main' ? fileInputRef : secondaryFileInputRef).current?.click()} onRestore={handleRestoreTemplateLayout}
-            onRemoveDetail={() => { if (textEditor.finish() && compositionDocument) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } }); }} />
+            onRemoveDetail={() => { if (textEditor.finish() && compositionDocument) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } }); }} />}
           {sidebarTab === 'text' && elementSection !== 'text' && <section className="elements-object-panel">
             {elementSection === 'decor' && <div className="elements-object-heading"><div><h3>Decorations</h3><p>Customize decorative elements from your template.</p></div></div>}
               {elementSection === 'buttons' && <button type="button" className="elements-add" onClick={() => { finishCompositionEdit(); if (!textEditor.finish()) return; const document = compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: layoutMode === 'duo' }; const id = crypto.randomUUID(); changeComposition({ ...document, objects: [...document.objects, { id, name: 'Button', kind: 'button', frame: { centerX: .5, centerY: .8, widthRatio: .25, heightRatio: .07, rotation: 0 }, text: 'Get started', fill: '#272617', color: '#ffffff', fontSize: 20, radius: 8, padding: 16, autoWidth: false, arrow: true }], order: [...document.order, id] }); textEditor.select(null); setSelectedObject(id); }}><Plus size={16} aria-hidden="true" /> Add button</button>}

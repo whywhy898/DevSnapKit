@@ -60,7 +60,7 @@ test('T3 actual style controls target selection, validate drafts, normalize font
   await page.focus('[aria-label="Text color picker"]');
   await page.$eval('[aria-label="Text color picker"]', el => { const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(el, '#123456'); el.dispatchEvent(new Event('input', { bubbles: true })); });
   assert.equal((await snap(page)).layers[1].color, '#123456');
-  await page.keyboard.press('Escape'); assert.equal((await snap(page)).layers[1].color, '#FFFFFF');
+  await page.keyboard.press('Escape'); assert.equal((await snap(page)).layers[1].color, original.layers[1].color);
   await clickButton(page, 'Dark text'); assert.equal((await snap(page)).layers[1].color, '#111827');
   await clickButton(page, 'Light text'); assert.equal((await snap(page)).layers[1].color, '#FFFFFF');
   await page.select('[aria-label="Current text"]', original.layers[0].id); await page.focus('[aria-label="Current text"]'); await page.keyboard.press('Delete');
@@ -109,6 +109,7 @@ test('T3 invalid style draft has reachable Discard changes and blocks keyboard t
 }));
 test('T3 style controls cannot replace an invalid or composing content draft', { skip: !url, timeout: 60000 }, () => withPage(async page => {
   await clickButton(page, 'Add text');
+  const initialColor = (await snap(page)).layers[0].color;
   for (const composing of [false, true]) {
     if (composing) await page.$eval('[aria-label="Text content"]', el => el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })));
     const draft = '🙂'.repeat(1001); await input(page, draft);
@@ -117,7 +118,7 @@ test('T3 style controls cannot replace an invalid or composing content draft', {
     assert.equal((await snap(page)).layers[0].content, 'Text'); assert.equal((await snap(page)).layers[0].fontSize, 48);
     await page.$eval('[aria-label="Text color picker"]', el => { const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(el, '#123456'); el.dispatchEvent(new Event('input', { bubbles: true })); });
     assert.equal(await page.$eval('[aria-label="Text content"]', el => el.value), draft);
-    assert.equal((await snap(page)).layers[0].color, '#FFFFFF');
+    assert.equal((await snap(page)).layers[0].color, initialColor);
     await discardTextChanges(page); await clickButton(page, 'Edit text');
   }
 }));

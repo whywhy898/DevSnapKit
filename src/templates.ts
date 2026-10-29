@@ -258,6 +258,13 @@ const SOCIAL_LAUNCH_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org
 
 export const MOCKUP_PRESETS: MockupPreset[] = [
   {
+    id: 'workspace',
+    name: 'Folio Workspace',
+    badge: 'Starter',
+    title: 'folio.example — Workspace',
+    svgDataUri: '/designed/examples/collection/folio-workspace.svg'
+  },
+  {
     id: 'social',
     name: 'Social Launch',
     badge: 'Creator',

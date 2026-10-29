@@ -1,11 +1,17 @@
 import type { CanvasTextDocument } from './types';
-import { AlignLeft, AlignCenter, AlignRight, Copy, Palette, Plus, Trash2 } from 'lucide-react';
+import { AlignLeft, AlignCenter, AlignRight, Copy, Palette, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { useCanvasTextEditor } from './useCanvasTextEditor';
 type Editor = ReturnType<typeof useCanvasTextEditor>;
 const field = 'canvas-text-field min-w-0 rounded-lg border border-white/10 bg-white/[0.04] text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60';
 const button = field + ' text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
 export function TextControls({ document, editor, disabled, onDuplicateText, exportError }: { document: CanvasTextDocument; editor: Editor; disabled: boolean; onDuplicateText: (id: string) => void; exportError?: string }) {
   const { active, session } = editor;
+  const revealCanvasEditor = () => requestAnimationFrame(() => {
+    const input = window.document.querySelector<HTMLTextAreaElement>('[data-text-edit-layout] textarea[aria-label="Text content"]');
+    if (!input) return;
+    const box = input.getBoundingClientRect();
+    if (box.top < 0 || box.bottom > window.innerHeight) input.scrollIntoView({ block: 'center', inline: 'nearest' });
+  });
   const numericOrColor = (kind: 'fontSize' | 'color' | 'lineHeight' | 'letterSpacing' | 'x' | 'y' | 'width', label: string) => <label className="flex min-w-0 flex-col gap-1.5 text-xs text-white/60">{label}
     <input aria-label={kind === 'fontSize' ? 'Text size' : kind === 'color' ? 'Text color' : `Text ${kind}`} type="text" inputMode={kind === 'color' ? 'text' : 'decimal'}
       title={kind === 'fontSize' ? '8–512 px' : kind === 'letterSpacing' ? '−40–40 px' : undefined}
@@ -18,15 +24,15 @@ export function TextControls({ document, editor, disabled, onDuplicateText, expo
       onKeyDown={event => { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') { if (editor.finish()) event.currentTarget.blur(); } if (event.key === 'Escape') { editor.cancel(); event.currentTarget.blur(); } }} />
   </label>;
   return <div data-canvas-text-controls data-text-editor-ui data-export-ignore="true" className="w-full min-w-0 space-y-5" aria-label="Canvas text controls">
-    <button type="button" aria-label="Add another text" disabled={disabled || document.layers.length >= 20} onClick={editor.add} className="elements-add"><Plus size={16} aria-hidden="true" /> Add text</button>
-    <label className="flex flex-col gap-1.5 text-xs text-white/60">Selected text
+    <button type="button" aria-label="Add another text" disabled={disabled || document.layers.length >= 20} onClick={() => { editor.add(); revealCanvasEditor(); }} className="elements-add"><Plus size={16} aria-hidden="true" /> Add text</button>
+    <label className="elements-select-label">Selected text
     <select aria-label="Current text" className={field + ' w-full'} value={editor.activeId ?? ''} onChange={event => editor.select(event.target.value || null)}>
       <option value="">No text selected</option>{document.layers.map((layer, i) => <option value={layer.id} key={layer.id}>{i + 1}. {layer.content.trim().slice(0, 24) || '(empty)'}</option>)}
     </select></label>
     {active && <section data-text-properties className="element-text-properties">
       <div className="element-object-title"><h3>Text</h3><div className="element-actions"><button type="button" className="element-action element-duplicate" aria-label="Duplicate text" title="Duplicate text" disabled={disabled || document.layers.length >= 20} onClick={() => onDuplicateText(active.id)}><Copy size={16} aria-hidden="true" /><span className="sr-only">Duplicate text</span></button><button type="button" aria-label="Delete text" title="Delete text" className="element-action element-delete" onClick={editor.remove}><Trash2 size={16} aria-hidden="true" /><span className="sr-only">Delete text</span></button></div></div>
       <div className="flex flex-wrap gap-2">
-      {editor.editingId !== active.id && <button type="button" aria-label="Edit text" className={button} onClick={() => editor.edit(active.id)}>Edit text</button>}
+      {editor.editingId !== active.id && <button type="button" aria-label="Edit text" title="Edit this text on the canvas" className={button + ' inline-flex items-center gap-2'} onClick={() => { editor.edit(active.id); revealCanvasEditor(); }}><Pencil size={14} aria-hidden="true" />Edit on canvas</button>}
       </div>
       <fieldset className="space-y-3"><legend className="mb-3 text-[11px] font-bold uppercase tracking-wider text-white/50">Typography</legend>
       <label className="flex flex-col gap-1.5 text-xs text-white/60">Font

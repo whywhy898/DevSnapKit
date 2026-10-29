@@ -19,10 +19,10 @@ export async function clickButton(page, text) {
     if (textSection) await textSection.evaluate(button => button.click());
     return;
   }
-  const hiddenTextAction = await page.evaluate(text => ![...document.querySelectorAll('button')].some(b => b.offsetParent !== null && b.innerText.replace(/\s+/g, ' ').trim() === text.replace(/\s+/g, ' ').trim()) && [...document.querySelectorAll('[data-canvas-text-controls] button')].some(b => b.innerText.replace(/\s+/g, ' ').trim() === text.replace(/\s+/g, ' ').trim()), text);
+  const hiddenTextAction = await page.evaluate(text => ![...document.querySelectorAll('button')].some(b => b.offsetParent !== null && (b.innerText.replace(/\s+/g, ' ').trim() === text.replace(/\s+/g, ' ').trim() || b.getAttribute('aria-label') === text)) && [...document.querySelectorAll('[data-canvas-text-controls] button')].some(b => b.innerText.replace(/\s+/g, ' ').trim() === text.replace(/\s+/g, ' ').trim() || b.getAttribute('aria-label') === text), text);
   if (hiddenTextAction) await clickButton(page, 'Text');
-  await page.waitForFunction(text => [...document.querySelectorAll('button')].some(b => b.offsetParent !== null && b.innerText.replace(/\s+/g, ' ').trim() === text.replace(/\s+/g, ' ').trim()), {}, text);
-  const handle = await page.evaluateHandle(text => [...document.querySelectorAll('button')].find(b => b.offsetParent !== null && b.innerText.replace(/\s+/g, ' ').trim() === text.replace(/\s+/g, ' ').trim()), text);
+  await page.waitForFunction(text => [...document.querySelectorAll('button')].some(b => b.offsetParent !== null && (b.innerText.replace(/\s+/g, ' ').trim() === text.replace(/\s+/g, ' ').trim() || b.getAttribute('aria-label') === text)), {}, text);
+  const handle = await page.evaluateHandle(text => [...document.querySelectorAll('button')].find(b => b.offsetParent !== null && (b.innerText.replace(/\s+/g, ' ').trim() === text.replace(/\s+/g, ' ').trim() || b.getAttribute('aria-label') === text)), text);
   await handle.evaluate(button => button.click());
   await handle.dispose();
 }

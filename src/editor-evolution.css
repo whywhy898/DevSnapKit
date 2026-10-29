@@ -38,6 +38,7 @@
 .inspector-device-styles>summary::after { content:'  ·  Frames & compositions'; color:var(--editor-muted); font-weight:400; font-size:10px; }
 /* Elements: a compact workspace for text and template objects. */
 .elements-panel { color:var(--editor-text); }
+.studio-inspector > .elements-panel + .elements-object-panel, .studio-inspector > .elements-panel + .elements-text-panel { margin-top:10px!important; }
 .elements-panel-heading, .elements-object-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 .elements-panel-heading h3, .elements-object-heading h3 { color:var(--editor-text); font-size:15px; font-weight:750; letter-spacing:-.015em; }
 .elements-panel-heading p, .elements-object-heading p { margin-top:4px; color:var(--editor-muted); font-size:11px; line-height:1.5; }
@@ -69,6 +70,8 @@
 .elements-text-panel [data-canvas-text-controls] { color:var(--editor-text); }
 .element-text-properties { display:flex; flex-direction:column; gap:16px; padding:15px; border:1px solid var(--editor-border); border-radius:13px; background:var(--editor-soft); }
 .element-text-properties h3 { margin:7px 0 0; color:var(--editor-text); font-size:13px; font-weight:750; }
+.element-text-properties label, .elements-text-panel .elements-select-label { color:var(--editor-text); font-weight:650; }
+.theme-light aside.studio-inspector .element-text-properties label, .theme-light aside.studio-inspector .elements-text-panel .elements-select-label { color:#0f172a!important; }
 .elements-text-panel [data-canvas-text-controls] fieldset { padding:0; border:0; background:transparent; }
 .element-object-title { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
 .elements-object-panel [data-object-properties] .element-object-title h3 { margin:7px 0 13px; }

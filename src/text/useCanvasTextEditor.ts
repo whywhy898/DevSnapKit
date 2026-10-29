@@ -95,7 +95,9 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
         return { left: (rect.left - bounds.left) / scale + horizontal.left, top: (rect.top - bounds.top) / scale,
           width: horizontal.right - horizontal.left, height: Math.max(rect.height / scale, node.offsetHeight, node.scrollHeight) };
       }) : undefined;
-      const next = addText(latest.current.textDocument, size, initialTextColor(latest.current.bgType, latest.current.solidColor), crypto.randomUUID(), occupied);
+      const source = latest.current.primaryMediaOrigin;
+      const lightStarter = source?.kind === 'builtin' && source.sampleId === 'workspace' && !latest.current.compositionDocument && latest.current.bgType === 'gradient';
+      const next = addText(latest.current.textDocument, size, lightStarter ? '#111827' : initialTextColor(latest.current.bgType, latest.current.solidColor), crypto.randomUUID(), occupied);
       history.beginTransaction(latest.current); applyDocument(next); history.commitTransaction(latest.current);
       edit(next.layers[next.layers.length - 1].id);
     } catch (e) { setMessage((e as Error).message); }
