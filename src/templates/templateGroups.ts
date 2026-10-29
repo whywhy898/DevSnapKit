@@ -21,3 +21,10 @@ export function groupTemplates<T extends { width: number; height: number }>(item
     return (ai < 0 ? ORDER.length : ai) - (bi < 0 ? ORDER.length : bi) || a.localeCompare(b);
   }).map(([key, entries]) => ({ key, items: entries }));
 }
+
+/** Recommend only a group that really exists for the current logical canvas ratio. */
+export function matchCanvasGroup<T>(groups: readonly { key: string; items: readonly T[] }[], size?: { width: number; height: number }) {
+  if (!size || !Number.isSafeInteger(size.width) || !Number.isSafeInteger(size.height) || size.width <= 0 || size.height <= 0) return undefined;
+  const { key } = templateRatio(size.width, size.height);
+  return groups.find(group => group.key === key);
+}

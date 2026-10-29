@@ -2387,7 +2387,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               {/* Starter Demo Dropdown Popover */}
               {showDemoTemplatesMenu && (
                 <>
-                  <TemplateMenu onDesignedApply={handleApplyDesignedTemplate} onClose={dismissTemplateGallery} suspended={showProModal || showClaimModal || showSuccessModal} isProUnlocked={isProUnlocked} disabled={isExporting || preparingTemplate || assetBusy} busy={preparingTemplate || assetBusy} error={textError} />
+                  <TemplateMenu canvasSize={canvasLogicalSize} onDesignedApply={handleApplyDesignedTemplate} onClose={dismissTemplateGallery} suspended={showProModal || showClaimModal || showSuccessModal} isProUnlocked={isProUnlocked} disabled={isExporting || preparingTemplate || assetBusy} busy={preparingTemplate || assetBusy} error={textError} />
                 </>
               )}
             

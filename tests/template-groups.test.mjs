@@ -23,3 +23,15 @@ test('each catalog entry appears once and ratio filtering returns the whole grou
   assert.deepEqual(Array.from(result[0].items, x => x.id), ['a','b']);
   assert.equal(result.flatMap(g => g.items).length, input.length);
 });
+
+test('canvas recommendations use exact catalog groups without inventing or discarding ratios', () => {
+  assert.equal(typeof groups.matchCanvasGroup, 'function');
+  const grouped = groups.groupTemplates([{id:'social',width:1200,height:630},{id:'square',width:1080,height:1080},{id:'wide',width:1920,height:1080}]);
+  assert.equal(groups.matchCanvasGroup(grouped, {width:720,height:720})?.key, '1:1');
+  assert.equal(groups.matchCanvasGroup(grouped, {width:1920,height:1080})?.key, '16:9');
+  assert.equal(groups.matchCanvasGroup(grouped, {width:1200,height:630})?.key, '1.91:1');
+  assert.equal(groups.matchCanvasGroup(grouped, {width:1500,height:900}), undefined);
+  assert.equal(groups.matchCanvasGroup(grouped, {width:1200,height:861}), undefined);
+  assert.equal(groups.matchCanvasGroup(grouped, undefined), undefined);
+  for (const size of [{width:0,height:0},{width:-1,height:1},{width:Infinity,height:2},{width:1.5,height:1}]) assert.equal(groups.matchCanvasGroup(grouped, size), undefined);
+});

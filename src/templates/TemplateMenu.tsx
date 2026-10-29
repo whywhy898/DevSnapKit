@@ -1,20 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Layers3, Lock } from 'lucide-react';
+import { X, Layers3, Lock, Sparkles } from 'lucide-react';
 import { CURATED_TEMPLATE_CATALOG } from './collection/catalog';
 import type { CuratedTemplateId } from './collection/types';
-import { groupTemplates } from './templateGroups';
+import { groupTemplates, matchCanvasGroup } from './templateGroups';
 import { TemplatePreview } from './TemplatePreview';
 
 type Template = typeof CURATED_TEMPLATE_CATALOG[number];
 const groups = groupTemplates(CURATED_TEMPLATE_CATALOG);
 
-export function TemplateMenu({ onDesignedApply, onClose, suspended = false, isProUnlocked = false, disabled, busy, error }: {
+export function TemplateMenu({ canvasSize, onDesignedApply, onClose, suspended = false, isProUnlocked = false, disabled, busy, error }: {
+  canvasSize?: { width: number; height: number };
   onDesignedApply?: (id: CuratedTemplateId) => void;
   onClose?: () => void; suspended?: boolean; isProUnlocked?: boolean; disabled: boolean; busy: boolean; error?: string;
 }) {
   const [preview, setPreview] = useState<Template | null>(null);
   const [filter, setFilter] = useState('all');
+  const [matchingGroup] = useState(() => matchCanvasGroup(groups, canvasSize));
+  const visibleGroups = filter === 'all'
+    ? matchingGroup ? [matchingGroup, ...groups.filter(group => group.key !== matchingGroup.key)] : groups
+    : groups.filter(group => group.key === filter);
   const dialog = useRef<HTMLDialogElement>(null);
   const galleryScroll = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
@@ -54,11 +59,19 @@ export function TemplateMenu({ onDesignedApply, onClose, suspended = false, isPr
         <button type="button" data-template-filter="all" aria-pressed={filter === 'all'} onClick={() => chooseFilter('all')}>All</button>
         {groups.map(group => <button key={group.key} type="button" data-template-filter={group.key} aria-pressed={filter === group.key} onClick={() => chooseFilter(group.key)}>{group.key}</button>)}
       </div>
+      {matchingGroup && <div className="template-recommendation" data-template-recommendation>
+        <span className="template-recommendation-icon" aria-hidden="true"><Sparkles size={18} /></span>
+        <div className="template-recommendation-copy">
+          <strong>Matches your canvas ratio · {matchingGroup.key}</strong>
+          <span>{matchingGroup.items.length} matching {matchingGroup.items.length === 1 ? 'template' : 'templates'}</span>
+        </div>
+        <button type="button" data-show-matching disabled={filter === matchingGroup.key} onClick={() => chooseFilter(matchingGroup.key)}>{filter === matchingGroup.key ? 'Showing matches' : 'Show matching'}</button>
+      </div>}
       {busy && <p role="status" className="template-gallery-status">Preparing artwork…</p>}
       {error && <p role="alert" className="template-gallery-error">{error}</p>}
       <div ref={galleryScroll} className="template-gallery-scroll">
         {!groups.some(group => filter === 'all' || group.key === filter) && <p className="template-gallery-note">No templates in this size yet. <button type="button" onClick={() => chooseFilter('all')}>View all templates</button></p>}
-        {groups.filter(group => filter === 'all' || group.key === filter).map(group => <section className="template-group" key={group.key}>
+        {visibleGroups.map(group => <section className="template-group" key={group.key}>
           <div className="template-group-heading"><h3>{group.key}</h3><span>{group.items.length} {group.items.length === 1 ? 'template' : 'templates'}</span></div>
           <div className="template-gallery-grid">{group.items.map(template => <article className="template-card" key={template.id}>
             <button type="button" aria-label={`Preview ${template.name} template`} onClick={() => setPreview(template)} className={`template-card-image ${template.height > template.width ? 'is-portrait' : template.height === template.width ? 'is-square' : 'is-landscape'}`}>
