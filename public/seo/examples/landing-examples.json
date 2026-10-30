@@ -2,33 +2,71 @@
   "version": 1,
   "createdAt": "2026-10-23",
   "editorUrl": "https://devsnapkit.com/?editor=1",
-  "editorSourceCommit": "00ab8f237ff4fbee49ce1fa2f4b26d1432d542d2",
-  "method": "Original public-page screenshots imported through the studio UI; styled PNGs downloaded with its 1x PNG export. No injected editor state or external compositing.",
-  "disclosure": "Public-page styling demonstrations, not customer endorsements.",
+  "method": "Source images imported through the actual studio UI. Each example describes its source, export scale and capture method. No injected editor state or external compositing of the exported images.",
+  "disclosure": "Public-page or owned illustrative-interface demonstrations, not customer endorsements.",
   "examples": [
     {
       "page": "og-image-generator",
       "source": "https://github.com/vitejs/vite",
       "description": "Existing real Vite repository capture, imported into the studio with a browser frame and three editable text boxes. Custom 1200 by 630 canvas, 1x PNG export.",
-      "originals": [{"file": "og-original.png", "width": 1280, "height": 800, "sha256": "83c3cd5498fa4573561c2c376c182ed118119326007e62944a3dfb2cdff98690"}],
-      "export": {"file": "og-styled.png", "width": 1200, "height": 630, "sha256": "066f67af251a3b7edfe0c5a917a9979e3b07f41c31c9ff31b67aac9db3fee7b8"}
+      "originals": [
+        {
+          "file": "og-original.png",
+          "width": 1280,
+          "height": 800,
+          "sha256": "83c3cd5498fa4573561c2c376c182ed118119326007e62944a3dfb2cdff98690"
+        }
+      ],
+      "export": {
+        "file": "og-styled.png",
+        "width": 1200,
+        "height": 630,
+        "sha256": "066f67af251a3b7edfe0c5a917a9979e3b07f41c31c9ff31b67aac9db3fee7b8"
+      }
     },
     {
       "page": "product-hunt-image-maker",
       "source": "https://devsnapkit.com/screenshot-beautifier/",
       "description": "Hero and how-it-works section captures of the same public DevSnapKit landing page. Uploaded to Duo, arranged side by side, given a dark background and three editable text boxes, then exported at 1x. This is a launch-visual demonstration, not a statement of Product Hunt's required dimensions.",
       "originals": [
-        {"file": "ph-original.png", "width": 1281, "height": 692, "sha256": "80af47eda85c75902a34ec9249914f285cae607779d307d4b1f8d05a5320556c"},
-        {"file": "ph-secondary-original.png", "width": 1425, "height": 364, "sha256": "56a99a99094cb4884c54fe3af93962d306720e5c23ea827e5f233bad7c0576ee"}
+        {
+          "file": "ph-original.png",
+          "width": 1281,
+          "height": 692,
+          "sha256": "80af47eda85c75902a34ec9249914f285cae607779d307d4b1f8d05a5320556c"
+        },
+        {
+          "file": "ph-secondary-original.png",
+          "width": 1425,
+          "height": 364,
+          "sha256": "56a99a99094cb4884c54fe3af93962d306720e5c23ea827e5f233bad7c0576ee"
+        }
       ],
-      "export": {"file": "ph-styled.png", "width": 1600, "height": 1200, "sha256": "b14069c72a4676fcdc3700055b66b2ce268d6c14ba4e3d5ae6e5918f200fe426"}
+      "export": {
+        "file": "ph-styled.png",
+        "width": 1600,
+        "height": 1200,
+        "sha256": "b14069c72a4676fcdc3700055b66b2ce268d6c14ba4e3d5ae6e5918f200fe426"
+      }
     },
     {
       "page": "add-text-to-image",
-      "source": "https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/grid-template-columns",
-      "description": "Existing real MDN CSS reference capture imported into the studio. Includes a headline, an editable blue note over a clear portion of the screenshot, and a source caption; exported on a 1200 by 900 canvas at 1x.",
-      "originals": [{"file": "text-original.png", "width": 1280, "height": 800, "sha256": "c3af1405db76f79638b17dc01e2c5b934141027c2fd48e437d0d72515dc822f2"}],
-      "export": {"file": "text-styled.png", "width": 1200, "height": 900, "sha256": "585b1773816612b905945457d6fb1b373fa42658a35f12118ef107df3cf4d22a"}
+      "source": "https://devsnapkit.com/seo/examples/text-source.png",
+      "description": "Owned illustrative Clear Skies interface, captured as a real browser screenshot from tests/fixtures/text-demo-source.html. Imported through the actual studio UI; one editable Gelasio 42 px headline added above it. Actual 2x PNG download. The capture introduction provides OS shortcut instructions; it does not claim to record the OS overlay.",
+      "originals": [
+        {
+          "file": "text-source.png",
+          "width": 1120,
+          "height": 560,
+          "sha256": "fd8203b6f27412487d4c4c311004ec56d6b0a319c7ca09954ea8bf0e17294372"
+        }
+      ],
+      "export": {
+        "file": "text-result.png",
+        "width": 2400,
+        "height": 1376,
+        "sha256": "56593b4f1299b41f6c43e94a684620c27a7d5dca1ca91518fbae1b4f92daddfa"
+      }
     }
   ]
 }

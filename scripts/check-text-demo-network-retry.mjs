@@ -28,7 +28,8 @@ try {
   browser = await launchBrowser();
   const page = await browser.newPage();
   page.setDefaultTimeout(20000);
-  await page.setContent(`<video data-demo-player controls preload="none"><source src="http://127.0.0.1:${server.address().port}/video.mp4" type="video/mp4"></video><button data-demo-play><span class="demo-play-label">Play</span></button><p data-demo-status hidden></p>`);
+  await page.emulateMediaFeatures([{name:'prefers-reduced-motion',value:'reduce'}]);
+  await page.setContent(`<div data-demo-slot><div data-demo-frame><video data-demo-player controls preload="none"><source src="http://127.0.0.1:${server.address().port}/video.mp4" type="video/mp4"></video><button data-demo-play><span data-demo-icon>Play</span></button><button data-demo-expand>Expand</button></div></div><dialog data-demo-dialog><button data-demo-close>Close</button><div data-demo-expanded-slot></div></dialog><p data-demo-status hidden></p>`);
   await page.addScriptTag({ content: playerScript });
   await page.click('[data-demo-play]');
   await page.waitForFunction(() => document.querySelector('video').error);

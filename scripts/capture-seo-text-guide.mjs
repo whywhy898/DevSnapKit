@@ -88,7 +88,7 @@ try {
         };
       });
       assert.equal(layout.overflow, false);
-      assert.equal(layout.images, 3);
+      assert.equal(layout.images, 4);
       assert.equal(layout.broken, 0);
       assert.equal(layout.headings, 1);
       assert.equal(layout.canonical, 'https://devsnapkit.com/add-text-to-image/');
@@ -108,7 +108,7 @@ try {
     assert.equal(new URL(page.url()).searchParams.get('tool'), 'text');
     const chooser = page.waitForFileChooser();
     await page.click('button[title="Upload screenshot from computer"]');
-    await (await chooser).accept([path.join(root, 'public/seo/examples/text-original.png')]);
+    await (await chooser).accept([path.join(root, 'public/seo/examples/text-source.png')]);
     await page.waitForFunction(() => [...document.querySelectorAll('#studio-canvas img')].some(image => image.complete && image.naturalWidth > 0 && /^(blob:|data:image\/png)/.test(image.src)));
     await page.evaluate(() => document.fonts.ready);
     if (capture) await publishAsset(await page.screenshot(), 'text-guide-upload.webp');

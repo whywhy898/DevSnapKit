@@ -2,9 +2,10 @@
 
 The user has approved the reference layout and interactions. Implement in the existing isolated worktree; no additional approval checkpoint is needed for these reversible changes.
 
-- [ ] Prepare a low-text illustrative source and capture it with the system screenshot tool, retaining truthful evidence.
-- [ ] Re-record capture/import/add-text/export and replace this page's images/video/poster/caption assets with the new example.
-- [ ] Rebuild the page hero around the first-screen video and concise copy; update all page examples, metadata and capture instructions.
-- [ ] Implement muted autoplay and corner playback/replay control, expanded dialog and robust preference/error/focus behavior.
-- [ ] Verify geometry, actual player behavior, accessibility, media and complete text export; review and fix concrete issues.
+- [x] Prepare an owned low-text source; retain a real browser-area capture and describe its provenance.
+- [x] Record the capture-instruction introduction and real import/add-text/export, replacing all examples on this page.
+- [x] Rebuild the first-screen hero and refresh examples, metadata and capture instructions.
+- [x] Implement muted autoplay, corner controls and expanded dialog with preference/error/focus handling.
+- [x] Verify player/SEO/export behavior and independently review; fix the mobile landscape clipping found in review.
 - [ ] Merge, publish and verify production; record completion in parent workspace acceptance notes.
+- [ ] Follow-up: record the native system screenshot selection overlay. Current tools cannot operate that overlay; this release uses explicit instructions rather than simulated OS footage. See the specification's capture limitation.

@@ -9,6 +9,8 @@ import sharp from 'sharp';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const output = path.resolve(process.env.TEXT_DEMO_OUTPUT || 'D:/workspace/MarkMoney/output/devsnapkit/text-demo-video-2026-10-30');
 const assets = path.join(root, 'public/seo/video');
+const flow = process.env.TEXT_DEMO_FLOW === '1';
+const name = flow ? 'add-text-flow' : 'add-text-demo';
 await fs.mkdir(assets, { recursive: true });
 const recording = JSON.parse(await fs.readFile(path.join(output, 'recording.json'), 'utf8'));
 assert.equal(recording.passed, true, 'A genuine successful recording is required.');
@@ -30,12 +32,17 @@ async function png(bytes, file) {
 }
 
 const groups = [
+  ...(flow ? [{ name: 'capture', title: 'Capture an area. Windows: Win + Shift + S', step: '01 / 06' }, { name: 'import', title: 'Replace Image. Import your screenshot.', step: '02 / 06' }] : []),
   { name: 'original', title: 'Start with your screenshot.', step: '01 / 05' },
   { name: 'add', title: 'Add a text box. Write your headline.', step: '02 / 05' },
   { name: 'font', title: 'Choose the type. Set the size.', step: '03 / 05' },
   { name: 'move', title: 'Give your words room to breathe.', step: '04 / 05' },
   { name: 'export', title: 'Download the finished image.', step: '05 / 05' },
 ];
+if (flow) {
+  groups.splice(groups.findIndex(group => group.name === 'original'), 1);
+  groups.forEach((group, index) => group.step = `${String(index + 1).padStart(2, '0')} / ${String(groups.length).padStart(2, '0')}`);
+}
 const captions = groups.map((group, index) => ({ ...group, start: index === 0 ? 0 : recording.marks.find(mark => mark.name === group.name).at, end: index + 1 < groups.length ? recording.marks.find(mark => mark.name === groups[index + 1].name).at : duration }));
 const captionFiles = [];
 for (let i = 0; i < captions.length; i++) {
@@ -95,7 +102,7 @@ graph.push(`[${finalIndex}:v]fps=30,trim=duration=${hold},settb=AVTB,setpts=PTS-
 graph.push(`[footage][end]xfade=transition=fade:duration=${fade}:offset=${(rawDuration - fade).toFixed(5)},format=yuv420p[video]`);
 const filterFile = path.join(output, 'edit-filter.txt');
 await fs.writeFile(filterFile, graph.join(';\n'));
-const target = path.join(assets, 'add-text-demo.mp4');
+const target = path.join(assets, `${name}.mp4`);
 const args = ['-hide_banner', '-loglevel', 'error', '-y', '-i', path.join(output, 'raw.mp4'), '-loop', '1', '-i', mask];
 for (const file of captionFiles) args.push('-loop', '1', '-i', file);
 args.push('-loop', '1', '-i', end, '-filter_complex_script', filterFile, '-map', '[video]', '-an', '-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-pix_fmt', 'yuv420p', '-r', '30', '-t', duration.toFixed(5), '-map_metadata', '-1', '-movflags', '+faststart', target);
@@ -104,7 +111,7 @@ assert.equal(render.status, 0, render.stderr);
 
 // The poster is a real successful export laid out on the same final card.
 const { data, info } = await sharp(end).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-const poster = path.join(assets, 'add-text-demo-poster.webp');
+const poster = path.join(assets, `${name}-poster.webp`);
 await sharp(data, { raw: { width: info.width, height: info.height, channels: info.channels } }).webp({ lossless: true }).toFile(poster);
 assert.ok(data.equals(await sharp(poster).ensureAlpha().raw().toBuffer()), 'Poster preserves pixels.');
 const posterBytes = await fs.readFile(poster);
@@ -120,7 +127,7 @@ function stamp(time) {
 }
 const cues = recording.marks.filter(mark => mark.name !== 'done').map((mark, index, all) => ({ start: mark.at, end: index + 1 < all.length ? all[index + 1].at : rawDuration - fade, text: mark.caption }));
 cues.push({ start: rawDuration - fade, end: duration, text: 'The actual downloaded image, with the finished headline.' });
-await fs.writeFile(path.join(assets, 'add-text-demo.en.vtt'), 'WEBVTT\n\n' + cues.map(cue => `${stamp(cue.start)} --> ${stamp(cue.end)}\n${cue.text}\n`).join('\n'));
+await fs.writeFile(path.join(assets, `${name}.en.vtt`), 'WEBVTT\n\n' + cues.map(cue => `${stamp(cue.start)} --> ${stamp(cue.end)}\n${cue.text}\n`).join('\n'));
 const final = probe(target);
 assert.equal(final.streams[0].codec_name, 'h264');
 assert.equal(final.streams[0].width, 1280);
@@ -130,6 +137,6 @@ assert.ok(Number(final.format.size) < 20 * 1024 * 1024, 'Video remains within st
 const decode = spawnSync('ffmpeg', ['-v', 'error', '-i', target, '-f', 'null', '-'], { encoding: 'utf8', windowsHide: true, timeout: 60000 });
 assert.equal(decode.status, 0, decode.stderr);
 const bytes = await fs.readFile(target);
-const manifest = { passed: true, reference: 'Editing grammar only; no Google footage or music reused.', rawDuration, duration: Number(final.format.duration), format: final.streams[0], bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), actualExport: { width: exportMetadata.width, height: exportMetadata.height, sha256: createHash('sha256').update(exported).digest('hex') }, captions, cues, poster: { chunks: posterChunks, pixelsUnchanged: true }, published: '/seo/video/add-text-demo.mp4' };
+const manifest = { passed: true, capture: recording.capture, reference: 'Editing grammar only; no Google footage or music reused.', rawDuration, duration: Number(final.format.duration), format: final.streams[0], bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), actualExport: { width: exportMetadata.width, height: exportMetadata.height, sha256: createHash('sha256').update(exported).digest('hex') }, captions, cues, poster: { chunks: posterChunks, pixelsUnchanged: true }, published: `/seo/video/${name}.mp4` };
 await fs.writeFile(path.join(output, 'render.json'), JSON.stringify(manifest, null, 2) + '\n');
 console.log(JSON.stringify({ passed: true, duration: manifest.duration, bytes: manifest.bytes, target }));

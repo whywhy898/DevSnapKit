@@ -7,6 +7,8 @@ import { startSeoServer } from '../tests/helpers/seo-server.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const output = path.resolve(process.env.TEXT_DEMO_OUTPUT || 'D:/workspace/MarkMoney/output/devsnapkit/text-demo-video-2026-10-30');
+const flow = process.env.TEXT_DEMO_FLOW === '1';
+const headline = flow ? 'A brighter outlook.' : 'Understand CSS grid.';
 await fs.mkdir(output, { recursive: true });
 const server = await startSeoServer(() => ({}));
 const browser = await launchBrowser();
@@ -79,11 +81,26 @@ try {
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
   await page.evaluateOnNewDocument(() => localStorage.setItem('devsnapkit_welcome_seen', '1'));
   page.on('pageerror', error => result.errors.push(error.message));
+  if (flow) {
+    await page.setContent(await fs.readFile(path.join(root, 'tests/fixtures/text-demo-source.html'), 'utf8'));
+    await page.evaluate(() => document.fonts.ready);
+    recorder = await page.screencast({ path: path.join(output, 'raw.mp4'), format: 'mp4', fps: 30, quality: 16 });
+    started = performance.now();
+    await mark('capture', 'First, capture the area you need. Windows: Win + Shift + S. Mac: Shift + Command + 4.');
+    await pause(3000);
+    await page.$eval('.capture-board', node => node.style.outline = '3px solid #756b53');
+    await pause(800);
+    await page.$eval('.capture-board', node => node.style.outline = '');
+    await (await page.$('.capture-board')).screenshot({ path: path.join(output, 'captured-source.png') });
+    result.capture = { method: 'Actual browser area screenshot; OS shortcut is instructional text, not a recording of the operating-system overlay.', source: 'tests/fixtures/text-demo-source.html' };
+    await pause(700);
+  }
   await page.goto(`${server.origin}/?editor=1&tool=text`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#studio-canvas');
+  if (flow) { await mark('import', 'Open DevSnapKit. Replace Image imports your screenshot.'); await pause(1000); }
   const chooser = page.waitForFileChooser();
   await page.click('button[title="Upload screenshot from computer"]');
-  await (await chooser).accept([path.join(root, 'public/seo/examples/text-original.png')]);
+  await (await chooser).accept([flow ? path.join(output, 'captured-source.png') : path.join(root, 'public/seo/examples/text-original.png')]);
   await page.waitForFunction(() => [...document.querySelectorAll('#studio-canvas img')].some(image => image.complete && image.naturalWidth > 0 && /^(blob:|data:image\/png)/.test(image.src)));
   // Choose an actual light canvas preset so the newly created text has strong
   // contrast from the very first typed character, including over a white UI.
@@ -107,9 +124,9 @@ try {
   });
   await page.mouse.move(pointer.x, pointer.y);
   await page.screenshot({ path: path.join(output, 'before.png') });
-  recorder = await page.screencast({ path: path.join(output, 'raw.mp4'), format: 'mp4', fps: 30, quality: 16 });
-  started = performance.now();
+  if (!flow) { recorder = await page.screencast({ path: path.join(output, 'raw.mp4'), format: 'mp4', fps: 30, quality: 16 }); started = performance.now(); }
   await mark('original', 'A screenshot. A little more context.');
+  if (flow) await page.screenshot({ path: path.join(output, 'guide-upload.png') });
   await pause(1700);
   const add = '[data-canvas-text-controls] button[aria-label="Add another text"]';
   const addTarget = await box(add);
@@ -120,7 +137,7 @@ try {
   await mark('type', 'Write the headline your screenshot needs.', 1.2, text);
   await move(text, 450);
   await page.keyboard.down('Control'); await page.keyboard.press('a'); await page.keyboard.up('Control');
-  await page.keyboard.type('Understand CSS grid.', { delay: 95 });
+  await page.keyboard.type(headline, { delay: 115 });
   await pause(900);
   await finishTextEditing(page);
   await pause(300);
@@ -139,7 +156,7 @@ try {
     const handle = document.querySelector('[aria-label="Move text"]');
     if (!handle) return { labels: [...document.querySelectorAll('[data-text-editor-ui] button')].map(node => node.getAttribute('aria-label')) };
     const h = handle.getBoundingClientRect();
-    return { from: { x: h.x + h.width / 2, y: h.y + h.height / 2 }, to: { x: h.x + h.width / 2 + canvas.x + canvas.width / 2 - (glyph.x + glyph.width / 2), y: h.y + h.height / 2 + canvas.y + canvas.height * 44 / 816 - (glyph.y + glyph.height / 2) }, focus: { x: canvas.x + canvas.width / 2, y: canvas.y + canvas.height / 2 } };
+    return { from: { x: h.x + h.width / 2, y: h.y + h.height / 2 }, to: { x: h.x + h.width / 2 + canvas.x + canvas.width / 2 - (glyph.x + glyph.width / 2), y: h.y + h.height / 2 + canvas.y + canvas.height * .065 - (glyph.y + glyph.height / 2) }, focus: { x: canvas.x + canvas.width / 2, y: canvas.y + canvas.height / 2 } };
   });
   assert.ok(drag.from, 'Real Move text handle: ' + JSON.stringify(drag));
   await mark('move', 'Move the caption into clear space.', 1.05, drag.focus);
@@ -153,7 +170,8 @@ try {
   dragging = false;
   result.actions.push({ at: seconds(), action: 'drag', ...drag });
   await pause(1000);
-  await page.waitForFunction(() => [...document.querySelectorAll('[data-canvas-text]')].some(node => node.textContent === 'Understand CSS grid.'));
+  await page.waitForFunction(text => [...document.querySelectorAll('[data-canvas-text]')].some(node => node.textContent === text), {}, headline);
+  if (flow) await page.screenshot({ path: path.join(output, 'guide-edit.png') });
   const exportTab = '[data-inspector-tabs] button:last-child';
   const exportTarget = await box(exportTab);
   await mark('export', 'Open Export and download your image.', 1.5, exportTarget);
