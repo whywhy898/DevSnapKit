@@ -1,0 +1,24 @@
+/* Only the screenshot-text landing page loads this walkthrough stylesheet. */
+.guide-jump{display:block;width:fit-content;margin-top:18px;font-size:14px;line-height:1.6;color:var(--muted);text-decoration:underline;text-underline-offset:4px}
+.text-guide{padding-block:80px}
+.text-guide .guide-heading{max-width:800px;margin-bottom:56px}
+.text-guide .guide-heading h2{max-width:760px}
+.text-guide .guide-heading p:not(.eyebrow){max-width:740px;font-size:16px;line-height:1.85}
+.guide-steps{list-style:none;padding:0;margin:0;display:grid;gap:52px}
+.guide-steps>li{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.2fr);gap:48px;align-items:start;padding-top:40px;border-top:1px solid var(--line)}
+.guide-copy{min-width:0}
+.guide-copy .eyebrow{margin:0 0 16px}
+.guide-copy h3{font-size:clamp(23px,2.5vw,30px);line-height:1.25;letter-spacing:-.8px;margin:0 0 20px;max-width:390px}
+.guide-copy p:not(.eyebrow){font-size:15px;line-height:1.85;color:var(--muted);margin:0 0 16px}
+.text-guide strong{font-weight:700;color:var(--ink)}
+.guide-steps figure{margin:0;min-width:0}
+.guide-steps figure>a{display:block;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--raised)}
+.guide-steps img{width:100%;height:auto}
+.guide-steps figcaption{margin-top:13px;font-size:13px;line-height:1.75;color:var(--muted)}
+.guide-note{margin-top:48px;padding:28px 32px;border-left:3px solid var(--accent);background:var(--bg)}
+.guide-note h3{margin:0 0 12px;font-size:19px;line-height:1.4;letter-spacing:-.3px}
+.guide-note p{margin:0;max-width:930px;font-size:15px;line-height:1.85;color:var(--muted)}
+.guide-action{margin-top:36px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+.guide-action p{margin:0;font-size:18px;font-weight:600;line-height:1.6}
+@media(max-width:1024px){.guide-steps>li{gap:28px;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}}
+@media(max-width:767px){.text-guide{padding-block:52px}.text-guide .guide-heading{margin-bottom:32px}.text-guide .guide-heading p:not(.eyebrow){font-size:15px}.guide-steps{gap:36px}.guide-steps>li{grid-template-columns:minmax(0,1fr);gap:20px;padding-top:28px}.guide-copy h3{font-size:25px;max-width:none}.guide-copy p:not(.eyebrow){font-size:15px}.guide-note{margin-top:32px;padding:22px}.guide-action{align-items:flex-start;flex-direction:column;gap:16px}.guide-action p{font-size:17px}.guide-action .button{max-width:100%;font-size:13px}.guide-jump{font-size:13px}}

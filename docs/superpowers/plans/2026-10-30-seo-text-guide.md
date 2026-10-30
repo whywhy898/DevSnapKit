@@ -8,9 +8,9 @@
 
 **Tech stack:** Existing HTML/CSS, Puppeteer browser helpers, Sharp asset encoding, Vite build, existing SEO tests.
 
-- [ ] Verify current baseline, editor controls and example export using the existing isolated worktree.
-- [ ] Capture genuine upload/edit/export illustrations and record provenance; verify metadata and lossless pixel preservation.
-- [ ] Update `public/add-text-to-image/index.html`, add `public/seo/text-guide.css`, and update that sitemap entry's lastmod.
-- [ ] Verify existing SEO suites, production build, desktop/mobile guide readability, editor preset and actual text export. Use existing tests and a focused browser acceptance runner; do not add tests that merely assert marketing copy.
-- [ ] Review final diff for unsupported claims, broken links, accessibility and unrelated changes. Record validation.
+- [x] Verify current baseline, editor controls and example export using the existing isolated worktree.
+- [x] Capture genuine upload/edit/export illustrations and record provenance; verify metadata and lossless pixel preservation.
+- [x] Update `public/add-text-to-image/index.html`, add `public/seo/text-guide.css`, and update that sitemap entry's lastmod.
+- [x] Verify existing SEO suites, production build, desktop/mobile guide readability, editor preset and actual text export. Use existing tests and a focused browser acceptance runner; do not add tests that merely assert marketing copy.
+- [x] Review final diff for unsupported claims, broken links, accessibility and unrelated changes. Record validation.
 - [ ] Commit, merge to main and release through the established production workflow, then verify the live page while suppressing synthetic telemetry.
