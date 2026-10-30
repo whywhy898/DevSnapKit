@@ -19,3 +19,9 @@ Validation:
 - The new comparison image is pixel-reencoded; decoded equality, PNG chunks and absence of EXIF/XMP/C2PA-style ancillary metadata are verified by its capture script.
 
 Independent review confirms desktop, portrait and landscape alignment, player corners, no native timeline and a correctly sized dialog. Its one P3 finding (an error message referencing the removed visible video link) has been corrected to offer only retry and written steps. Publication is recorded after production verification. This correction does not modify the recorded video or editor runtime.
+
+## Production verification
+
+Merged and pushed source `51332039570f39cc375bc07929a8dd733c17410d` to main. Production deployment `4b505e0c-b8bd-4fbb-9a81-c5fedd7b1cfa` is live at https://devsnapkit.com/add-text-to-image/ and https://4b505e0c.devsnapkit.pages.dev . Fresh main build, 26 SEO tests and all eight main/production player scenarios pass. The two versioned assets and new comparison PNG return 200 and exactly match built bytes. The production document references both new versions and has no header CTA.
+
+Playwright reused the existing browser context, observed the new versioned requests, and confirmed entry playback with `playing:true`, `muted:true`, `controls:false`. Production hero/comparison screenshots are under the evidence directory's `production/` folder. Normal page refresh gets the versioned assets; clearing the user's browser cache is unnecessary.
