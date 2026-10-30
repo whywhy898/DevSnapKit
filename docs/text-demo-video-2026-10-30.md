@@ -18,6 +18,8 @@ The recording uses existing Puppeteer browser helpers, ffmpeg, and Sharp. Its vi
 
 Actual exported PNG: 2400 × 1632; SHA-256 `5bdcbb3df6256376042ff4f21f0a6e86f859dee97268828f606246141d9b6f8d`.
 
+The VTT byte count and checksum above describe its normalized LF source. Windows Git checkouts can use CRLF (670 bytes in the release checkout), without changing caption text or timing. Binary video and poster checksums are identical across checkouts.
+
 The poster is decoded to pixels and losslessly re-encoded without copied metadata. Its decoded pixels match and its only WebP chunk is VP8L, with no EXIF/XMP/C2PA or other ancillary chunks. No claim about pixel-level watermark removal or external provenance is made.
 
 ## Page behavior
