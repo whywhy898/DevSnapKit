@@ -12,7 +12,7 @@ const browser = await launchBrowser();
 const result = { origin, cases: [], errors: [] };
 let active;
 try {
-  for (const config of [{width:1440,height:900}, {width:1366,height:768}, {width:390,height:844}, {width:390,height:844,dark:true,reduced:true}, {width:320,height:800,noScript:true}, {width:1440,height:900,autoplayDenied:true}, {width:390,height:844,failed:true}]) {
+  for (const config of [{width:1440,height:900}, {width:1366,height:768}, {width:390,height:844}, {width:390,height:844,dark:true,reduced:true}, {width:320,height:800,noScript:true}, {width:1440,height:900,autoplayDenied:true}, {width:390,height:844,failed:true}, {width:1440,height:900,legacyCache:true}]) {
     const context = await browser.createBrowserContext();
     const page = await context.newPage(); active = page;
     page.setDefaultTimeout(15000);
@@ -29,8 +29,11 @@ try {
       };
     });
     let fail = config.failed;
+    let legacyServed=false;
     await page.setRequestInterception(true);
     page.on('request', request => {
+      if(config.legacyCache && request.url()===`${origin}/seo/text-demo.js`){legacyServed=true;return request.respond({status:200,contentType:'application/javascript',body:'document.querySelector("video").controls=true;'});}
+      if(config.legacyCache && request.url()===`${origin}/seo/text-guide.css`){legacyServed=true;return request.respond({status:200,contentType:'text/css',body:'.text-task .hero{max-width:1440px}.comparison{max-width:980px;margin:auto}'});}
       if (remote && request.url().includes('/api/telemetry/event')) return request.respond({status:200,contentType:'application/json',body:'{"ok":true}'});
       if (fail && request.url().includes('/seo/video/add-text-flow.mp4')) return request.respond({status:404,body:''});
       return request.continue();
@@ -38,15 +41,21 @@ try {
     await page.goto(`${origin}/add-text-to-image/`, {waitUntil:'networkidle0'});
     const initial = await page.evaluate(() => {
       const v=document.querySelector('video'), r=v.getBoundingClientRect(), t=document.querySelector('[data-demo-play]').getBoundingClientRect(), e=document.querySelector('[data-demo-expand]').getBoundingClientRect();
-      return {paused:v.paused,muted:v.muted,loop:v.loop,controls:v.controls,overflow:document.documentElement.scrollWidth>innerWidth+1,top:r.top,bottom:r.bottom,width:r.width,height:r.height,toggleRight:t.right>=r.right-35,toggleTop:t.top<=r.top+25,expandLeft:e.left<=r.left+25,expandBottom:e.bottom>=r.bottom-25};
+      const brand=document.querySelector('.site-header .brand').getBoundingClientRect(),copy=document.querySelector('.hero-copy').getBoundingClientRect(),heading=document.querySelector('.comparison-section .section-heading').getBoundingClientRect(),comparison=document.querySelector('.comparison').getBoundingClientRect(),before=document.querySelector('.compare-before img').getBoundingClientRect(),after=document.querySelector('.compare-after img').getBoundingClientRect();
+      return {paused:v.paused,muted:v.muted,loop:v.loop,controls:v.controls,overflow:document.documentElement.scrollWidth>innerWidth+1,top:r.top,bottom:r.bottom,width:r.width,height:r.height,toggleLeft:t.left<=r.left+25,toggleTop:t.top<=r.top+25,expandRight:e.right>=r.right-25,expandBottom:e.bottom>=r.bottom-25,copyAligned:Math.abs(brand.left-copy.left)<1,comparisonAligned:Math.abs(heading.left-comparison.left)<1&&Math.abs(brand.left-comparison.left)<1,imagesAligned:Math.abs(before.left-after.left)<1&&Math.abs(before.top-after.top)<1&&Math.abs(before.width-after.width)<1&&Math.abs(before.height-after.height)<1,headerCTA:!!document.querySelector('.site-header .button')};
     });
     assert.equal(initial.overflow,false);
     assert.equal(initial.muted,true); assert.equal(initial.loop,false);
     assert.equal(initial.controls,!!config.noScript);
+    if(config.legacyCache) assert.equal(legacyServed,false,'Updated HTML bypasses the previously cached player and stylesheet URLs');
+    assert.equal(initial.copyAligned,true,'Hero shares the header left edge');
+    assert.equal(initial.comparisonAligned,true,'Comparison shares the header and section-heading left edge');
+    assert.equal(initial.imagesAligned,true,'Before and after occupy the same image geometry');
+    assert.equal(initial.headerCTA,false,'No duplicate header CTA');
     assert.ok(initial.bottom <= config.height - 30, 'Video is visible within the first viewport');
     assert.ok(Math.abs(initial.width/initial.height-16/9)<.02);
     if (config.noScript) {assert.equal(initial.paused,true); result.cases.push({...config,initial});await context.close();continue;}
-    assert.ok(initial.toggleRight && initial.toggleTop && initial.expandLeft && initial.expandBottom);
+    assert.ok(initial.toggleLeft && initial.toggleTop && initial.expandRight && initial.expandBottom);
     if (config.failed) {
       await page.waitForFunction(()=>document.querySelector('[data-demo-play]').dataset.state==='retry');
       assert.equal(await page.$eval('[data-demo-status]',n=>n.hidden),false);
@@ -79,6 +88,7 @@ try {
     assert.ok(Math.abs(await page.$eval('video',v=>v.currentTime)-pausedAt)<.1);
     await page.keyboard.press('Escape');
     assert.equal(await page.$eval('dialog',d=>d.open),false);
+    await page.waitForFunction(()=>document.activeElement===document.querySelector('[data-demo-expand]'));
     assert.equal(await page.evaluate(()=>document.activeElement===document.querySelector('[data-demo-expand]')),true);
     assert.equal(await page.$eval('video',v=>v.paused),true);
     await page.click('[data-demo-play]');

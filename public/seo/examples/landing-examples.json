@@ -66,6 +66,13 @@
         "width": 2400,
         "height": 1376,
         "sha256": "56593b4f1299b41f6c43e94a684620c27a7d5dca1ca91518fbae1b4f92daddfa"
+      },
+      "comparisonBefore": {
+        "file": "text-before-caption.png",
+        "width": 2400,
+        "height": 1376,
+        "sha256": "dbefa9249567253d2bc96a507f8069f6a73e2cd8196934bfae25b8b43e025711",
+        "method": "Actual studio 2x PNG download using the same source and Soft Gray canvas, without a text object."
       }
     }
   ]

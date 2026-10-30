@@ -70,6 +70,9 @@ test('text page uses one sparse source and the actual export throughout the firs
   assert.match(html, /data-demo-dialog/);
   assert.match(html, /Win<\/kbd>.*Shift<\/kbd>.*S<\/kbd>/);
   assert.match(html, /illustrative interface created for this walkthrough/);
+  assert.match(html, /src="\/seo\/text-demo\.js\?v=/);
+  assert.match(html, /href="\/seo\/text-guide\.css\?v=/);
+  assert.match(html, /class="compare-before"><img src="\/seo\/examples\/text-before-caption\.png" width="2400" height="1376"/);
 });
 
 test('sitemap publishes exactly the homepage and four canonical tools', () => {

@@ -1,6 +1,6 @@
 # Add-text landing page: first-screen demonstration
 
-The user requests a substantial redesign after reviewing the first video: the demo must appear on the first screen, at the right of concise copy; play silently on entry; pause/resume and change to replay when finished; open into an expanded overlay. Follow the user's written control positions (top right playback, bottom left expansion), despite the reference screenshots using opposite corners. Scope is the add-text landing page, not the global home/editor.
+The user requests a substantial redesign after reviewing the first video: the demo must appear on the first screen, at the right of concise copy; play silently on entry; pause/resume and change to replay when finished; open into an expanded overlay. The latest annotated feedback supersedes the initial corner positions: playback belongs at the top left, expansion at the bottom right, matching the Google reference. Scope is the add-text landing page, not the global home/editor.
 
 Replace every example shown on this page with a clear, low-text example. Create an owned illustrative weather interface with large simple weather symbols, three short day labels and temperatures. Capture only its visual board, excluding its title/navigation. Newly added words (“A brighter outlook.”) must be unmistakable. No MDN documentation examples remain on this page. Use genuine system screenshot capture, import, text creation, positioning and export. Clearly distinguish system screenshot tools from DevSnapKit's editor; do not imply built-in screen capture.
 

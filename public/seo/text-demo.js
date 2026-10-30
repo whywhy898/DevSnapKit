@@ -23,7 +23,7 @@
     failed = true;
     desiredPlaying = false;
     video.pause();
-    status.textContent = 'The video could not load. Retry, open the video link, or follow the written steps below.';
+    status.textContent = 'The video could not load. Retry or follow the written steps below.';
     status.hidden = false;
     label();
   }

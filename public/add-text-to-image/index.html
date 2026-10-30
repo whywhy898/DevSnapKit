@@ -24,16 +24,16 @@
   <link rel="preload" href="/seo/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
   <script>try{const t=localStorage.getItem('devsnapkit_landing_theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch{}</script>
   <link rel="stylesheet" href="/seo/landing.css">
-  <link rel="stylesheet" href="/seo/text-guide.css">
+  <link rel="stylesheet" href="/seo/text-guide.css?v=20261030-2">
   <script src="/seo/attribution.js" defer></script>
   <script src="/seo/landing.js" defer></script>
-  <script src="/seo/text-demo.js" defer></script>
+  <script src="/seo/text-demo.js?v=20261030-2" defer></script>
 </head>
 <body class="task-page text-task" style="--case-ratio:2400/1376">
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header wrap">
     <a class="brand" href="/" aria-label="DevSnapKit home"><img src="/favicon.svg" alt="" width="30" height="30">DevSnap<span>Kit</span><small>STUDIO</small></a>
-    <nav aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="#questions">FAQ</a><button class="theme-toggle" type="button" aria-label="Switch color theme">Theme</button><a class="button button-small" href="/?editor=1&amp;tool=text">Open studio <span aria-hidden="true">↗</span></a></nav>
+    <nav aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="#questions">FAQ</a><button class="theme-toggle" type="button" aria-label="Switch color theme">Theme</button></nav>
   </header>
   <main id="main">
     <section class="hero wrap" aria-labelledby="hero-title">
@@ -49,15 +49,16 @@
           <button class="demo-toggle" data-demo-play type="button" hidden aria-label="Play walkthrough"><span data-demo-icon aria-hidden="true">▶</span></button>
           <button class="demo-expand" data-demo-expand type="button" hidden aria-label="Expand walkthrough"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button>
         </div></div>
-        <p id="text-demo-description" class="demo-caption">From a captured image to a finished headline. <a href="/seo/video/add-text-flow.mp4">Open video</a> · <a href="#how-it-works">Read the steps</a></p>
+        <p id="text-demo-description" class="sr-only">A silent walkthrough from a captured image to a finished headline. Use the upper-left button to pause or replay, or the lower-right button to expand.</p>
+        <noscript><p class="demo-caption">Use the video controls, <a href="/seo/video/add-text-flow.mp4">open the video</a>, or <a href="#how-it-works">follow the written steps</a>.</p></noscript>
         <p class="demo-status" data-demo-status role="status" hidden></p>
       </div>
     </section>
     <dialog class="demo-dialog" data-demo-dialog aria-labelledby="text-demo-title"><button class="demo-close" data-demo-close type="button" aria-label="Close expanded walkthrough">×</button><div data-demo-expanded-slot></div></dialog>
     <div class="benefits wrap"><p>One headline, clearly yours<span>Give new words a space of their own.</span></p><p>Editable while you work<span>Change the type, size, and placement.</span></p><p>Ready to share<span>Download a PNG, WebP, or JPEG.</span></p></div>
     <section class="comparison-section wrap reveal" aria-labelledby="comparison-title">
-      <div class="section-heading"><p class="eyebrow">THE DIFFERENCE IS A SENTENCE</p><h2 id="comparison-title">Same screenshot.<br>A little more meaning.</h2><p>The weather cards are the original image. “A brighter outlook.” is the headline added in DevSnapKit. Slide to compare.</p></div>
-      <div class="comparison" data-comparison><div class="compare-stage"><div class="compare-before"><img src="/seo/examples/text-source.png" width="1120" height="560" alt="Before: three weather cards, with no headline" loading="lazy"></div><div class="compare-after"><img src="/seo/examples/text-result.png" width="2400" height="1376" alt="After: the same weather cards with A brighter outlook added above them" loading="lazy"></div><div class="compare-divider" aria-hidden="true"><span>↔</span></div></div><div class="compare-key"><span>Original screenshot</span><span>Headline added in DevSnapKit</span></div><div class="compare-control"><label for="reveal">Slide to compare</label><input id="reveal" type="range" min="0" max="100" value="50" aria-label="Reveal the screenshot with added text" aria-valuetext="50% of the styled export revealed"></div></div>
+      <div class="section-heading"><p class="eyebrow">THE DIFFERENCE IS A SENTENCE</p><h2 id="comparison-title">Same screenshot.<br>A little more meaning.</h2><p>Same image, same canvas. Slide to see “A brighter outlook.” appear above the weather cards.</p></div>
+      <div class="comparison" data-comparison><div class="compare-stage"><div class="compare-before"><img src="/seo/examples/text-before-caption.png" width="2400" height="1376" alt="Before: the weather screenshot on the same studio canvas, without the new headline" loading="lazy"></div><div class="compare-after"><img src="/seo/examples/text-result.png" width="2400" height="1376" alt="After: the same weather cards with A brighter outlook added above them" loading="lazy"></div><div class="compare-divider" aria-hidden="true"><span>↔</span></div></div><div class="compare-key"><span>Before adding text</span><span>Headline added in DevSnapKit</span></div><div class="compare-control"><label for="reveal">Slide to compare</label><input id="reveal" type="range" min="0" max="100" value="50" aria-label="Reveal the screenshot with added text" aria-valuetext="50% of the styled export revealed"></div></div>
       <p class="image-caption">Clear Skies is an illustrative interface created for this walkthrough. The result is an actual studio download. <a href="/seo/examples/text-source.png" target="_blank" rel="noopener">View original</a> / <a href="/seo/examples/text-result.png" target="_blank" rel="noopener">View export</a>.</p>
     </section>
     <section class="workflow-section text-guide" id="how-it-works" aria-labelledby="how-to-write-on-a-screenshot"><div class="wrap">

@@ -13,7 +13,7 @@ test('published example records match the actual downloaded PNG files', () => {
   for (const item of manifest.examples) {
     assert.equal(new URL(item.source).protocol, 'https:');
     assert.equal(item.originals.length, item.page === 'product-hunt-image-maker' ? 2 : 1);
-    for (const asset of [...item.originals, item.export]) {
+    for (const asset of [...item.originals, item.export, ...(item.comparisonBefore ? [item.comparisonBefore] : [])]) {
       const bytes = readFileSync(new URL(asset.file, exampleRoot));
       assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', asset.file);
       assert.equal(bytes.readUInt32BE(16), asset.width, `${asset.file}: width`);
@@ -30,7 +30,8 @@ test('static resource URLs and page-local anchors resolve before deployment', ()
       if (target.startsWith('#')) {
         assert.ok(html.includes(`id="${target.slice(1)}"`), `${slug}: ${target}`);
       } else if (target.startsWith('/') && !target.startsWith('/?') && target !== '/') {
-        const path = target.endsWith('/') ? `${target.slice(1)}index.html` : target.slice(1);
+        const pathname = target.split('?')[0];
+        const path = pathname.endsWith('/') ? `${pathname.slice(1)}index.html` : pathname.slice(1);
         assert.ok(existsSync(new URL(path, publicRoot)), `${slug}: ${target}`);
       }
     }
