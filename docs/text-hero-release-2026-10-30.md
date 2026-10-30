@@ -19,3 +19,11 @@ Validation before integration:
 - Independent review found and fixed mobile landscape modal clipping, a stale test entrypoint and global provenance wording.
 
 Evidence directory (outside Git): `D:/workspace/MarkMoney/output/devsnapkit/text-hero-redesign-2026-10-30/`. Production publication is recorded separately after deployment verification.
+
+## Production verification
+
+Merged and pushed code commit `eb09364db108d42d640a3ebcdee89af9519be8ad` to main. Fresh main build and all 26 SEO tests pass. Cloudflare production deployment `3defb372-d292-4bb8-8cea-16f6f8bf5e47` serves `https://devsnapkit.com/add-text-to-image/` and `https://3defb372.devsnapkit.pages.dev`.
+
+All seven production player scenarios pass, including the added landscape modal check. MP4 byte-range responses return 206 and captions have text/vtt MIME. Nine published assets return 200 with bytes matching the built main artifacts. Canonical is unchanged, the hero contains the new player, and no old MDN examples remain. Playwright independently opened the production URL, observed actual muted autoplay, paused it and saved the live first-screen screenshot. Remote test telemetry is intercepted locally to avoid creating synthetic conversion events.
+
+Native OS selection recording remains the one explicitly deferred item; this release does not claim that footage exists.
