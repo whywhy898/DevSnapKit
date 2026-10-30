@@ -1,0 +1,13 @@
+# Add-text landing page: first-screen demonstration
+
+The user requests a substantial redesign after reviewing the first video: the demo must appear on the first screen, at the right of concise copy; play silently on entry; pause/resume and change to replay when finished; open into an expanded overlay. Follow the user's written control positions (top right playback, bottom left expansion), despite the reference screenshots using opposite corners. Scope is the add-text landing page, not the global home/editor.
+
+Replace every example shown on this page with a clear, low-text example. Create an owned illustrative weather interface with large simple weather symbols, three short day labels and temperatures. Capture only its visual board, excluding its title/navigation. Newly added words (“A brighter outlook.”) must be unmistakable. No MDN documentation examples remain on this page. Use genuine system screenshot capture, import, text creation, positioning and export. Clearly distinguish system screenshot tools from DevSnapKit's editor; do not imply built-in screen capture.
+
+Use an actual local source browser and Windows screenshot tool for the capture portion, followed by the real local editor. Preserve original recordings and actual exports. No Google media is reused. Refresh the hero video/poster, before/after images, step illustrations, social preview metadata and provenance. Keep the canonical, editor preset, truthful Free/Pro limits and existing attribution.
+
+Use existing static HTML/CSS/JS. On desktop, a compact copy column sits beside the larger rounded demo stage, both fitting the first screen. On mobile, concise copy followed immediately by the demo must fit a practical first viewport. Keep written instructions, but simplify repetition and make capture → import → text → export explicit.
+
+Muted inline autoplay is attempted once unless reduced-motion or data-saving preferences request a still view. Browser autoplay refusal shows a usable play state. Never loop automatically; ended becomes replay. Manual pause must remain paused through visibility changes. Use one video in a native dialog for expansion so time and state are preserved, with Escape/close and focus return. Keep a native-player fallback when scripts are disabled, handle source and midstream errors/retry, and do not hide usable controls.
+
+Validate hero geometry, low-text examples, actual capture provenance, muted autoplay/pause/replay, reduced motion, refusal/error/retry, dialog focus/time/close and desktop/mobile layout. Run appropriate SEO, player and export checks; independently review before merging and publishing through the established authorized workflow.
