@@ -1,0 +1,11 @@
+# Screenshot text product demo
+
+The user explicitly approved recording a Google What's New-inspired add-text demonstration and placing it on the existing marketing page. The reference was inspected in the previous turn and its editing grammar is recorded in the parent workspace. Use our own actual UI and exported images; no Google footage, UI, copy, or music is reused.
+
+Record the existing studio in a fresh local browser context against the built application with test telemetry handled locally. Use the existing MDN documentation screenshot and complete genuine text creation, styling, movement, and PNG download. Add a clear cursor and small click ripples as recording-only overlays outside exported artwork. Use controlled punch-ins toward the active control, restore full context after the action, and hold the final actual result. Keep captions short and in English to match the page. Aim for a calm roughly 25-second silent tutorial; readability takes precedence over exact duration. No voiceover is requested.
+
+Use the existing Puppeteer/Sharp/ffmpeg tools to keep the recording pipeline local and repeatable without production dependencies. Preserve a raw capture, edit timeline, actual PNG download, and capture provenance outside the published assets. Output a browser-compatible 1280×720 MP4 (H.264/yuv420p/faststart), WebVTT captions, and a metadata-free poster. Verify media duration, decode integrity, real export content, and selected frames before embedding.
+
+Place the video in the add-text page's walkthrough section before the existing illustrated steps. It should have a clear title, controls, accessible captions, a stable poster, a direct editor CTA, responsive 16:9 sizing and no automatic playback. Use preload=none to keep the page's initial load light and respect visitors who prefer less motion. Retain the current hero result, canonical, static tutorial, true feature boundaries and attribution.
+
+Acceptance: no fake app state or substituted export; no production test event writes; the video visually shows clicking, typing, styling, movement, export, and finished result; controls/track/poster work on desktop/mobile; keyboard access and no overflow; existing SEO checks and build pass. Review before merging and publishing through the already authorized release workflow. Confirm the live video is playable and supports seeking.
