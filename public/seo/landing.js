@@ -48,3 +48,58 @@ if (!reducedMotion.matches && 'IntersectionObserver' in window) {
   reducedMotion.addEventListener('change', revealAll);
   addEventListener('pagehide', () => observer.disconnect(), { once: true });
 }
+
+// Floating "open the studio" card (replaces the header pill). Static pages only: the editor never
+// loads this file (index.html skips landing.js in app mode). Per-page target/label come from
+// <body data-studio-cta data-studio-cta-label>. Dismissal is remembered for 7 days.
+(() => {
+  const KEY = 'dsk_studio_cta_dismissed_until';
+  const DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
+  if (root.classList.contains('dsk-app') || document.querySelector('.studio-cta')) return;
+  try { if (Number(localStorage.getItem(KEY)) > Date.now()) return; } catch {}
+  const body = document.body;
+  const href = body.dataset.studioCta || '/?editor=1';
+  const label = body.dataset.studioCtaLabel || 'Open the Studio';
+  const compact = matchMedia('(max-width: 640px)').matches;
+  let started = false;
+  let timer = 0;
+  const onScroll = () => { if (scrollY > innerHeight * (compact ? 0.6 : 0.25)) start(); };
+  function start() {
+    if (started) return;
+    started = true;
+    clearTimeout(timer);
+    removeEventListener('scroll', onScroll);
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = '/seo/studio-cta.css';
+    css.onload = mount;
+    document.head.appendChild(css);
+  }
+  function mount() {
+    const card = document.createElement('aside');
+    card.className = 'studio-cta';
+    card.setAttribute('aria-label', 'DevSnapKit Studio');
+    card.innerHTML = '<button class="studio-cta__close" type="button" aria-label="Dismiss the studio card"><span aria-hidden="true">×</span></button>'
+      + '<div class="studio-cta__top"><div><p class="studio-cta__eyebrow"><span aria-hidden="true">✦</span> DEVSNAPKIT STUDIO</p>'
+      + '<p class="studio-cta__title">Turn screenshots into polished mockups</p>'
+      + '<p class="studio-cta__text">Add a frame, background and headline, then export, right in your browser.</p></div>'
+      + '<img class="studio-cta__visual" src="/seo/examples/cta-thumb.webp" width="336" height="237" alt="" loading="lazy" decoding="async"></div>'
+      + '<p class="studio-cta__mini"><strong>DevSnapKit Studio</strong>Free • No uploads</p>'
+      + '<a class="studio-cta__button"><span></span><span aria-hidden="true">↗</span></a>'
+      + '<p class="studio-cta__meta">Free • 100% in-browser • No uploads</p>';
+    const link = card.querySelector('.studio-cta__button');
+    link.setAttribute('href', href);
+    link.firstChild.textContent = label;
+    card.querySelector('.studio-cta__close').addEventListener('click', () => {
+      try { localStorage.setItem(KEY, String(Date.now() + DISMISS_MS)); } catch {}
+      card.remove();
+      body.classList.remove('has-studio-cta');
+    });
+    body.appendChild(card);
+    body.classList.add('has-studio-cta');
+    requestAnimationFrame(() => requestAnimationFrame(() => card.classList.add('is-shown')));
+  }
+  // Desktop: after 2.5 s or a little scroll. Mobile: after scrolling past most of the hero (or 6 s).
+  timer = setTimeout(start, compact ? 6000 : 2500);
+  addEventListener('scroll', onScroll, { passive: true });
+})();

@@ -40,6 +40,26 @@ test('all landing pages expose a distinct, crawlable canonical document', () => 
   assert.equal(titles.size, slugs.length);
 });
 
+test('static pages use the floating studio card instead of a header pill', () => {
+  const pages = { ...Object.fromEntries(slugs.map(slug => [`${slug}/index.html`, editorEntries[slug]])), '404.html': '/?editor=1', 'terms/index.html': '/?editor=1', 'privacy/index.html': '/?editor=1', '../index.html': '/?editor=1' };
+  for (const [file, entry] of Object.entries(pages)) {
+    const html = read(file);
+    const header = html.match(/<header class="site-header[\s\S]*?<\/header>/)[0];
+    assert.doesNotMatch(header, /button-small|href="\/\?editor/, `${file}: no editor pill in the header`);
+    assert.match(header, /class="theme-toggle"/, `${file}: theme toggle kept`);
+    assert.ok(html.includes(`data-studio-cta="${entry}"`), `${file}: card links to its editor entry`);
+    assert.doesNotMatch(html, /class="studio-cta/, `${file}: card is not in the raw HTML`);
+  }
+  const script = read('seo/landing.js');
+  assert.match(script, /dsk_studio_cta_dismissed_until/);
+  assert.match(script, /dsk-app/);
+  assert.match(script, /\/seo\/studio-cta\.css/);
+  const css = read('seo/studio-cta.css');
+  assert.match(css, /prefers-reduced-motion:reduce/);
+  assert.match(css, /max-width:640px/);
+  assert.doesNotMatch(css + script, /role="?dialog/);
+});
+
 test('new pages identify one original/export case and three proposed scenarios', () => {
   for (const [slug, prefix, width, height] of [
     ['og-image-generator', 'og', 1200, 630],

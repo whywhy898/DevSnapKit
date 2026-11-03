@@ -1,0 +1,27 @@
+/* Floating "open the studio" card for the static pages. Loaded on demand by /seo/landing.js. */
+.studio-cta{position:fixed;right:24px;bottom:24px;z-index:60;box-sizing:border-box;width:min(384px,calc(100vw - 32px));padding:22px 22px 16px;border-radius:22px;color:#eef3ff;font-family:Manrope,sans-serif;background:radial-gradient(120% 120% at 100% 0%,rgba(74,124,240,.45) 0%,rgba(74,124,240,0) 55%),linear-gradient(155deg,#16294b 0%,#0e1b33 100%);border:1px solid rgba(153,185,255,.55);box-shadow:0 18px 48px rgba(9,18,36,.38),inset 0 1px 0 rgba(255,255,255,.07);opacity:0;transform:translateY(18px);transition:opacity .35s ease,transform .35s ease}
+.studio-cta.is-shown{opacity:1;transform:none}
+.studio-cta__top{display:grid;grid-template-columns:1fr 112px;gap:16px;align-items:center}
+.studio-cta__eyebrow{margin:0 0 8px;font-size:10.5px;font-weight:800;letter-spacing:.14em;color:#8fb2ff}
+.studio-cta__title{margin:0 0 8px;font-size:19px;line-height:1.22;font-weight:800;color:#fff}
+.studio-cta__text{margin:0;font-size:12.5px;line-height:1.55;color:#c3d1ea}
+.studio-cta__visual{display:block;width:112px;height:79px;margin-top:10px;border-radius:12px;object-fit:cover;border:1px solid rgba(255,255,255,.16);box-shadow:0 10px 22px rgba(0,0,0,.38);transform:rotate(3deg)}
+.studio-cta__button{margin-top:18px;display:flex;justify-content:center;align-items:center;gap:10px;min-height:48px;border-radius:14px;background:linear-gradient(90deg,#2f5fd6,#4a7cf0);color:#fff;font-weight:800;font-size:14px;text-decoration:none;box-shadow:0 8px 22px rgba(47,95,214,.4);transition:transform .2s ease,box-shadow .2s ease}
+.studio-cta__button:hover{transform:translateY(-1px);box-shadow:0 12px 28px rgba(74,124,240,.5)}
+.studio-cta__meta{margin:11px 0 0;text-align:center;font-size:11px;font-weight:600;color:#9fb0cc}
+.studio-cta__close{position:absolute;top:10px;right:10px;width:30px;height:30px;padding:0;border-radius:50%;border:0;background:rgba(255,255,255,.12);color:#fff;font:inherit;font-size:18px;line-height:1;cursor:pointer;display:grid;place-items:center}
+.studio-cta__close:hover{background:rgba(255,255,255,.22)}
+.studio-cta a:focus-visible,.studio-cta button:focus-visible{outline:3px solid #ffd166;outline-offset:2px}
+@media (max-width:640px){
+  .studio-cta{left:12px;right:12px;bottom:12px;width:auto;padding:8px 8px 8px 14px;border-radius:18px;display:flex;align-items:center;gap:10px}
+  .studio-cta__top,.studio-cta__meta{display:none}
+  .studio-cta__mini{display:block}
+  .studio-cta__button{margin:0;flex:1;min-height:44px;font-size:13.5px;border-radius:12px}
+  .studio-cta__close{position:static;flex:none;width:36px;height:36px}
+  body.has-studio-cta{padding-bottom:76px}
+}
+@media (min-width:641px){.studio-cta__mini{display:none}}
+.studio-cta__mini{margin:0;font-size:11px;line-height:1.3;font-weight:700;color:#c3d1ea;white-space:nowrap}
+.studio-cta__mini strong{display:block;color:#fff;font-size:12.5px}
+@media (prefers-reduced-motion:reduce){.studio-cta,.studio-cta__button{transition:none}.studio-cta{transform:none}.studio-cta__button:hover{transform:none}}
+@media print{.studio-cta{display:none}}
