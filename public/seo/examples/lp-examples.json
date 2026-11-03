@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "createdAt": "2026-11-03",
+  "editorUrl": "https://devsnapkit.com/?editor=1",
+  "method": "Real captures of public DevSnapKit pages imported through the actual studio UI (headless Chromium), styled with the listed controls and exported with the Download button. Web copies are WebP (quality 80); wider exports were downscaled. No external compositing.",
+  "disclosure": "DevSnapKit's own public pages used as illustrative screenshots.",
+  "examples": [
+    {
+      "file": "lp-iphone.webp",
+      "width": 1080,
+      "height": 1080,
+      "sha256": "fc986905136f4fb4c6cd595fbfa62af4869281d421e1d6374e2198d7fcb45e06",
+      "source": "https://devsnapkit.com/ (mobile, 390x844 @3x capture)",
+      "description": "Tall capture auto-selected the iPhone 17 Pro frame; Aurora Borealis gradient; 1:1 Square 1080x1080; 1x PNG export.",
+      "studioExport": {
+        "width": 1080,
+        "height": 1080,
+        "format": "PNG",
+        "sha256": "b14fdfe5d06bb187e7c8cc893774129f7aab66213e927909ca6b3664c7bb4630"
+      },
+      "pages": [
+        "shots-so-alternative",
+        "iphone-mockup-generator"
+      ]
+    },
+    {
+      "file": "lp-appstore.webp",
+      "width": 645,
+      "height": 1398,
+      "sha256": "937fbd2395ff75eecd6bb56cdc5452640152dac4b2847f04212f218d142bba14",
+      "source": "https://devsnapkit.com/ (mobile, 390x844 @3x capture)",
+      "description": "iPhone 17 Pro frame (auto); Sunset Coral gradient; custom canvas 1290x2796; 1x JPEG export (no alpha). Web copy downscaled to 645x1398.",
+      "studioExport": {
+        "width": 1290,
+        "height": 2796,
+        "format": "JPEG",
+        "sha256": "512c671b7795d3b67ceefcd02a55f760af1d4ef83d9fa2305358a71b9ee14b81"
+      },
+      "pages": [
+        "app-store-screenshot-generator"
+      ]
+    },
+    {
+      "file": "lp-ph-gallery.webp",
+      "width": 1270,
+      "height": 760,
+      "sha256": "a49def3d50137c0e2355282f990082a7b714e156094facf369281f5731c8b47d",
+      "source": "https://devsnapkit.com/screenshot-beautifier/ (1280x800, light)",
+      "description": "Safari Browser frame; Aurora Borealis gradient; custom canvas 1270x760; 1x PNG export.",
+      "studioExport": {
+        "width": 1270,
+        "height": 760,
+        "format": "PNG",
+        "sha256": "a4a747a10921634857ac9f47f713e2887a6f6f8a5a19f5fece7b7e362f40f874"
+      },
+      "pages": [
+        "product-hunt-gallery-image-size"
+      ]
+    },
+    {
+      "file": "lp-linkedin.webp",
+      "width": 1200,
+      "height": 627,
+      "sha256": "1501e037649bdbdb8ab66689e450691ec57c3d54bb4c765532c69d32d2b182bd",
+      "source": "https://devsnapkit.com/og-image-generator/ (1280x800)",
+      "description": "macOS Light window frame; Emerald Glow gradient; LinkedIn Post 1200x627; 1x PNG export.",
+      "studioExport": {
+        "width": 1200,
+        "height": 627,
+        "format": "PNG",
+        "sha256": "b1d4dd33149547f7fa61edc475ffe691fa9f21f5237e31c6bf329fb0eb6a05d1"
+      },
+      "pages": [
+        "screely-alternative",
+        "linkedin-post-image-size"
+      ]
+    },
+    {
+      "file": "lp-x-post.webp",
+      "width": 1600,
+      "height": 900,
+      "sha256": "09fa6585642613a60c3c301b24884810589b7988d617ed20a398b89cc1326e83",
+      "source": "https://devsnapkit.com/screenshot-beautifier/ (1280x800, dark)",
+      "description": "Glass Window frame; Tokyo Dusk gradient; 16:9 1920x1080; 1x PNG export. Web copy downscaled to 1600x900.",
+      "studioExport": {
+        "width": 1920,
+        "height": 1080,
+        "format": "PNG",
+        "sha256": "a0942221e45cec23d5cfb26d346ce405045a90872004fe89ff1a21c6d942f353"
+      },
+      "pages": [
+        "cleanshot-alternative",
+        "twitter-x-post-image-size"
+      ]
+    },
+    {
+      "file": "lp-background.webp",
+      "width": 1600,
+      "height": 900,
+      "sha256": "c4347c825186f87778094b33123d4fb94eb34eb227a8cdeae1460b4e94dbf785",
+      "source": "https://devsnapkit.com/og-image-generator/ (1280x800)",
+      "description": "Borderless frame; Nordic Glacier gradient; 16:9 1920x1080; 1x PNG export. Web copy downscaled to 1600x900.",
+      "studioExport": {
+        "width": 1920,
+        "height": 1080,
+        "format": "PNG",
+        "sha256": "182205595dc2b79d3d03e970844b08aa7ad820d7a14de887ccf0ee3c47173814"
+      },
+      "pages": [
+        "xnapper-alternative",
+        "screenshot-background-generator"
+      ]
+    },
+    {
+      "file": "lp-macbook.webp",
+      "width": 1600,
+      "height": 900,
+      "sha256": "5f1f02f75125920b67630c8218d8502c269a83b136e52d1d2e480891dc1a2403",
+      "source": "https://devsnapkit.com/screenshot-beautifier/ (1280x800, light)",
+      "description": "MacBook Pro frame; Cyberpunk gradient; 16:9 1920x1080; 1x PNG export. Web copy downscaled to 1600x900.",
+      "studioExport": {
+        "width": 1920,
+        "height": 1080,
+        "format": "PNG",
+        "sha256": "8a19101947c05b9d0934b760cbd73ecddc72432ef7d56a5dda124cdc087fad1d"
+      },
+      "pages": [
+        "shotgenio-alternative",
+        "macbook-mockup-generator"
+      ]
+    },
+    {
+      "file": "lp-browser.webp",
+      "width": 1200,
+      "height": 900,
+      "sha256": "7013f88aa4a0224d5f5f9fdc73e6d986d3b359bdcfb558dd9f8e8e48af8a471a",
+      "source": "https://devsnapkit.com/og-image-generator/ (1280x800)",
+      "description": "Safari Browser frame; Studio Silver background; 4:3 1200x900; 1x PNG export.",
+      "studioExport": {
+        "width": 1200,
+        "height": 900,
+        "format": "PNG",
+        "sha256": "b34f0fe95b0933231a1413c0be34d81791bde7198e229d9919e27c42e8911020"
+      },
+      "pages": [
+        "pika-style-alternative",
+        "browser-mockup-generator"
+      ]
+    },
+    {
+      "file": "lp-before-after.webp",
+      "width": 1200,
+      "height": 630,
+      "sha256": "9e51e7899d8067801062726c23d2ed9ed6bf9c995bfbfef6ad325ac130013cb9",
+      "source": "https://devsnapkit.com/screenshot-beautifier/ (1280x800, light and dark)",
+      "description": "Duo mode (mode=duo), Side by Side; Safari Browser frames; Midnight Neon gradient; Twitter / OG 1200x630; 1x PNG export.",
+      "studioExport": {
+        "width": 1200,
+        "height": 630,
+        "format": "PNG",
+        "sha256": "c29080e71ffbadda3f1447ea3d1a0c6ecd5f80dd08a1657f52b3c6708d9bc134"
+      },
+      "pages": [
+        "before-after-screenshot"
+      ]
+    }
+  ]
+}
