@@ -16,7 +16,10 @@ export type CuratedTemplateId =
   | 'editorial-story'
   | 'code-preview'
   | 'metric-focus'
-  | 'before-after';
+  | 'before-after'
+  | 'violet-launch'
+  | 'electric-pair'
+  | 'peach-editorial';
 
 export type CuratedTextRole =
   | 'brand'

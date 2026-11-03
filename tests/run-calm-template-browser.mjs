@@ -5,8 +5,10 @@ import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {spawn} from 'node:child_process';
 import {launchBrowser,selectElement,openImageAdvanced,downloadPng} from './helpers/browser.mjs';
+import {createTypeScriptLoader} from './helpers/load-typescript.mjs';
 
 const root=path.resolve(import.meta.dirname,'..'), require=createRequire(import.meta.url), sharp=require('sharp');
+const curatedCatalog=JSON.parse(JSON.stringify(createTypeScriptLoader(path.join(root,'src'))('templates/collection/catalog.ts').CURATED_TEMPLATE_CATALOG));
 const output=process.env.CALM_OUTPUT||path.resolve(root,'../../output/devsnapkit/template-collection-2026-10-27/b1-calm/browser',new Date().toISOString().replace(/[:.]/g,'-'));
 const origin=process.env.CALM_ORIGIN||'http://127.0.0.1:5293';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -77,7 +79,7 @@ try{
  for(const mode of ['free','invalid','valid']){
   page=await fresh(mode);const before=await state(page),h=await history(page);await menu(page);
   const gallery=await page.$$eval('[data-template-gallery] article',nodes=>nodes.map(n=>({name:n.querySelector('button[aria-label^="Preview"]')?.getAttribute('aria-label')?.replace(/^Preview | template$/g,''),tier:n.querySelector('div.flex span:last-child')?.textContent})));
-  assert.deepEqual(gallery.sort((a,b)=>a.name.localeCompare(b.name)),[{name:'Editorial Honey',tier:'Free'},{name:'Paper Launch Duo',tier:'Free'},{name:'Calm Split',tier:'Free'},{name:'App Pair',tier:'Free'},{name:'Night Signal Duo',tier:'Pro'},{name:'Pocket Flow Duo',tier:'Pro'},{name:'Big Type Launch',tier:'Pro'},{name:'Cover Story',tier:'Pro'},{name:'Feature Spotlight',tier:'Pro'},{name:'Web & Mobile',tier:'Pro'},{name:'Metric Focus',tier:'Pro'},{name:'Before & After',tier:'Pro'}].sort((a,b)=>a.name.localeCompare(b.name)));
+  assert.deepEqual(gallery.sort((a,b)=>a.name.localeCompare(b.name)),curatedCatalog.map(({name,tier})=>({name,tier:tier==='free'?'Free':'Pro'})).sort((a,b)=>a.name.localeCompare(b.name)));
   await page.click('[aria-label="Preview Calm Split template"]');await page.waitForSelector('[data-template-preview][open]');await page.$eval('[data-template-preview] img',async n=>{await n.decode();if(!n.naturalWidth)throw Error('Preview image failed');});await page.keyboard.press('Escape');await page.waitForSelector('[data-template-preview]',{hidden:true});assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'Preview Calm Split template');
   assert.deepEqual(await state(page),before);assert.deepEqual(await history(page),h);
   await apply(page);assert.equal(await page.$('[data-pro-upsell]'),null,'Calm is Free');

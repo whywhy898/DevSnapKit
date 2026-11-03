@@ -6,7 +6,7 @@ import {launchBrowser, selectElement, openImageAdvanced, downloadPng} from './he
 process.env.IMPACT_ORIGIN ||= 'http://127.0.0.1:5333';
 const out=path.resolve(import.meta.dirname,'../../../output/devsnapkit/template-collection-2026-10-27/remaining-pro-implementation/browser');
 process.env.IMPACT_OUTPUT=out;
-const {fresh,state,history,settle,fill,clickButton,menu,setBrowser,fixtures,sharp}=await import('./run-pro-impact-browser.mjs');
+const {fresh,state,history,settle,fill,clickButton,menu,setBrowser,fixtures,sharp,curatedCatalog}=await import('./run-pro-impact-browser.mjs');
 const configs=[{id:'feature-spotlight',name:'Feature Spotlight',width:1200,height:630},{id:'code-preview',name:'Web & Mobile',width:1600,height:1200},{id:'metric-focus',name:'Metric Focus',width:1920,height:1080},{id:'before-after',name:'Before & After',width:1080,height:1080}];
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const results={simulatedLicense:true,realPayment:false,checks:[],templates:[],errors:[]};
@@ -35,7 +35,7 @@ try{
  browser=await launchBrowser();setBrowser(browser);
  for(const mode of ['free','invalid'])for(const c of configs){
   page=await fresh(mode);page.on('pageerror',e=>results.errors.push(e.message));const before=await state(page),hist=await history(page);await menu(page);
-  const gallery=await page.$$eval('[data-template-gallery] article',nodes=>nodes.map(n=>n.querySelector('div.flex span:last-child')?.textContent));assert.equal(gallery.length,12);assert.equal(gallery.filter(x=>x==='Free').length,4);assert.equal(gallery.filter(x=>x==='Pro').length,8);
+  const gallery=await page.$$eval('[data-template-gallery] article',nodes=>nodes.map(n=>n.querySelector('div.flex span:last-child')?.textContent));assert.equal(gallery.length,curatedCatalog.length);assert.equal(gallery.filter(x=>x==='Free').length,curatedCatalog.filter(x=>x.tier==='free').length);assert.equal(gallery.filter(x=>x==='Pro').length,curatedCatalog.filter(x=>x.tier==='pro').length);
   await page.click(`[aria-label="Apply ${c.name} template"]`);await page.waitForSelector('input[placeholder="DSK-XXXX-XXXX-XXXX"]',{visible:true});assert.deepEqual(await state(page),before);assert.deepEqual(await history(page),hist);assert.notEqual(await page.evaluate(()=>localStorage.getItem('devsnapkit_pro_unlocked')),'true');check(`${c.id} ${mode} gate without mutation`);await page.close();page=null;
  }
  const fixtureDir=await fixtures();const manifest=[];

@@ -1,0 +1,30 @@
+{
+  "templateId": "electric-pair",
+  "method": "Resized from actual browser-triggered editor PNG download; simulated valid license; not a generated concept poster",
+  "sourceFile": "D:\\workspace\\MarkMoney\\output\\devsnapkit\\premium-template-implementation-2026-11-03\\final\\electric-pair\\default-duo-1x.png",
+  "sourceSha256": "61264bf48dbf4bda2e761d566fe07379934f11221aee7f57a3e8b5f12664e9fe",
+  "width": 1920,
+  "height": 1080,
+  "sources": {
+    "src/templates/collection/definitions/electric-pair.ts": "a4b904c9783eccab38498774933cb393aa6494e40241f4e1c291c5463c0eb234",
+    "src/templates/collection/apply.ts": "3a3c42b9a6f93b9b45e8fe303f957ceb99c08744a30a0af261ae02f8c4665829",
+    "src/composition/CompositionRenderer.tsx": "d52780e33a2afce96fa5dd6f01d55627d25663230bda6e93421fc2291278808a",
+    "src/composition/MediaShell.tsx": "5895d7df63b686720cc0eb42fbe2ce183383094fac34143f9272668927084364"
+  },
+  "records": [
+    {
+      "file": "electric-pair.webp",
+      "width": 480,
+      "height": 270,
+      "sha256": "5285e4c8a787a36759a145611f94a2202830b3a311bef17ee906854ed8849cc0"
+    },
+    {
+      "file": "electric-pair-preview.webp",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "3579da540c1972bfdb61460b9cc825e848b53e9cadafc5219343977cb202184d"
+    }
+  ],
+  "simulatedLicense": true,
+  "realPayment": false
+}

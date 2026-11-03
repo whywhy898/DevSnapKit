@@ -1,0 +1,3 @@
+# Premium trio browser checks
+
+Run `node tests/run-premium-trio-browser.mjs`. For the first bootstrap run only, set `TRIO_SKIP_PREVIEWS=1`, then run `node scripts/build-premium-trio-previews.mjs <passing-run-directory>` and rerun without that flag. The final full run must verify static preview decode and mobile gallery. Optional TRIO_ORIGIN points at an already running test-instrumented Vite server, TRIO_OUTPUT chooses a unique evidence directory. Actual PNG downloads use the shipped rendering and export path; fixture licenses do not test real payment. All three preserve independent uploads, native editable headings, complete Undo, single-image layout, exact 1x/2x PNG sizes, WebP/JPEG and preview/export geometry.

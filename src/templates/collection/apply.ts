@@ -14,6 +14,9 @@ import { FEATURE_SPOTLIGHT } from './definitions/feature-spotlight';
 import { CODE_PREVIEW } from './definitions/code-preview';
 import { METRIC_FOCUS } from './definitions/metric-focus';
 import { BEFORE_AFTER } from './definitions/before-after';
+import { VIOLET_LAUNCH } from './definitions/violet-launch';
+import { ELECTRIC_PAIR } from './definitions/electric-pair';
+import { PEACH_EDITORIAL } from './definitions/peach-editorial';
 
 const templates = [
   { blueprint: PAPER_LAUNCH_DUO, brandMark: PAPER_BRAND_MARK, background: '#F6F3EC' },
@@ -27,6 +30,9 @@ const templates = [
   { blueprint: CODE_PREVIEW, background: '#E7EDAF' },
   { blueprint: METRIC_FOCUS, background: '#F8F7F2' },
   { blueprint: BEFORE_AFTER, background: '#E6E9CD' },
+  { blueprint: VIOLET_LAUNCH, background: '#10051F' },
+  { blueprint: ELECTRIC_PAIR, background: '#071D54' },
+  { blueprint: PEACH_EDITORIAL, background: '#F7D1BC' },
 ];
 const templateFor = (id: string | undefined) => templates.find(template => template.blueprint.id === id);
 const blueprintFor = (id: string | undefined) => templateFor(id)?.blueprint;

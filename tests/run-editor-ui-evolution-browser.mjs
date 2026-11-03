@@ -153,7 +153,7 @@ try {
   assert.equal(openingAnimation, 'template-gallery-enter', 'template library opens with an entrance animation');
   if (process.env.UI_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.UI_SCREENSHOT_DIR, 'gallery.png') });
   assert.equal(await page.$eval('[data-template-filter="all"]', el => el.getAttribute('aria-pressed')), 'true');
-  assert.equal(await page.$$eval('[data-template-gallery] article', xs => xs.length), 12);
+  assert.equal(await page.$$eval('[data-template-gallery] article', xs => xs.length), 15);
   assert.equal(await page.$eval('.template-gallery-grid', el => getComputedStyle(el).gridTemplateColumns.split(' ').length), 3, 'desktop gallery keeps three fixed columns');
   await page.click('[data-template-filter="9:16"]');
   await page.$eval('[data-template-gallery] article img', img => img.decode());

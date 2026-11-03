@@ -1,0 +1,68 @@
+{
+  "generator": "scripts/build-premium-trio-samples.mjs",
+  "provenance": "Original fictional interfaces, geometric artwork, charts and initial-letter avatars; no third-party screenshots, photos or customer data. Device and browser chrome excluded. All domains use .example.",
+  "fonts": [
+    {
+      "source": "public/poster/fonts/manrope-latin.woff2",
+      "license": "Manrope-OFL.txt",
+      "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972"
+    },
+    {
+      "source": "public/poster/fonts/Gelasio.ttf",
+      "license": "Gelasio-OFL.txt",
+      "sha256": "4daecea457258c9ebeb8bc99ed3fd24353618bfad3ea4b93fa0b5d0468fc04e4"
+    }
+  ],
+  "records": [
+    {
+      "file": "trio-studio-library.svg",
+      "width": 396,
+      "height": 730,
+      "sha256": "fbbf27a6bcde21ca268b220e3ac2b722d3c33cae5d3b39ea46adb25b631bd776",
+      "source": "scripts/build-premium-trio-samples.mjs",
+      "license": "Original self-authored demo content; bundled with DevSnapKit"
+    },
+    {
+      "file": "trio-studio-detail.svg",
+      "width": 396,
+      "height": 730,
+      "sha256": "f8156c563a3f6f903dc79eff44ec2b6f2b06bdd7bb3611c1a1562af41ebe0d39",
+      "source": "scripts/build-premium-trio-samples.mjs",
+      "license": "Original self-authored demo content; bundled with DevSnapKit"
+    },
+    {
+      "file": "trio-workspace-overview.svg",
+      "width": 1160,
+      "height": 744,
+      "sha256": "6071be5d9219fdbef5a425537c8030c8f2b57cf8e7b7f0d99f22564422fccb07",
+      "source": "scripts/build-premium-trio-samples.mjs",
+      "license": "Original self-authored demo content; bundled with DevSnapKit"
+    },
+    {
+      "file": "trio-workspace-activity.svg",
+      "width": 396,
+      "height": 730,
+      "sha256": "9fae9bfacfa7f3e47b751d387fad803a5d0d9f10aeb6ce7ff2901a960c98c503",
+      "source": "scripts/build-premium-trio-samples.mjs",
+      "license": "Original self-authored demo content; bundled with DevSnapKit"
+    },
+    {
+      "file": "trio-journal-home.svg",
+      "width": 600,
+      "height": 722,
+      "sha256": "42c8b78857ffddfe2491afeddd09091ccf13b618ce33ce2bd6f28391892fa85e",
+      "source": "scripts/build-premium-trio-samples.mjs",
+      "license": "Original self-authored demo content; bundled with DevSnapKit",
+      "illustration": "Original vector desert illustration made from SVG paths, gradients and circles; not a photograph"
+    },
+    {
+      "file": "trio-journal-article.svg",
+      "width": 400,
+      "height": 504,
+      "sha256": "9bb8a4e7f94dcbcc447c2477f3b015cb9c96441496a7d39366d1f83d90296d9f",
+      "source": "scripts/build-premium-trio-samples.mjs",
+      "license": "Original self-authored demo content; bundled with DevSnapKit",
+      "illustration": "Original vector desert illustration made from SVG paths, gradients and circles; not a photograph"
+    }
+  ]
+}

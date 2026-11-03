@@ -5,8 +5,10 @@ import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {spawn} from 'node:child_process';
 import {launchBrowser,selectElement,openImageAdvanced,downloadPng} from './helpers/browser.mjs';
+import {createTypeScriptLoader} from './helpers/load-typescript.mjs';
 
 export const root=path.resolve(import.meta.dirname,'..'), require=createRequire(import.meta.url), sharp=require('sharp');
+export const curatedCatalog=JSON.parse(JSON.stringify(createTypeScriptLoader(path.join(root,'src'))('templates/collection/catalog.ts').CURATED_TEMPLATE_CATALOG));
 export const config=process.env.IMPACT_TEMPLATE==='editorial-story'?{id:'editorial-story',name:'Cover Story',width:1080,height:1350,main:'halden-journal.svg',secondary:'halden-week.svg',font:136,spacing:-3.4}: {id:'studio-bridge',name:'Big Type Launch',width:1920,height:1080,main:'kiln-overview.svg',secondary:'kiln-deploy.svg',font:452,spacing:-28.024};
 if(process.env.IMPACT_TEMPLATE&&!['studio-bridge','editorial-story'].includes(process.env.IMPACT_TEMPLATE))throw Error('Unsupported IMPACT_TEMPLATE');
 export const output=process.env.IMPACT_OUTPUT||path.resolve(root,'../../output/devsnapkit/template-collection-2026-10-27/pro-impact/implementation',config.id,'browser',new Date().toISOString().replace(/[:.]/g,'-'));
@@ -110,9 +112,9 @@ export async function run(){try{
  browser=await launchBrowser();
  for(const mode of ['free','invalid']){
   page=await fresh(mode);const before=await state(page),h=await history(page);await menu(page);
-  assert.equal(await page.$$eval('[data-template-gallery] article',nodes=>nodes.length),12);
+  assert.equal(await page.$$eval('[data-template-gallery] article',nodes=>nodes.length),curatedCatalog.length);
   const gallery=await page.$$eval('[data-template-gallery] article',nodes=>nodes.map(n=>({name:n.querySelector('button[aria-label^="Preview"]')?.getAttribute('aria-label')?.replace(/^Preview | template$/g,''),tier:n.querySelector('div.flex span:last-child')?.textContent})));
-  assert.deepEqual(gallery.sort((a,b)=>a.name.localeCompare(b.name)),[{name:'Editorial Honey',tier:'Free'},{name:'Paper Launch Duo',tier:'Free'},{name:'Calm Split',tier:'Free'},{name:'App Pair',tier:'Free'},{name:'Night Signal Duo',tier:'Pro'},{name:'Pocket Flow Duo',tier:'Pro'},{name:'Big Type Launch',tier:'Pro'},{name:'Cover Story',tier:'Pro'},{name:'Feature Spotlight',tier:'Pro'},{name:'Web & Mobile',tier:'Pro'},{name:'Metric Focus',tier:'Pro'},{name:'Before & After',tier:'Pro'}].sort((a,b)=>a.name.localeCompare(b.name)));
+  assert.deepEqual(gallery.sort((a,b)=>a.name.localeCompare(b.name)),curatedCatalog.map(({name,tier})=>({name,tier:tier==='free'?'Free':'Pro'})).sort((a,b)=>a.name.localeCompare(b.name)));
   await page.click(`[aria-label="Preview ${config.name} template"]`);await page.waitForSelector('[data-template-preview][open]');await page.$eval('[data-template-preview] img',async n=>{await n.decode();if(!n.naturalWidth)throw Error('Preview image failed');});await page.keyboard.press('Escape');await page.waitForSelector('[data-template-preview]',{hidden:true});assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),`Preview ${config.name} template`);
   await page.click(`[aria-label="Apply ${config.name} template"]`);await page.waitForSelector('input[placeholder="DSK-XXXX-XXXX-XXXX"]',{visible:true});
   assert.deepEqual(await state(page),before);assert.deepEqual(await history(page),h);assert.notEqual(await page.evaluate(()=>localStorage.getItem('devsnapkit_pro_unlocked')),'true');

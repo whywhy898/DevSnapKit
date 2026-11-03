@@ -9,6 +9,9 @@ import { FEATURE_SPOTLIGHT } from './definitions/feature-spotlight';
 import { CODE_PREVIEW } from './definitions/code-preview';
 import { METRIC_FOCUS } from './definitions/metric-focus';
 import { BEFORE_AFTER } from './definitions/before-after';
+import { VIOLET_LAUNCH } from './definitions/violet-launch';
+import { ELECTRIC_PAIR } from './definitions/electric-pair';
+import { PEACH_EDITORIAL } from './definitions/peach-editorial';
 import type { CuratedTemplateId } from './types';
 
 /** Only implemented templates are available; declared future IDs are not listings. */
@@ -25,6 +28,9 @@ export const CURATED_TEMPLATE_CATALOG = [
   { id: CODE_PREVIEW.id, version: CODE_PREVIEW.version, name: CODE_PREVIEW.name, tier: CODE_PREVIEW.tier, width: 1600, height: 1200, thumbnail: '/designed/collection/code-preview.webp', description: 'A listening room across a wide desktop browser and a light phone on pale green.' },
   { id: METRIC_FOCUS.id, version: METRIC_FOCUS.version, name: METRIC_FOCUS.name, tier: METRIC_FOCUS.tier, width: 1920, height: 1080, thumbnail: '/designed/collection/metric-focus.webp', description: 'An editable headline metric on cobalt with an overview and a closer audience view.' },
   { id: BEFORE_AFTER.id, version: BEFORE_AFTER.version, name: BEFORE_AFTER.name, tier: BEFORE_AFTER.tier, width: 1080, height: 1080, thumbnail: '/designed/collection/before-after.webp', description: 'Equal browser views and editable comparison headings on charcoal and pale green.' },
+  { id: VIOLET_LAUNCH.id, version: VIOLET_LAUNCH.version, name: VIOLET_LAUNCH.name, tier: VIOLET_LAUNCH.tier, width: 1920, height: 1080, thumbnail: '/designed/collection/violet-launch.webp', description: 'A rich purple launch canvas with oversized typography and two independently editable phones.' },
+  { id: ELECTRIC_PAIR.id, version: ELECTRIC_PAIR.version, name: ELECTRIC_PAIR.name, tier: ELECTRIC_PAIR.tier, width: 1920, height: 1080, thumbnail: '/designed/collection/electric-pair.webp', description: 'A cobalt and navy canvas connecting a desktop overview with a foreground phone.' },
+  { id: PEACH_EDITORIAL.id, version: PEACH_EDITORIAL.version, name: PEACH_EDITORIAL.name, tier: PEACH_EDITORIAL.tier, width: 1080, height: 1350, thumbnail: '/designed/collection/peach-editorial.webp', description: 'An expressive peach editorial cover with large serif typography and two independent journal views.' },
 ];
 export const getCuratedTemplate = (id: string) => CURATED_TEMPLATE_CATALOG.find(template => template.id === id);
 export const isCuratedTemplateAvailable = (id: string): id is CuratedTemplateId => !!getCuratedTemplate(id);

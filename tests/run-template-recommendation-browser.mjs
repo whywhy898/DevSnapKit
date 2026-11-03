@@ -19,7 +19,7 @@ try {
   const selectAspect = async ratio => { await page.$eval('[data-canvas-dock]', (dock, ratio) => [...dock.querySelectorAll('button')].find(button => button.textContent.trim() === ratio).click(), ratio); };
   const checkAll = async () => {
     assert.equal(await page.$eval('[data-template-filter="all"]', el => el.getAttribute('aria-pressed')), 'true');
-    assert.equal(await page.$$eval('[data-template-gallery] article', els => els.length), 12);
+    assert.equal(await page.$$eval('[data-template-gallery] article', els => els.length), 15);
   };
 
   await openGallery();

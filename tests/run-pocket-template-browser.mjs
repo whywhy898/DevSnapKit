@@ -5,8 +5,10 @@ import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {spawn} from 'node:child_process';
 import {launchBrowser,selectElement,openImageAdvanced,downloadPng} from './helpers/browser.mjs';
+import {createTypeScriptLoader} from './helpers/load-typescript.mjs';
 
 const root=path.resolve(import.meta.dirname,'..'), require=createRequire(import.meta.url), sharp=require('sharp');
+const curatedCatalog=JSON.parse(JSON.stringify(createTypeScriptLoader(path.join(root,'src'))('templates/collection/catalog.ts').CURATED_TEMPLATE_CATALOG));
 const output=process.env.POCKET_OUTPUT||path.resolve(root,'../../output/devsnapkit/template-collection-2026-10-26/a2-pocket/browser',new Date().toISOString().replace(/[:.]/g,'-'));
 const origin=process.env.POCKET_ORIGIN||'http://127.0.0.1:5283';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -63,9 +65,9 @@ try{
  browser=await launchBrowser();
  for(const mode of ['free','invalid']){
   page=await fresh(mode);const before=await state(page),h=await history(page);await menu(page);
-  assert.equal(await page.$$eval('[data-template-gallery] article',nodes=>nodes.length),12);
+  assert.equal(await page.$$eval('[data-template-gallery] article',nodes=>nodes.length),curatedCatalog.length);
   const gallery=await page.$$eval('[data-template-gallery] article',nodes=>nodes.map(n=>({name:n.querySelector('button[aria-label^="Preview"]')?.getAttribute('aria-label')?.replace(/^Preview | template$/g,''),tier:n.querySelector('div.flex span:last-child')?.textContent})));
-  assert.deepEqual(gallery.sort((a,b)=>a.name.localeCompare(b.name)),[{name:'Editorial Honey',tier:'Free'},{name:'Paper Launch Duo',tier:'Free'},{name:'Calm Split',tier:'Free'},{name:'App Pair',tier:'Free'},{name:'Night Signal Duo',tier:'Pro'},{name:'Pocket Flow Duo',tier:'Pro'},{name:'Big Type Launch',tier:'Pro'},{name:'Cover Story',tier:'Pro'},{name:'Feature Spotlight',tier:'Pro'},{name:'Web & Mobile',tier:'Pro'},{name:'Metric Focus',tier:'Pro'},{name:'Before & After',tier:'Pro'}].sort((a,b)=>a.name.localeCompare(b.name)));
+  assert.deepEqual(gallery.sort((a,b)=>a.name.localeCompare(b.name)),curatedCatalog.map(({name,tier})=>({name,tier:tier==='free'?'Free':'Pro'})).sort((a,b)=>a.name.localeCompare(b.name)));
   await page.click('[aria-label="Preview Pocket Flow Duo template"]');await page.waitForSelector('[data-template-preview][open]');await page.$eval('[data-template-preview] img',async n=>{await n.decode();if(!n.naturalWidth)throw Error('Preview image failed');});await page.keyboard.press('Escape');await page.waitForSelector('[data-template-preview]',{hidden:true});assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'Preview Pocket Flow Duo template');
   await page.click('[aria-label="Apply Pocket Flow Duo template"]');await page.waitForSelector('input[placeholder="DSK-XXXX-XXXX-XXXX"]',{visible:true});
   assert.deepEqual(await state(page),before);assert.deepEqual(await history(page),h);assert.notEqual(await page.evaluate(()=>localStorage.getItem('devsnapkit_pro_unlocked')),'true');

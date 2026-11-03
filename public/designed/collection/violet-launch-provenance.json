@@ -1,0 +1,30 @@
+{
+  "templateId": "violet-launch",
+  "method": "Resized from actual browser-triggered editor PNG download; simulated valid license; not a generated concept poster",
+  "sourceFile": "D:\\workspace\\MarkMoney\\output\\devsnapkit\\premium-template-implementation-2026-11-03\\final\\violet-launch\\default-duo-1x.png",
+  "sourceSha256": "23439a37588dca15d679f6998f5fb0bfd860df7237527546b77dc1f597f7a3b6",
+  "width": 1920,
+  "height": 1080,
+  "sources": {
+    "src/templates/collection/definitions/violet-launch.ts": "4db6038f7f41a72d82cd7cbcac46d6b351486bdcc0f7746851c01b7f1509ea78",
+    "src/templates/collection/apply.ts": "3a3c42b9a6f93b9b45e8fe303f957ceb99c08744a30a0af261ae02f8c4665829",
+    "src/composition/CompositionRenderer.tsx": "d52780e33a2afce96fa5dd6f01d55627d25663230bda6e93421fc2291278808a",
+    "src/composition/MediaShell.tsx": "5895d7df63b686720cc0eb42fbe2ce183383094fac34143f9272668927084364"
+  },
+  "records": [
+    {
+      "file": "violet-launch.webp",
+      "width": 480,
+      "height": 270,
+      "sha256": "8aafe9b88346cab755f8f4fe7de6fb616f42a14105b04e397eb6c3e57d2e8ede"
+    },
+    {
+      "file": "violet-launch-preview.webp",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "efcaec31e2e6518407774e0709b553feaa29f385dc32298c41bd17dd74517ab0"
+    }
+  ],
+  "simulatedLicense": true,
+  "realPayment": false
+}
