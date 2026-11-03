@@ -6,6 +6,19 @@ export const STORAGE_KEY = 'devsnapkit_welcome_seen';
 /** Spec key for "has completed onboarding"; written alongside STORAGE_KEY. */
 export const ONBOARDED_KEY = 'dsk_onboarded';
 
+/**
+ * Entries where the welcome overlay would get in the way, so it is skipped (and not marked seen):
+ * PayPal returns open the claim modal (?tx, ?status, ?claim), the URL API pre-fills the canvas
+ * (?title, ?theme), legal deep links open Terms/Privacy (?legal), and the admin dashboard.
+ */
+const SKIP_WELCOME_PARAMS = ['tx', 'status', 'claim', 'title', 'theme', 'legal'];
+
+export function shouldSkipWelcome(pathname: string, search: string): boolean {
+  if (pathname.startsWith('/admin')) return true;
+  const params = new URLSearchParams(search);
+  return SKIP_WELCOME_PARAMS.some(key => params.has(key));
+}
+
 interface WelcomeOverlayProps {
   onOpenLegal: () => void;
   onOpenLegalPrivacy: () => void;
@@ -76,7 +89,8 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('editor') === '1') return;
+    // Shown once per browser on the first editor entry (including /?editor=1 and tool deep links).
+    if (shouldSkipWelcome(window.location.pathname, window.location.search)) return;
     try {
       if (!localStorage.getItem(STORAGE_KEY) && !localStorage.getItem(ONBOARDED_KEY)) setVisible(true);
     } catch {
