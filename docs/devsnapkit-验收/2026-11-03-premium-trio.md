@@ -1,6 +1,6 @@
 # DevSnapKit 三款原生模板验收
 
-日期：2026-11-03。状态：本地实现、验证和独立复核完成；未部署、未合并 main。
+日期：2026-11-03。状态：三款模板已合入本地主程序 main，合入后验证完成；未推送、未生产部署。
 
 ## 交付
 
@@ -19,7 +19,7 @@
 ## 本地查看
 
 - 三款对照页：http://127.0.0.1:5379
-- 普通编辑器：http://127.0.0.1:5378/?editor=1 → Templates → 对应名称 → Preview
+- 普通编辑器：http://127.0.0.1:5380/?editor=1 → Templates → 对应名称 → Preview
 - 三款均支持免费大图预览；紫幕发布可免费应用及导出，另外两款应用遵循现有 Pro 授权检查。本地浏览器验收使用模拟有效许可证回复，不代表真实付款或生产授权后端验收。
 
 对照页左侧是实际 PNG 导出，右侧为原概念参考；可切换真实单图／双图。服务仅绑定 127.0.0.1。
@@ -29,12 +29,14 @@
 node 'D:/workspace/MarkMoney/output/devsnapkit/premium-template-implementation-2026-11-03/review-server.mjs'
 ```
 
-在实现工作区重启普通编辑器：
+在主程序目录 D:/workspace/MarkMoney/apps/shotcraft 重启普通编辑器：
 ```powershell
-node 'D:/workspace/MarkMoney/node_modules/vite/bin/vite.js' --host 127.0.0.1 --port 5378 --strictPort
+node 'D:/workspace/MarkMoney/node_modules/vite/bin/vite.js' --host 127.0.0.1 --port 5380 --strictPort
 ```
 
 ## 验证结果
+
+主程序集成验收：main 快进合入 4288c04 后，93 项模板／素材单元检查通过，npm run build 通过；从主程序目录启动测试服务 5381，完整 22 项真实浏览器检查全部通过，包括免费紫幕应用与 PNG 导出、另外两款 Pro 门禁、三款可编辑文字与独立替图、单图、真实下载和窄屏预览。证据：main-integration/results.json。
 
 权限更新完整浏览器验收 22 项通过，记录于 access-update/results.json；包含无 Pro 许可证的紫幕应用及真实 PNG 下载，另外两款继续验证 Pro 门禁。更新后 93 项单元检查和 npm run build 均通过。原 final/ 保留首轮成图证据，不覆盖历史结果。
 
@@ -76,5 +78,5 @@ D:/workspace/MarkMoney/output/devsnapkit/premium-template-implementation-2026-11
 - 路径：D:/workspace/MarkMoney/apps/shotcraft-worktrees/premium-trio
 - 分支：codex/premium-template-trio
 - 基础提交：06fdb359c48e41bd816ba2d4e74fb675c11d0c57
-- 原主工作区 D:/workspace/MarkMoney/apps/shotcraft 保持干净。
-- 未推送、未合并、未生产部署；本地服务与分支保留供检查和继续修改。
+- 三款模板已合入主程序 D:/workspace/MarkMoney/apps/shotcraft 的 main；模板代码提交 4288c04。
+- 已按用户“在程序中添加这些模板”的要求合入本地 main；未推送、未生产部署。对照工作区与本地服务保留。
