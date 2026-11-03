@@ -17,6 +17,7 @@ import { BEFORE_AFTER } from './definitions/before-after';
 import { VIOLET_LAUNCH } from './definitions/violet-launch';
 import { ELECTRIC_PAIR } from './definitions/electric-pair';
 import { PEACH_EDITORIAL } from './definitions/peach-editorial';
+import { NEXT_STAGE } from './definitions/next-stage';
 
 const templates = [
   { blueprint: PAPER_LAUNCH_DUO, brandMark: PAPER_BRAND_MARK, background: '#F6F3EC' },
@@ -33,6 +34,7 @@ const templates = [
   { blueprint: VIOLET_LAUNCH, background: '#10051F' },
   { blueprint: ELECTRIC_PAIR, background: '#071D54' },
   { blueprint: PEACH_EDITORIAL, background: '#F7D1BC' },
+  { blueprint: NEXT_STAGE, background: '#0D120D' },
 ];
 const templateFor = (id: string | undefined) => templates.find(template => template.blueprint.id === id);
 const blueprintFor = (id: string | undefined) => templateFor(id)?.blueprint;

@@ -19,6 +19,7 @@ export type CuratedTemplateId =
   | 'before-after'
   | 'violet-launch'
   | 'electric-pair'
+  | 'next-stage'
   | 'peach-editorial';
 
 export type CuratedTextRole =

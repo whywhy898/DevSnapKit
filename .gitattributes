@@ -1,3 +1,7 @@
 # These generated source files have byte hashes recorded in their manifest.
 public/designed/examples/collection/trio-*.svg text eol=lf
 public/designed/examples/collection/premium-trio-samples.json text eol=lf
+
+public/designed/examples/next-stage/*.svg text eol=lf
+public/designed/examples/next-stage/samples.json text eol=lf
+public/designed/examples/next-stage/album-cover-provenance.json text eol=lf
