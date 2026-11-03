@@ -95,9 +95,10 @@ test('text page uses one sparse source and the actual export throughout the firs
   assert.match(html, /class="compare-before"><img src="\/seo\/examples\/text-before-caption\.png" width="2400" height="1376"/);
 });
 
-test('sitemap publishes exactly the homepage, four canonical tools and the legal pages', () => {
+test('sitemap publishes exactly the homepage, four canonical tools, the guides and the legal pages', () => {
   const urls = [...read('sitemap.xml').matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
-  assert.deepEqual(urls.sort(), ['https://devsnapkit.com/', ...slugs.map(slug => `https://devsnapkit.com/${slug}/`), 'https://devsnapkit.com/terms/', 'https://devsnapkit.com/privacy/'].sort());
+  const guides = JSON.parse(read('../tests/fixtures/seo-guides.json')).map(guide => guide.slug);
+  assert.deepEqual(urls.sort(), ['https://devsnapkit.com/', ...slugs.map(slug => `https://devsnapkit.com/${slug}/`), ...guides.map(slug => `https://devsnapkit.com/${slug}/`), 'https://devsnapkit.com/terms/', 'https://devsnapkit.com/privacy/'].sort());
 });
 
 test('shared presentation keeps new image ratios intrinsic and reduced-motion content visible', () => {
