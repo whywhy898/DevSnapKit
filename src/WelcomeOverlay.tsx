@@ -3,6 +3,8 @@ import { X, ArrowRight, Smartphone, Layers, Compass, ShieldCheck } from 'lucide-
 import { productCopy } from './productCopy';
 
 export const STORAGE_KEY = 'devsnapkit_welcome_seen';
+/** Spec key for "has completed onboarding"; written alongside STORAGE_KEY. */
+export const ONBOARDED_KEY = 'dsk_onboarded';
 
 interface WelcomeOverlayProps {
   onOpenLegal: () => void;
@@ -70,18 +72,22 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
   onOpenLegalPrivacy,
 }) => {
   const [heroIndex, setHeroIndex] = useState(0);
-  const [visible, setVisible] = useState<boolean>(() => {
-    if (new URLSearchParams(window.location.search).get('editor') === '1') return false;
+  // Always start hidden (never part of the initial render); decide after mount from localStorage.
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('editor') === '1') return;
     try {
-      return !localStorage.getItem(STORAGE_KEY);
+      if (!localStorage.getItem(STORAGE_KEY) && !localStorage.getItem(ONBOARDED_KEY)) setVisible(true);
     } catch {
-      return false;
+      // storage unavailable: keep the editor uncluttered
     }
-  });
+  }, []);
 
   const close = useCallback(() => {
     try {
       localStorage.setItem(STORAGE_KEY, '1');
+      localStorage.setItem(ONBOARDED_KEY, '1');
     } catch {
       // safe fallback for private browsing
     }
