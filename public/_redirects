@@ -1,2 +1,6 @@
-# Cloudflare Pages SPA Redirect Rules
-/*    /index.html   200
+# Cloudflare Pages routing.
+# No SPA catch-all: unknown paths are served /404.html with HTTP 404.
+# "/" is a static landing page; the studio loads on "/?editor=1" (see index.html).
+# The admin dashboard is a client route of the studio bundle.
+/admin      /index.html   200
+/admin/*    /index.html   200
