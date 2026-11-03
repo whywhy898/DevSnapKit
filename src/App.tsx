@@ -1110,7 +1110,7 @@ export default function App() {
       if (match) setGradient(match);
     }
 
-    // Legal deep links from the static landing/404 pages (?legal=terms|privacy|refund|contact)
+    // Legal deep links (?legal=refund|contact open modals; ?legal=terms|privacy are redirected to /terms/ and /privacy/ by index.html)
     const urlLegal = params.get('legal');
     if (urlLegal === 'terms' || urlLegal === 'privacy' || urlLegal === 'refund' || urlLegal === 'contact') {
       setActiveLegalModal(urlLegal);
@@ -4181,15 +4181,15 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
       {/* Footer with Real Legal & Trust Links */}
       <footer className="border-t border-white/[0.06] bg-[#07080c] py-8 px-4 sm:px-6 lg:px-8 text-center text-xs text-white/40 space-y-3">
         <div className="flex flex-wrap items-center justify-center gap-6 text-xs font-medium text-white/60">
-          <button onClick={() => setActiveLegalModal('privacy')} className="hover:text-white cursor-pointer flex items-center gap-1.5 transition-colors">
+          <a href="/privacy/" target="_blank" rel="noopener" className="hover:text-white cursor-pointer flex items-center gap-1.5 transition-colors">
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>Privacy Policy</span>
-          </button>
+          </a>
           <span>•</span>
-          <button onClick={() => setActiveLegalModal('terms')} className="hover:text-white cursor-pointer flex items-center gap-1.5 transition-colors">
+          <a href="/terms/" target="_blank" rel="noopener" className="hover:text-white cursor-pointer flex items-center gap-1.5 transition-colors">
             <FileText className="w-3.5 h-3.5" />
             <span>Terms of Service</span>
-          </button>
+          </a>
           <span>•</span>
           <button onClick={() => setActiveLegalModal('refund')} className="hover:text-white cursor-pointer flex items-center gap-1.5 transition-colors">
             <ShieldCheck className="w-3.5 h-3.5" />
