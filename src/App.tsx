@@ -1110,6 +1110,12 @@ export default function App() {
       if (match) setGradient(match);
     }
 
+    // Legal deep links from the static landing/404 pages (?legal=terms|privacy|refund|contact)
+    const urlLegal = params.get('legal');
+    if (urlLegal === 'terms' || urlLegal === 'privacy' || urlLegal === 'refund' || urlLegal === 'contact') {
+      setActiveLegalModal(urlLegal);
+    }
+
     // Track page view event anonymously
     trackEvent('page_view');
   }, []);
