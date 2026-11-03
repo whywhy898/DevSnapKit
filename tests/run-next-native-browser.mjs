@@ -3,20 +3,16 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createRequire} from 'node:module';
 import {spawn} from 'node:child_process';
-import {createTypeScriptLoader} from './helpers/load-typescript.mjs';
 import {launchBrowser,downloadPng,selectElement,openImageAdvanced} from './helpers/browser.mjs';
 const root=path.resolve(import.meta.dirname,'..'),require=createRequire(import.meta.url),sharp=require('sharp');
 const output=process.env.NEXT_OUTPUT||path.resolve(root,'../../../output/devsnapkit/next-native-export-2026-11-03','run-'+new Date().toISOString().replace(/[:.]/g,'-'));
 const origin=process.env.NEXT_ORIGIN||'http://127.0.0.1:5391';
 process.env.IMPACT_ORIGIN=origin;process.env.IMPACT_OUTPUT=output;
 const {fresh,state,history,settle,fill,clickButton,setBrowser,fixtures}=await import('./run-pro-impact-browser.mjs');
-const load=createTypeScriptLoader(path.join(root,'src'));
-const {buildCuratedSnapshot}=load('templates/collection/apply.ts');
-const results={authoringOnly:true,publishedCatalogChanged:false,simulatedLicense:true,realPayment:false,checks:[],downloads:[],errors:[],startedAt:new Date().toISOString()};
+const results={authoringOnly:false,publishedCatalogChanged:true,simulatedLicense:true,realPayment:false,checks:[],downloads:[],errors:[],startedAt:new Date().toISOString()};
 let browser,server,page;
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const pass=name=>{results.checks.push({name,passed:true});console.log('PASS '+name);};
-const json=x=>JSON.parse(JSON.stringify(x));
 async function captureState(name){await fs.writeFile(path.join(output,name+'.snapshot.json'),JSON.stringify(await state(page),null,2));}
 async function screenshot(name){await page.mouse.move(0,0);await settle(page);await(await page.$('#studio-canvas')).screenshot({path:path.join(output,name+'.preview.png')});}
 async function nativePng(name,scale=1){
@@ -45,16 +41,33 @@ try{
   server=spawn(process.execPath,[path.join(path.dirname(require.resolve('vite/package.json')),'bin/vite.js'),'--config','tests/vite-mockup-baseline.config.mjs','--host','127.0.0.1','--port','5391','--strictPort'],{cwd:root,stdio:'ignore',windowsHide:true});
   let ready=false;for(let i=0;i<120;i++){try{if((await fetch(origin)).ok){ready=true;break;}}catch{}await pause(100);}assert.ok(ready,'QA server started');
  }
- browser=await launchBrowser();setBrowser(browser);page=await fresh('valid');page.on('pageerror',e=>results.errors.push(e.message));
+ browser=await launchBrowser();setBrowser(browser);
+ page=await fresh('free',390);page.on('pageerror',e=>results.errors.push(e.message));
+ const freeBefore=await state(page),freeHistory=await history(page);
+ await clickButton(page,'Templates');await page.click('[data-template-filter="9:16"]');
+ assert.equal(await page.$$eval('[data-template-gallery] article',ns=>ns.length),3);
+ await page.click('[aria-label="Preview NEXT Stage template"]');
+ await page.waitForSelector('[data-template-preview][open]');
+ await page.$eval('[data-template-preview] img',n=>n.decode());
+ assert.ok(await page.$eval('[data-template-preview] img',n=>n.naturalWidth===1080&&n.naturalHeight===1920));
+ assert.ok(await page.evaluate(()=>Math.max(document.documentElement.scrollWidth,document.body.scrollWidth,document.querySelector('[data-template-preview]').getBoundingClientRect().width)<=390));
+ await page.screenshot({path:path.join(output,'gallery-mobile-preview.png'),fullPage:true});
+ await clickButton(page,'Close template preview');await page.click('[aria-label="Apply NEXT Stage template"]');
+ await page.waitForSelector('[data-pro-modal]');
+ assert.deepEqual(await state(page),freeBefore);assert.deepEqual(await history(page),freeHistory);
+ pass('free users can preview NEXT at390px and Pro admission preserves their document');
+ await page.close();page=await fresh('valid');page.on('pageerror',e=>results.errors.push(e.message));
  await clickButton(page,'Templates');const names=await page.$$eval('[data-template-gallery] article',ns=>ns.map(n=>n.textContent));
- assert.equal(names.length,15);assert.ok(names.every(s=>!s.includes('NEXT STAGE')));
- await clickButton(page,'Close template gallery');pass('published gallery stays15 and proof is not listed');
- const before=await state(page),h=await history(page),proof=json(buildCuratedSnapshot(before,'next-stage','next-native'));
- await page.evaluate(n=>window.__mockupBaseline.apply(n,{pro:true}),proof);
+ assert.equal(names.length,16);assert.ok(names.some(s=>s.includes('NEXT Stage')));
+ await page.click('[aria-label="Preview NEXT Stage template"]');await page.waitForSelector('[data-template-preview][open]');
+ await page.$eval('[data-template-preview] img',n=>n.decode());await clickButton(page,'Close template preview');
+ pass('published gallery includes NEXT with a complete native export preview');
+ const before=await state(page),h=await history(page);
+ await page.click('[aria-label="Apply NEXT Stage template"]');
  await page.waitForFunction(()=>window.__mockupBaseline.snapshot.templateContext?.id==='next-stage');await settle(page);
  const duo=await state(page);assert.equal((await history(page)).count,h.count+1);
  await clickButton(page,'Undo');assert.deepEqual(await state(page),before);await clickButton(page,'Redo');assert.deepEqual(await state(page),duo);
- pass('factory-built native document loads as one reversible authoring command');
+ pass('gallery Use template applies NEXT as one reversible history command');
  const layers=await page.evaluate(async()=>{
   const {textHorizontalExtent,textBoxIssue}=await import('/src/text/geometry.ts');
   const c=document.querySelector('#studio-canvas'),snap=window.__mockupBaseline.snapshot,b=c.getBoundingClientRect(),s=b.width/c.offsetWidth;

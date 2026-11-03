@@ -11,7 +11,7 @@ const text = (role: CuratedTextDefinition['role'], content: string, x: number, y
   color: '#F4F0DB', align: 'left', lineHeight: 1.05, ...extra,
 } });
 
-/** Private authoring proof. Publication and access are owned by the catalog. */
+/** Native portrait launch template. Publication and access are owned by the catalog. */
 export const NEXT_STAGE: CuratedTemplateBlueprint = {
   id: 'next-stage', version: 1, name: 'NEXT Stage', tier: 'pro', canvas,
   examples: {

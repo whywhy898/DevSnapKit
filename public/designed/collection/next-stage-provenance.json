@@ -1,0 +1,30 @@
+{
+  "templateId": "next-stage",
+  "method": "Resized from actual browser-triggered editor PNG download; simulated valid license",
+  "sourceFile": "D:\\workspace\\MarkMoney\\output\\devsnapkit\\next-gallery-integration-2026-11-03\\default-duo-1x.png",
+  "sourceSha256": "a68394c660c6f4997b5d7ba6c3bf1261fec100f6b9707f1f87d79211a5930813",
+  "width": 1080,
+  "height": 1920,
+  "sources": {
+    "src/templates/collection/definitions/next-stage.ts": "3c21e2841477bb4ae212b7aea8f807a063a0915bb85a82e819952a2bd55021f9",
+    "src/templates/collection/apply.ts": "5a5ceef9e7e042ef9c74e8b036c4068a82f832aa4c8e9f4131ce3515cac2e472",
+    "src/composition/CompositionRenderer.tsx": "d52780e33a2afce96fa5dd6f01d55627d25663230bda6e93421fc2291278808a",
+    "src/composition/MediaShell.tsx": "5895d7df63b686720cc0eb42fbe2ce183383094fac34143f9272668927084364"
+  },
+  "records": [
+    {
+      "file": "next-stage.webp",
+      "width": 480,
+      "height": 853,
+      "sha256": "8af4aac5ec1870813055982ebfd3c3b595b0266adf9e79f6a395fc6b803bc629"
+    },
+    {
+      "file": "next-stage-preview.webp",
+      "width": 1080,
+      "height": 1920,
+      "sha256": "d8345265179a7033457d1d430bcf12dcbe7ffb98e0c467ca65635c25fef76b53"
+    }
+  ],
+  "simulatedLicense": true,
+  "realPayment": false
+}

@@ -48,9 +48,9 @@ for(const [id,name,width,height,bg,headline,main,secondary,mainRect,secondaryRec
   const {EditorHistory}=load('editorHistory.ts');const history=new EditorHistory(base);history.flush(n);assert.equal(history.count,2);assert.deepEqual(plain(history.undo(n)),plain(base));assert.deepEqual(plain(history.redo()),plain(n));
  });
 }
-test('all fifteen collection entries include five Free and ten gated Pro templates',()=>{
+test('all sixteen collection entries include five Free and eleven gated Pro templates',()=>{
  const {CURATED_TEMPLATE_CATALOG:c}=load('templates/collection/catalog.ts');const {canApplyCuratedTemplate}=load('templates/collection/access.ts');
- assert.equal(c.length,15);assert.equal(c.filter(x=>x.tier==='free').length,5);assert.equal(c.filter(x=>x.tier==='pro').length,10);
+ assert.equal(c.length,16);assert.equal(c.filter(x=>x.tier==='free').length,5);assert.equal(c.filter(x=>x.tier==='pro').length,11);
  assert.deepEqual(plain(c.slice(8,12).map(x=>[x.id,x.name])),cases.map(x=>x.slice(0,2)));
  for(const [id]of cases){assert.equal(canApplyCuratedTemplate(id,false),false);assert.equal(canApplyCuratedTemplate(id,true),true);}
 });
