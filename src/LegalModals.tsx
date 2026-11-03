@@ -1,5 +1,7 @@
 import React from 'react';
 import { ShieldCheck, Mail, CheckCircle2, X } from 'lucide-react';
+import legal from './legal/legalContent.json';
+import { LegalSections } from './legal/LegalDocument';
 
 export type LegalModalType = 'terms' | 'privacy' | 'refund' | 'contact' | null;
 
@@ -21,69 +23,32 @@ export const LegalModals: React.FC<LegalModalsProps> = ({ activeModal, onClose }
           <X className="w-4 h-4" />
         </button>
 
-        {/* Privacy Policy */}
+        {/* Privacy Policy & Terms of Service: text lives in ./legal/legalContent.json, shared with /privacy/ and /terms/ */}
         {activeModal === 'privacy' && (
           <div className="space-y-4 text-slate-300 text-sm">
             <div className="flex items-center gap-2 text-indigo-400">
               <ShieldCheck className="w-6 h-6" />
-              <h2 className="text-xl font-black text-white">Privacy Policy</h2>
+              <h2 className="text-xl font-black text-white">{legal.privacy.title}</h2>
             </div>
-            <p className="text-xs text-slate-400">Effective Date: September 29, 2026</p>
-            
+            <p className="text-xs text-slate-400">{legal.privacy.date}</p>
+
             <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-300 text-xs flex items-start gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <strong>Zero-Upload Guarantee:</strong> All screenshot rendering, styling, image resizing, and OpenGraph card generation happens 100% locally in your web browser. No uploaded images or canvas outputs are ever transferred to or stored on our servers.
+                <strong>{legal.privacy.callout.label}</strong> {legal.privacy.callout.text}
               </div>
             </div>
 
-            <h3 className="text-base font-bold text-white pt-2">1. Data We Do Not Collect</h3>
-            <p>
-              We do not collect, view, transmit, or retain your raw screenshots, mockup contents, source code snippets, or exported graphic files. Everything runs client-side using Web APIs (HTML5 Canvas & Blob rendering).
-            </p>
-
-            <h3 className="text-base font-bold text-white pt-2">2. Payment & License Information</h3>
-            <p>
-              Payments are securely processed by PayPal Inc. DevSnapKit never stores credit card details or financial credentials. When you purchase a Pro Lifetime Pass, we only verify the transaction reference to issue your cryptographic license key.
-            </p>
-
-            <h3 className="text-base font-bold text-white pt-2">3. Local Storage</h3>
-            <p>
-              We store your Pro license activation status and UI preferences in your browser's standard <code className="bg-slate-950 px-1 py-0.5 rounded text-indigo-300">localStorage</code>. You may clear this at any time through your browser settings.
-            </p>
-
-            <h3 className="text-base font-bold text-white pt-2">4. Contact Us</h3>
-            <p>
-              If you have any questions or privacy inquiries, contact us directly at <a href="mailto:support@devsnapkit.com" className="text-indigo-400 underline">support@devsnapkit.com</a>.
-            </p>
+            <LegalSections sections={legal.privacy.sections} />
           </div>
         )}
 
-        {/* Terms of Service */}
         {activeModal === 'terms' && (
           <div className="space-y-4 text-slate-300 text-sm">
-            <h2 className="text-xl font-black text-white">Terms of Service</h2>
-            <p className="text-xs text-slate-400">Last updated: September 29, 2026</p>
+            <h2 className="text-xl font-black text-white">{legal.terms.title}</h2>
+            <p className="text-xs text-slate-400">{legal.terms.date}</p>
 
-            <h3 className="text-base font-bold text-white pt-2">1. Software License</h3>
-            <p>
-              By purchasing DevSnapKit Pro Lifetime Pass, you receive a perpetual, non-exclusive, worldwide commercial license to use DevSnapKit on up to three (3) personal workstations/browsers.
-            </p>
-
-            <h3 className="text-base font-bold text-white pt-2">2. Commercial Use & Copyright Ownership</h3>
-            <p>
-              You retain 100% intellectual property ownership of all graphics, mockups, social cards, and banners generated using DevSnapKit. You may use all generated assets for commercial products, client deliverables, app store listings, marketing materials, and open-source documentation with zero royalties.
-            </p>
-
-            <h3 className="text-base font-bold text-white pt-2">3. License Sharing Restrictions</h3>
-            <p>
-              Pro license keys are granted to the individual purchaser. Public sharing, resale, or distribution of your license key on public forums or key-sharing platforms is strictly prohibited and subject to revocation.
-            </p>
-
-            <h3 className="text-base font-bold text-white pt-2">4. Service Availability & Warranty</h3>
-            <p>
-              DevSnapKit is delivered as-is. While we strive for 99.9% uptime and broad browser compatibility (Chrome, Edge, Safari, Firefox), we are not liable for incidental damages resulting from browser incompatibilities.
-            </p>
+            <LegalSections sections={legal.terms.sections} />
           </div>
         )}
 

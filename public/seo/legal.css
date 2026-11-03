@@ -1,0 +1,11 @@
+/* Typography for the generated /terms/ and /privacy/ pages (on top of landing.css). */
+.legal-doc { max-width: 780px; padding-top: 56px; padding-bottom: 96px; }
+.legal-doc h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); line-height: 1.05; margin: .4rem 0 .6rem; }
+.legal-date { opacity: .72; font-size: .95rem; margin: 0 0 2rem; }
+.legal-callout { border: 1px solid rgba(16, 185, 129, .38); background: rgba(16, 185, 129, .08); border-radius: 16px; padding: 16px 20px; margin: 0 0 1.5rem; }
+.legal-callout p { margin: 0; }
+.legal-doc h2 { font-size: 1.35rem; margin: 2.2rem 0 .6rem; }
+.legal-doc p { line-height: 1.75; margin: 0 0 1rem; }
+.legal-doc code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em; padding: .1em .35em; border-radius: 6px; background: rgba(100, 116, 139, .16); }
+.legal-doc a { text-decoration: underline; }
+.legal-related { margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid rgba(100, 116, 139, .25); }

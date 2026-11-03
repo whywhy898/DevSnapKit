@@ -1,0 +1,62 @@
+{
+  "privacy": {
+    "slug": "privacy",
+    "title": "Privacy Policy",
+    "date": "Effective Date: September 29, 2026",
+    "description": "DevSnapKit Privacy Policy: screenshots are rendered locally in your browser and never uploaded. How payments, license keys and local storage are handled.",
+    "callout": {
+      "label": "Zero-Upload Guarantee:",
+      "text": "All screenshot rendering, styling, image resizing, and OpenGraph card generation happens 100% locally in your web browser. No uploaded images or canvas outputs are ever transferred to or stored on our servers."
+    },
+    "sections": [
+      {
+        "heading": "1. Data We Do Not Collect",
+        "body": [{ "text": "We do not collect, view, transmit, or retain your raw screenshots, mockup contents, source code snippets, or exported graphic files. Everything runs client-side using Web APIs (HTML5 Canvas & Blob rendering)." }]
+      },
+      {
+        "heading": "2. Payment & License Information",
+        "body": [{ "text": "Payments are securely processed by PayPal Inc. DevSnapKit never stores credit card details or financial credentials. When you purchase a Pro Lifetime Pass, we only verify the transaction reference to issue your cryptographic license key." }]
+      },
+      {
+        "heading": "3. Local Storage",
+        "body": [
+          { "text": "We store your Pro license activation status and UI preferences in your browser's standard " },
+          { "code": "localStorage" },
+          { "text": ". You may clear this at any time through your browser settings." }
+        ]
+      },
+      {
+        "heading": "4. Contact Us",
+        "body": [
+          { "text": "If you have any questions or privacy inquiries, contact us directly at " },
+          { "email": "support@devsnapkit.com" },
+          { "text": "." }
+        ]
+      }
+    ]
+  },
+  "terms": {
+    "slug": "terms",
+    "title": "Terms of Service",
+    "date": "Last updated: September 29, 2026",
+    "description": "DevSnapKit Terms of Service: the Pro Lifetime Pass license, commercial use and ownership of the graphics you create, license sharing rules and warranty.",
+    "sections": [
+      {
+        "heading": "1. Software License",
+        "body": [{ "text": "By purchasing DevSnapKit Pro Lifetime Pass, you receive a perpetual, non-exclusive, worldwide commercial license to use DevSnapKit on up to three (3) personal workstations/browsers." }]
+      },
+      {
+        "heading": "2. Commercial Use & Copyright Ownership",
+        "body": [{ "text": "You retain 100% intellectual property ownership of all graphics, mockups, social cards, and banners generated using DevSnapKit. You may use all generated assets for commercial products, client deliverables, app store listings, marketing materials, and open-source documentation with zero royalties." }]
+      },
+      {
+        "heading": "3. License Sharing Restrictions",
+        "body": [{ "text": "Pro license keys are granted to the individual purchaser. Public sharing, resale, or distribution of your license key on public forums or key-sharing platforms is strictly prohibited and subject to revocation." }]
+      },
+      {
+        "heading": "4. Service Availability & Warranty",
+        "body": [{ "text": "DevSnapKit is delivered as-is. While we strive for 99.9% uptime and broad browser compatibility (Chrome, Edge, Safari, Firefox), we are not liable for incidental damages resulting from browser incompatibilities." }]
+      }
+    ]
+  }
+}
