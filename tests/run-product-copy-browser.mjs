@@ -22,7 +22,7 @@ async function newPage(width=1440,welcome=false){
     else if(u.pathname==='/api/verify-license')data={valid:true,tier:'pro_lifetime',serverVerified:true};
     else if(u.pathname.startsWith('/api/'))data={};
     if(data){await request.respond({status:200,contentType:'application/json',body:JSON.stringify(data)});return}await request.continue();
-  });await page.goto(origin+(welcome?'/':'/?editor=1'),{waitUntil:'networkidle0'});await page.waitForSelector('#studio-canvas');
+  });await page.goto(origin+(welcome?'/?welcome=1':'/?editor=1'),{waitUntil:'networkidle0'});await page.waitForSelector('#studio-canvas');
 }
 async function modal(name){await page.waitForSelector('[data-pro-benefits]');const info=await page.$eval('[data-pro-benefits]',n=>({text:n.textContent,items:n.querySelectorAll('li').length,bottom:n.getBoundingClientRect().bottom}));assert.equal(info.items,4);for(const s of ['Premium templates','High-resolution export presets','Batch export','Premium gradient backgrounds','Text, logo uploads and QR codes are included in Free.'])assert.ok(info.text.includes(s),s);assert.doesNotMatch(info.text,/Dynamic|3840|4×|4x|Everything Included/);assert.ok(info.bottom<=1100,'benefit explanation fits initial viewport');await page.screenshot({path:path.join(output,name+'.png'),fullPage:true});results.push({scenario:name,pass:true});}
 async function closeModal(){await page.click('button[title="Close"]')}

@@ -4,56 +4,68 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DevSnapKit - Studio-Grade Screenshot Mockups & Social Cards in Seconds</title>
-    <meta name="description" content="Create professional product mockups, feature changelogs, and social media graphics without opening Figma. 100% private in-browser processing, zero server uploads, 32+ luxury studio palettes, 4K lossless exports." />
+    <title>Screenshot Mockup Generator in Your Browser | DevSnapKit</title>
+    <meta name="description" content="Turn screenshots into product mockups with device frames, two-image layouts and 3D angles. Runs 100% in your browser, no uploads. Free to start." />
     <link rel="canonical" href="https://devsnapkit.com/" />
-    
+
     <!-- OpenGraph Metadata -->
-    <meta property="og:title" content="DevSnapKit - Studio-Grade Screenshot Mockups & Social Cards in Seconds" />
-    <meta property="og:description" content="Transform raw screenshots into high-converting product mockups, launch graphics, and social assets in seconds. 100% private in-browser processing, zero server uploads." />
+    <meta property="og:title" content="DevSnapKit: Turn Screenshots into Beautiful Product Mockups" />
+    <meta property="og:description" content="Add device frames, Duo layouts and 3D angles to your screenshots. Free, in-browser, no uploads." />
     <meta property="og:url" content="https://devsnapkit.com/" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://devsnapkit.com/og-image.png" />
-    <meta property="og:image:width" content="2400" />
-    <meta property="og:image:height" content="1260" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="DevSnapKit turns screenshots into polished product mockups" />
     <meta property="og:site_name" content="DevSnapKit" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="DevSnapKit - Studio-Grade Screenshot Mockups & Social Cards in Seconds" />
-    <meta name="twitter:description" content="Transform raw screenshots into high-converting product mockups, launch graphics, and social assets in seconds. 100% private in-browser processing, zero server uploads." />
+    <meta name="twitter:title" content="DevSnapKit: Turn Screenshots into Beautiful Product Mockups" />
+    <meta name="twitter:description" content="Add device frames, Duo layouts and 3D angles to your screenshots. Free, in-browser, no uploads." />
     <meta name="twitter:image" content="https://devsnapkit.com/og-image.png" />
+    <meta name="twitter:image:alt" content="DevSnapKit turns screenshots into polished product mockups" />
 
-    <!-- Google Font Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-
-    <!-- JSON-LD Structured Data for Google Rich Snippets -->
+    <!-- JSON-LD Structured Data. Pro is a single one-time payment; no ratings until real reviews exist. -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "DevSnapKit Studio",
       "url": "https://devsnapkit.com/",
-      "description": "Studio-grade browser-based screenshot beautifier and social media card creator for content creators, marketers, founders, and designers.",
+      "description": "Browser-based screenshot mockup studio: device frames, two-image layouts, 3D angles, text, logo and QR codes. Images are processed locally in the browser.",
       "applicationCategory": "DesignApplication",
       "operatingSystem": "All",
-      "offers": {
-        "@type": "Offer",
-        "price": "1.00",
-        "priceCurrency": "USD",
-        "availability": "https://schema.org/InStock",
-        "priceValidUntil": "2027-12-31"
-      },
+      "browserRequirements": "Requires a modern web browser with JavaScript enabled.",
+      "isAccessibleForFree": true,
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "DevSnapKit Free",
+          "price": "0",
+          "priceCurrency": "USD",
+          "availability": "https://schema.org/InStock"
+        },
+        {
+          "@type": "Offer",
+          "name": "DevSnapKit Pro (lifetime, one-time payment)",
+          "description": "One-time payment of 1.00 USD for lifetime Pro access. No recurring subscription.",
+          "price": "1.00",
+          "priceCurrency": "USD",
+          "availability": "https://schema.org/InStock",
+          "priceValidUntil": "2027-12-31",
+          "url": "https://devsnapkit.com/"
+        }
+      ],
       "creator": {
-        "@type": "Person",
-        "name": "DevSnapKit Studio",
-        "email": "support@devsnapkit.com"
+        "@type": "Organization",
+        "name": "DevSnapKit",
+        "email": "support@devsnapkit.com",
+        "url": "https://devsnapkit.com/"
       }
     }
     </script>
-    <!-- Theme Initializer (Default Light, user-toggleable) -->
+    <!-- Theme Initializer for the studio (Default Light, user-toggleable) -->
     <script>
       (function() {
         try {
@@ -64,6 +76,44 @@
         } catch(e) { document.documentElement.classList.add('theme-light'); }
       })();
     </script>
+    <link rel="preload" href="/seo/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link id="landing-css" rel="stylesheet" href="/seo/landing.css">
+    <!--
+      Entry mode. "/" is the static landing page. The studio (React editor) loads only for
+      editor URLs: any query parameter other than marketing tags (?editor=1, ?tool=, ?aspect=,
+      ?mode=, ?title=, ?theme=, PayPal ?tx= / ?status= / ?claim=) or the /admin path.
+      src/main.tsx reads the "dsk-app" class set here.
+    -->
+    <script>
+      (function() {
+        var app = false;
+        try {
+          var l = window.location;
+          app = l.pathname.indexOf('/admin') === 0;
+          new URLSearchParams(l.search).forEach(function(v, k) {
+            if (!/^(utm_[a-z0-9_]+|ref|via|source|gclid|gbraid|wbraid|fbclid|msclkid|yclid|twclid|li_fat_id|mc_cid|mc_eid|_ga|_gl)$/i.test(k)) app = true;
+          });
+        } catch (e) {}
+        var root = document.documentElement;
+        if (app) {
+          root.classList.add('dsk-app');
+          var css = document.getElementById('landing-css');
+          if (css) css.parentNode.removeChild(css);
+          var font = document.createElement('link');
+          font.rel = 'stylesheet';
+          font.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap';
+          document.head.appendChild(font);
+        } else {
+          try { var t = localStorage.getItem('devsnapkit_landing_theme'); if (t === 'light' || t === 'dark') root.dataset.theme = t; } catch (e) {}
+        }
+      })();
+    </script>
+    <style>
+      .dsk-app #landing { display: none !important; }
+      html:not(.dsk-app) #studio-tools-nav { display: none; }
+      #landing .feature-points { list-style: none; padding: 0; margin: 0; }
+      #landing .tool-links a { font-weight: 700; }
+    </style>
   </head>
   <body class="antialiased selection:bg-indigo-500 selection:text-white">
     <script>
@@ -73,11 +123,93 @@
         if (dark) document.body.classList.add('dark');
       })();
     </script>
+    <div id="landing">
+      <a class="skip-link" href="#main">Skip to content</a>
+      <header class="site-header wrap">
+        <a class="brand" href="/" aria-label="DevSnapKit home"><img src="/favicon.svg" alt="" width="30" height="30">DevSnap<span>Kit</span><small>STUDIO</small></a>
+        <nav aria-label="Main navigation"><a href="#features">Features</a><a href="#how-it-works">How it works</a><a href="#questions">FAQ</a><button class="theme-toggle" type="button" aria-label="Switch color theme">Theme</button><a class="button button-small" href="/?editor=1">Open the studio <span aria-hidden="true">↗</span></a></nav>
+      </header>
+      <main id="main">
+        <section class="hero wrap" aria-labelledby="hero-title">
+          <div class="hero-copy">
+            <p class="eyebrow">SCREENSHOT MOCKUP STUDIO</p>
+            <h1 id="hero-title">Turn Screenshots into <span>Beautiful Product Mockups</span></h1>
+            <p class="hero-description">Add device frames, backgrounds, two-image layouts and 3D angles to your screenshots. Create polished launch visuals, social cards and Open Graph images directly in your browser. Your images never leave your device.</p>
+            <a class="button" href="/?editor=1">Create Your First Mockup <span aria-hidden="true">↗</span></a>
+            <p class="hero-description">Free to start, no account needed. Pro is a one-time $1 payment.</p>
+          </div>
+          <div class="hero-art">
+            <div class="hero-stage"><figure class="finished-shot"><img src="/welcome/welcome-bg.webp" width="1562" height="1108" alt="Product screenshots composed in laptop and phone device frames with DevSnapKit" fetchpriority="high"></figure></div>
+          </div>
+        </section>
+
+        <div class="benefits wrap"><p>100% in your browser<span>Screenshots are processed locally, never uploaded.</span></p><p>Logo &amp; QR included in Free<span>Brand every visual without paying.</span></p><p>Ready for every platform<span>PNG, WebP and JPEG in social and OG sizes.</span></p></div>
+
+        <section class="details-section wrap" id="features" aria-labelledby="features-title">
+          <div class="details-intro"><p class="eyebrow">WHAT YOU CAN DO</p><h2 id="features-title">Everything a launch visual needs.</h2><div class="detail-image"><img src="/welcome/feature-mockup.webp" width="1562" height="1108" alt="A screenshot placed inside a realistic laptop device frame in DevSnapKit" loading="lazy"></div></div>
+          <div class="detail-list">
+            <article><h3>Realistic device frames.</h3><p>Place your screenshot in a MacBook Pro, Studio Display, iPhone 17 Pro, Safari browser window or clay-style phone, or keep it borderless with rounded corners and a soft shadow.</p></article>
+            <article><h3>Duo layouts for two screenshots.</h3><p>Show web and mobile together, or a before and after, with Side by Side, Overlap Stack, Hero Split and Stacked Vertical compositions.</p></article>
+            <article><h3>3D angles in one click.</h3><p>Tilt a flat screen into a studio-style product shot with built-in 3D perspective presets, then fine-tune padding, background and shadow.</p></article>
+            <article><h3>100% in-browser, no uploads.</h3><p>Editing and rendering happen locally in your browser. Your screenshots are not uploaded to a server to be styled or exported.</p></article>
+            <article><h3>Sharp exports, up to 4K.</h3><p>Download PNG, WebP or JPEG at 1x or 2x for free. Pro adds the 4K preset (3840 pixels on the long edge) and batch export of several canvas sizes at once.</p></article>
+            <article><h3>Free logo, QR code and text.</h3><p>Upload your logo, add a static QR code that links to your website, and write headlines right on the canvas. All of it is included in the Free plan.</p></article>
+          </div>
+        </section>
+
+        <section class="use-section wrap" aria-labelledby="examples-title">
+          <div class="section-heading"><h2 id="examples-title">Made for the work you want to show.</h2><p>Product launches, changelogs, tutorials, app store style previews and social posts.</p></div>
+          <div class="use-grid">
+            <article><div class="use-image"><img src="/welcome/feature-duo.webp" width="1562" height="1578" alt="A web and a mobile screenshot combined in one DevSnapKit Duo layout" loading="lazy"></div><div class="use-copy"><h3>Two screens, one story.</h3><p>Pair a desktop view with its mobile version to show a cross-platform product in a single image.</p></div></article>
+            <article><div class="use-image"><img src="/welcome/feature-3d.webp" width="1562" height="1198" alt="A screenshot tilted with a 3D perspective preset in DevSnapKit" loading="lazy"></div><div class="use-copy"><h3>Perspective that stands out.</h3><p>Give a feature announcement depth with a 3D angle instead of a flat rectangle.</p></div></article>
+            <article><div class="use-image"><img src="/welcome/feature-brand.webp" width="1562" height="1124" alt="A branded launch graphic with a logo and QR code made in DevSnapKit" loading="lazy"></div><div class="use-copy"><h3>Branded in seconds.</h3><p>Add your logo and a QR code so every shared image points people back to your product.</p></div></article>
+          </div>
+        </section>
+
+        <section class="workflow-section" id="how-it-works" aria-labelledby="workflow-title"><div class="wrap workflow-layout">
+          <div class="section-heading"><h2 id="workflow-title">From screenshot to mockup in three steps.</h2><p>No design file, no blank canvas, no learning curve.</p></div>
+          <ol class="steps">
+            <li><span class="step-number" aria-hidden="true">1</span><div><h3>Choose your screenshot.</h3><p>Import an image you already captured, or start with a built-in demo screenshot to explore the controls.</p></div></li>
+            <li><span class="step-number" aria-hidden="true">2</span><div><h3>Style it.</h3><p>Pick a device frame, background, 3D angle or Duo layout, then add a headline, your logo or a QR code.</p></div></li>
+            <li><span class="step-number" aria-hidden="true">3</span><div><h3>Export and share.</h3><p>Choose a canvas size such as Open Graph, X, LinkedIn, Instagram or YouTube, and download your image.</p></div></li>
+          </ol>
+        </div></section>
+
+        <section class="details-section wrap" aria-labelledby="tools-title">
+          <div class="details-intro"><p class="eyebrow">FOCUSED TOOLS</p><h2 id="tools-title">Start from the job you need done.</h2></div>
+          <div class="detail-list tool-links">
+            <article><h3><a href="/screenshot-beautifier/">Screenshot beautifier</a></h3><p>Add backgrounds, padding, rounded corners, shadows and frames to any screenshot.</p></article>
+            <article><h3><a href="/og-image-generator/">OG image generator</a></h3><p>Turn a screenshot and a headline into a 1200×630 Open Graph image for link previews.</p></article>
+            <article><h3><a href="/product-hunt-image-maker/">Product Hunt image maker</a></h3><p>Compose gallery images for your launch from two product screenshots.</p></article>
+            <article><h3><a href="/add-text-to-image/">Add text to image</a></h3><p>Write a clear headline on a screenshot and download the result.</p></article>
+          </div>
+        </section>
+
+        <section class="faq-section wrap" id="questions" aria-labelledby="faq-title"><h2 id="faq-title">Frequently asked questions.</h2><div class="faq-list">
+          <details><summary>Is DevSnapKit free?</summary><p>Yes. The studio, device frames, Duo layouts, 3D angles, text, logo uploads, QR codes and PNG, WebP and JPEG exports are free. DevSnapKit Pro is a one-time payment of $1 USD for lifetime access to premium templates, the 4K export preset, batch export and premium gradient backgrounds. There is no subscription.</p></details>
+          <details><summary>Are my screenshots uploaded to a server?</summary><p>No. Editing and image rendering happen locally in your browser, so your screenshots stay on your device while you style and export them.</p></details>
+          <details><summary>Do I need an account or design skills?</summary><p>No. Open the studio and start editing; there is nothing to sign up for. Built-in demo screenshots let you try every control before you bring your own image.</p></details>
+          <details><summary>Which sizes can I export?</summary><p>You can switch the canvas between formats such as Open Graph (1200×630), X/Twitter, LinkedIn, 16:9 and YouTube, square, and Instagram post and story. Exports are available as PNG, WebP or JPEG.</p></details>
+          <details><summary>Does DevSnapKit capture screenshots for me?</summary><p>Start with an image you have already captured. DevSnapKit styles and composes that image; it does not capture a website from its URL.</p></details>
+        </div></section>
+
+        <section class="closing wrap"><div class="closing-panel"><div><p class="eyebrow">START WITH A SCREENSHOT</p><h2>Your next launch image is a few clicks away.</h2></div><a class="button" href="/?editor=1">Create Your First Mockup <span aria-hidden="true">↗</span></a></div></section>
+      </main>
+      <nav class="tools-nav wrap" aria-label="Screenshot tools"><a href="/screenshot-beautifier/">Screenshot beautifier</a><a href="/og-image-generator/">OG image generator</a><a href="/product-hunt-image-maker/">Product Hunt image maker</a><a href="/add-text-to-image/">Add text to image</a></nav>
+      <footer class="site-footer wrap"><a class="brand" href="/"><img src="/favicon.svg" alt="" width="24" height="24">DevSnap<span>Kit</span></a><p>Screenshot mockups, right in your browser.</p><div><a href="/">Home</a><a href="/?editor=1">Open studio ↗</a><a href="mailto:support@devsnapkit.com">Contact</a></div></footer>
+    </div>
     <div id="root"></div>
-    <nav aria-label="Screenshot tools" style="padding:10px 16px;text-align:center;font-size:12px;background:#f7f8f4;color:#475569;">
+    <nav id="studio-tools-nav" aria-label="Screenshot tools" style="padding:10px 16px;text-align:center;font-size:12px;background:#f7f8f4;color:#475569;">
       <a href="/screenshot-beautifier/">Explore the screenshot beautifier ↗</a>
     </nav>
     <script src="/seo/attribution.js"></script>
+    <script>
+      if (!document.documentElement.classList.contains('dsk-app')) {
+        var landingScript = document.createElement('script');
+        landingScript.src = '/seo/landing.js';
+        document.body.appendChild(landingScript);
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

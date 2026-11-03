@@ -1095,7 +1095,7 @@ export default function App() {
       }
       setClaimModalTab('claim');
       setShowClaimModal(true);
-      window.history.replaceState({}, document.title, window.location.pathname);
+      window.history.replaceState({}, document.title, window.location.pathname + '?editor=1');
     }
 
     // URL parameter API (?title=...&theme=...)
