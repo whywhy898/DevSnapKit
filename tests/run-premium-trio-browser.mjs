@@ -129,6 +129,10 @@ try{
   }else{
    await apply(page,c);assert.equal((await state(page)).templateContext.id,c.id);
    pass(c.id+' free application is available');
+   const dir=path.join(output,c.id);await fs.mkdir(dir,{recursive:true});
+   await png(page,c,dir,'free-default-1x.png',1);
+   assert.notEqual(await page.evaluate(()=>localStorage.getItem('devsnapkit_pro_unlocked')),'true');
+   pass(c.id+' free PNG download succeeds without a Pro license');
   }
   await page.close();page=null;
  }

@@ -10,7 +10,7 @@ const text = (role: CuratedTextDefinition['role'], content: string, x: number, y
 } });
 
 export const VIOLET_LAUNCH: CuratedTemplateBlueprint = {
-  id: 'violet-launch', version: 1, name: 'Violet Launch', tier: 'pro', canvas,
+  id: 'violet-launch', version: 1, name: 'Violet Launch', tier: 'free', canvas,
   examples: {
     main: { sampleId: 'trio-studio-library', src: '/designed/examples/collection/trio-studio-library.svg', name: 'trio-studio-library.svg' },
     secondary: { sampleId: 'trio-studio-detail', src: '/designed/examples/collection/trio-studio-detail.svg', name: 'trio-studio-detail.svg' },

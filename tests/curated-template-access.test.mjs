@@ -9,11 +9,11 @@ const load = createTypeScriptLoader(fileURLToPath(new URL('../', import.meta.url
 test('curated application denies unknown IDs and gates Night/Pocket while Honey and Paper stay free', () => {
   const { canApplyCuratedTemplate } = load('src/templates/collection/access.ts');
   for (const unlocked of [false, true]) {
-    for (const id of ['editorial-honey', 'paper-launch-duo', 'calm-split', 'app-pair']) assert.equal(canApplyCuratedTemplate(id, unlocked), true, id);
+    for (const id of ['editorial-honey', 'paper-launch-duo', 'calm-split', 'app-pair', 'violet-launch']) assert.equal(canApplyCuratedTemplate(id, unlocked), true, id);
     for (const id of ['unknown', '', '__proto__', 'unavailable-template']) assert.equal(canApplyCuratedTemplate(id, unlocked), false, id);
     assert.equal(canApplyCuratedTemplate('night-signal-duo', unlocked), unlocked);
     assert.equal(canApplyCuratedTemplate('pocket-flow-duo', unlocked), unlocked);
-    for (const id of ['studio-bridge','editorial-story','feature-spotlight','code-preview','metric-focus','before-after','violet-launch','electric-pair','peach-editorial']) assert.equal(canApplyCuratedTemplate(id, unlocked), unlocked);
+    for (const id of ['studio-bridge','editorial-story','feature-spotlight','code-preview','metric-focus','before-after','electric-pair','peach-editorial']) assert.equal(canApplyCuratedTemplate(id, unlocked), unlocked);
   }
 });
 test('premium templates add one ability without changing free branding or existing paid IDs', () => {

@@ -41,7 +41,7 @@ Create:
 - public/designed/examples/collection/trio-journal-article.svg
 - public/designed/examples/collection/premium-trio-samples.json
 
-Modify src/templates/collection/types.ts, apply.ts, catalog.ts and existing tests with fixed original count assumptions. Keep first 12 ordering and tiers unchanged. Reuse existing shared premium access policy for Pro additions; final tier follows the user's pending preference, defaulting to existing Pro if unanswered after other work.
+Modify src/templates/collection/types.ts, apply.ts, catalog.ts and existing tests with fixed original count assumptions. Keep first 12 ordering and tiers unchanged. Use the confirmed tiers: Violet Launch is Free; Electric Pair and Peach Editorial use the existing shared Pro policy.
 
 - [x] Implement all three approved compositions using native text and decorations, exactly two replaceable screenshot slots and explicit singlePlacement.
 - [x] Use the geometry and palette in the approved brief; no poster CTA and no decorative arrows.
