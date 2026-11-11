@@ -5,7 +5,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { launchBrowser, preparePage, clickButton, downloadPng, revealInspectorControl, finishTextEditing, discardTextChanges } from './helpers/browser.mjs';
 const url = process.env.TEST_UI_URL;
-const output = path.resolve('../../output/devsnapkit/canvas-text-v1/geometry');
+const output = path.resolve(process.env.CANVAS_TEXT_OUTPUT_ROOT || '../../output/devsnapkit/canvas-text-v1', 'geometry');
 const snapshot = page => page.evaluate(() => window.__mockupBaseline.snapshot);
 const paint = page => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 async function withPage(fn) { const browser = await launchBrowser(); try { const page = await preparePage(browser, url); await fn(page); } finally { await browser.close(); } }
@@ -116,6 +116,9 @@ test('T4 Auto upload recovery names image action and later edits use exact Custo
   const upload = async file => { await page.$eval('[aria-label="Main screenshot file"]',el=>el.value=''); await (await page.$('[aria-label="Main screenshot file"]')).uploadFile(file); await page.waitForFunction(name=>window.__mockupBaseline.snapshot.imageName===name,{},path.basename(file)); await new Promise(r=>setTimeout(r,180)); await paint(page); };
   await upload(tall); await clickButton(page,'Auto'); await clickButton(page,'Add text');
   await page.$eval('[aria-label="Text content"]', el => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'First line\nSecond line\nThird line'); el.dispatchEvent(new Event('input',{bubbles:true})); }); await finishTextEditing(page);
+  // This recovery fixture needs a valid multiline box before the image changes;
+  // new boxes now start in the much smaller screenshot header margin.
+  await page.evaluate(() => { const layer = window.__mockupBaseline.snapshot.textDocument.layers[0]; window.__mockupBaseline.apply({ textDocument: { version: 1, layers: [{ ...layer, centerY: .2 }] } }); }); await paint(page);
   const original=await page.$eval('#studio-canvas', el=>({width:el.offsetWidth,height:el.offsetHeight}));
   assert.equal(await page.$('[data-text-layout-errors]'),null);
   await upload(wide); await page.waitForSelector('[data-text-size-recovery]');
@@ -164,6 +167,7 @@ test('T4 delayed actual Auto measurement retains upload commit identity after a 
   await sharp({create:{width:1600,height:300,channels:3,background:'#654321'}}).png().toFile(wide);
   await (await page.$('[aria-label="Main screenshot file"]')).uploadFile(tall);await page.waitForFunction(()=>window.__mockupBaseline.snapshot.imageName==='delayed-original.png');await new Promise(r=>setTimeout(r,200));await paint(page);
   await clickButton(page,'Add text');await page.$eval('[aria-label="Text content"]',el=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'First line\nSecond line\nThird line');el.dispatchEvent(new Event('input',{bubbles:true}));});await finishTextEditing(page);
+  await page.evaluate(() => { const layer = window.__mockupBaseline.snapshot.textDocument.layers[0]; window.__mockupBaseline.apply({ textDocument: { version: 1, layers: [{ ...layer, centerY: .2 }] } }); }); await paint(page);
   const before=await page.$eval('#studio-canvas',el=>({width:el.offsetWidth,height:el.offsetHeight}));
   // Test-only delivery gate holds the REAL renderer's measured natural size,
   // leaving image upload, decode, DOM layout and all editing handlers intact.
@@ -244,7 +248,7 @@ test('T4 scene geometry families retain preview/export agreement after measured 
   for(const [id,patch] of [['browser',{windowTheme:'browser',windowTitle:'Geometry browser',imageName:'Geometry image.png'}],['phone',{windowTheme:'iphone-17'}],['duo',{layoutMode:'duo',secondarySrc:image,secondaryName:'Geometry second.png',duoLayout:'side'}],['duo-stack',{duoLayout:'stack'}],['projection',{layoutPreset:'dramatic'}],['decoration',{roundedCorners:32,shadowLevel:'3d',shadowOpacity:90,cornerStyle:'stack-2'}],['borderless',{hideMockup:true}]]){
     await page.evaluate(patch=>window.__mockupBaseline.apply(patch),patch);await page.evaluate(()=>document.fonts.ready);await new Promise(r=>setTimeout(r,150));await paint(page);
     const preview=await page.$eval('#studio-canvas',root=>window.__geometryRead(root));await page.evaluate(()=>window.__exportGeometry=[]);
-    await clickButton(page,'Export');await clickButton(page,'1x Web');
+    await clickButton(page,'Export');await clickButton(page,'Free 1x');
     const file=await downloadPng(page,output,'scene-'+id+'.png',()=>page.evaluate(()=>[...document.querySelectorAll('button')].find(b=>b.offsetParent!==null&&/^Download 1x/.test(b.innerText.trim())).click()));
     const exported=await page.evaluate(()=>window.__exportGeometry.at(-1));assert.ok(exported,'Actual offscreen shared export renderer was observed');
     assert.equal(exported.width,preview.width);assert.equal(exported.height,preview.height);assert.ok(Math.abs(exported.fit-preview.fit)<.00001,JSON.stringify({id,preview,exported}));

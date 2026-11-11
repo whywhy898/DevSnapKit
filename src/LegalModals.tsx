@@ -2,6 +2,7 @@ import React from 'react';
 import { ShieldCheck, Mail, CheckCircle2, X } from 'lucide-react';
 import legal from './legal/legalContent.json';
 import { LegalSections } from './legal/LegalDocument';
+import { Modal } from './Modal';
 
 export type LegalModalType = 'terms' | 'privacy' | 'refund' | 'contact' | null;
 
@@ -14,10 +15,11 @@ export const LegalModals: React.FC<LegalModalsProps> = ({ activeModal, onClose }
   if (!activeModal) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <Modal onClose={onClose} aria-label={activeModal === 'contact' ? 'Contact & support' : activeModal === 'refund' ? 'Refund policy' : activeModal === 'terms' ? 'Terms of service' : 'Privacy policy'} className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
+          data-modal-close aria-label="Close legal dialog"
           className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800/60 hover:bg-slate-800 cursor-pointer"
         >
           <X className="w-4 h-4" />
@@ -115,6 +117,6 @@ export const LegalModals: React.FC<LegalModalsProps> = ({ activeModal, onClose }
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

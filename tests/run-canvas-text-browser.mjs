@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const origin = 'http://127.0.0.1:5189';
@@ -15,6 +16,13 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   const pattern = process.env.CANVAS_TEXT_TEST_PATTERN ? [`--test-name-pattern=${process.env.CANVAS_TEXT_TEST_PATTERN}`] : [];
-  const runner = spawn(process.execPath, ['--test', '--test-concurrency=1', ...pattern, 'tests/canvas-text-v1-ui.test.mjs', 'tests/canvas-text-geometry-ui.test.mjs', 'tests/canvas-text-v1-export.test.mjs', 'tests/canvas-text-output-ui.test.mjs', 'tests/canvas-text-ux-ui.test.mjs', 'tests/canvas-text-movement-ui.test.mjs', 'tests/canvas-text-polish-ui.test.mjs', ...(process.env.CANVAS_TEXT_PERF ? ['tests/canvas-text-geometry-perf.test.mjs', 'tests/canvas-text-output-perf.test.mjs'] : [])], { cwd: root, env: { ...process.env, TEST_UI_URL: origin + '/?editor=1' }, stdio: 'inherit', windowsHide: true });
+  // Preserve long-run evidence even when an automation client stops streaming.
+  const report = process.env.CANVAS_TEXT_REPORT ? fs.createWriteStream(path.resolve(process.env.CANVAS_TEXT_REPORT)) : null;
+  const runner = spawn(process.execPath, ['--test', '--test-concurrency=1', ...pattern, 'tests/canvas-text-v1-ui.test.mjs', 'tests/canvas-text-geometry-ui.test.mjs', 'tests/canvas-text-v1-export.test.mjs', 'tests/canvas-text-output-ui.test.mjs', 'tests/canvas-text-ux-ui.test.mjs', 'tests/canvas-text-movement-ui.test.mjs', 'tests/canvas-text-polish-ui.test.mjs', ...(process.env.CANVAS_TEXT_PERF ? ['tests/canvas-text-geometry-perf.test.mjs', 'tests/canvas-text-output-perf.test.mjs'] : [])], { cwd: root, env: { ...process.env, TEST_UI_URL: origin + '/?editor=1' }, stdio: report ? ['ignore', 'pipe', 'pipe'] : 'inherit', windowsHide: true });
+  if (report) {
+    runner.stdout.on('data', chunk => { process.stdout.write(chunk); report.write(chunk); });
+    runner.stderr.on('data', chunk => { process.stderr.write(chunk); report.write(chunk); });
+  }
   process.exitCode = await new Promise(resolve => runner.on('exit', code => resolve(code ?? 1)));
+  if (report) await new Promise(resolve => report.end(`\nBrowser runner exit code: ${process.exitCode}\n`, resolve));
 } finally { server.kill(); }

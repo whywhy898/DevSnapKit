@@ -8,7 +8,7 @@ import sharp from 'sharp';
 import { launchBrowser, preparePage, clickButton, finishTextEditing } from './helpers/browser.mjs';
 
 const url = process.env.TEST_UI_URL;
-const output = path.resolve('../../output/devsnapkit/canvas-text-v1/outputs');
+const output = path.resolve(process.env.CANVAS_TEXT_OUTPUT_ROOT || '../../output/devsnapkit/canvas-text-v1', 'outputs');
 async function setup(browser, scale, batch) {
   const page = await preparePage(browser, url);
   await (await page.$('input[aria-label="Main screenshot file"]')).uploadFile(path.resolve('../../output/devsnapkit/honeywerank-original.png'));
@@ -19,7 +19,7 @@ async function setup(browser, scale, batch) {
     window.__mockupBaseline.apply({ aspectRatioId: 'custom', customCanvasSize: { width: 1600, height: 1200 }, bgType: 'transparent', vfxGlow: false,
       textDocument: { version: 1, layers: [{ ...layer, content: 'Launch DevSnapKit 世界🙂', widthRatio: .8, fontSize: 48, centerY: .2, color: '#E600A9' }] } }, { pro: batch });
   }, batch);
-  await clickButton(page, 'Export'); await clickButton(page, scale === 1 ? '1x Web' : '2x HD');
+  await clickButton(page, 'Export'); await clickButton(page, scale === 1 ? 'Free 1x' : 'Free 2x');
   await page.evaluate(async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); });
   return page;
 }

@@ -16,7 +16,7 @@ let browser,page;
 async function apply(p,c){await menu(p);await p.click(`[aria-label="Apply ${c.name} template"]`);await p.waitForFunction(id=>window.__mockupBaseline.snapshot.templateContext?.id===id,{},c.id);await settle(p);}
 async function geom(p){return p.$eval('#studio-canvas [data-composition-object="main"]',n=>{const r=n.getBoundingClientRect();return {width:r.width,height:r.height};});}
 async function exportPng(p,c,dir,name,scale){
- await clickButton(p,'Export');await clickButton(p,scale===1?'1x Web':'2x HD');await settle(p);
+ await clickButton(p,'Export');await clickButton(p,scale===1?'Free 1x':'Free 2x');await settle(p);
  const before=await state(p),hist=await history(p);
  await p.evaluate(()=>{
   const measure=c=>{const b=c.getBoundingClientRect(),s=b.width/c.offsetWidth;return [...c.querySelectorAll('[data-canvas-text],[data-composition-object],[data-media-screen],[data-media-chrome],[data-media-frame]')].map((n,i)=>{const r=n.getBoundingClientRect(),css=getComputedStyle(n);return {id:i+':'+(n.dataset.canvasText||n.dataset.compositionObject||n.tagName),x:(r.x-b.x)/s,y:(r.y-b.y)/s,width:r.width/s,height:r.height/s,shadow:css.boxShadow,radius:css.borderRadius};});};

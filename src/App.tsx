@@ -11,7 +11,7 @@ import { isCuratedTemplateAvailable } from './templates/collection/catalog';
 import { canApplyCuratedTemplate } from './templates/collection/access';
 import type { CuratedTemplateId } from './templates/collection/types';
 import type { CompositionDocument } from './composition/types';
-import { createIndependentComposition, compositionFrame, moveCompositionObject, secondaryRequired, boxOutsideCanvas } from './composition/document';
+import { createIndependentComposition, compositionFrame, moveCompositionObject, secondaryRequired, boxOutsideCanvas, reserveCompositionTextMargin } from './composition/document';
 import { SelectionControls } from './inspector/SelectionControls';
 import { ObjectControls } from './composition/ObjectControls';
 import { ElementPicker } from './inspector/ElementPicker';
@@ -38,7 +38,7 @@ import { GRADIENTS, PresetGradient } from './themes';
 import { verifyLicenseWithServer, claimLicenseViaApi } from './license';
 import { readPendingOrder, rememberPendingOrder, savePurchasedLicense, recoverPayPalLicense } from './paypalCheckout';
 import { LegalModals, LegalModalType } from './LegalModals';
-import { WelcomeOverlay } from './WelcomeOverlay';
+import { Modal } from './Modal';
 import { trackEvent } from './telemetry';
 import { 
   CornerStyle, CORNER_STYLES, CornerThumbnail,
@@ -901,7 +901,11 @@ export default function App() {
   };
   const effectivePaddingX = Math.min(padding, Math.max(0, (canvasLogicalSize.width - 120) / 2));
   const effectivePaddingY = Math.min(padding, Math.max(0, (canvasLogicalSize.height - 120) / 2));
-  const textEditor = useCanvasTextEditor(currentSnapshot, setTextDocument, canvasLogicalSize, { beginTransaction, commitTransaction, cancelTransaction }, canvasRef);
+  const textEditor = useCanvasTextEditor(currentSnapshot, setTextDocument, canvasLogicalSize, { beginTransaction, commitTransaction, cancelTransaction }, canvasRef,
+    media => {
+      if (compositionDocument?.mediaLayout === 'independent') setCompositionDocument(doc => doc ? reserveCompositionTextMargin(doc, canvasLogicalSize, media) : doc);
+      else setPadding(value => Math.max(value, 104));
+    });
   const selectedCompositionObject = selectedObject || textEditor.activeId;
   const switchInspectorTab = (tab: typeof sidebarTab) => {
     leaveBrandEdit();
@@ -1039,6 +1043,8 @@ export default function App() {
     aspectRatio.id, exportScale, canvasDomSize.width, canvasDomSize.height,
     canonicalAutoW, canonicalAutoH, customCanvasSize.width, customCanvasSize.height
   );
+  const exportResolutionLabel = exportScale === 4 ? (aspectRatio.id === '4-3' ? '3.2K' : '4K')
+    : exportScale === 2 && aspectRatio.id === '16-9' ? 'QHD' : exportScale + 'x';
   useEffect(() => {
     setDimensionDraft({ width: String(canvasLogicalSize.width), height: String(canvasLogicalSize.height) });
     setDimensionError('');
@@ -1767,6 +1773,7 @@ export default function App() {
       el instanceof HTMLElement && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || (el as HTMLElement)?.isContentEditable);
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (document.querySelector('[data-app-dialog]')) return;
       if (exportLock.current) { e.preventDefault(); return; }
       if (studioMode !== 'mockup') return;
       if (showDemoTemplatesMenu) return;
@@ -2229,9 +2236,9 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                       </div>
                       <div className="grid grid-cols-3 gap-1.5">
                         {[
-                          { scale: 1, label: '1x Web' },
-                          { scale: 2, label: '2x HD' },
-                          { scale: 4, label: '4K Ultra', isPro: true },
+                          { scale: 1, label: 'Free 1x' },
+                          { scale: 2, label: aspectRatio.id === '16-9' ? 'Free QHD' : 'Free 2x' },
+                          { scale: 4, label: aspectRatio.id === '4-3' ? 'Pro 3.2K' : 'Pro 4K', isPro: true },
                         ].map((res) => (
                           <button
                             key={res.scale}
@@ -2288,7 +2295,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                       className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.98]"
                     >
                       <Download className="w-4 h-4" />
-                      <span>{isExporting ? 'Exporting...' : `Download ${exportScale === 4 ? '4K' : exportScale + 'x'} (${dynamicExportDimensions.width}×${dynamicExportDimensions.height})`}</span>
+                      <span>{isExporting ? 'Exporting...' : `Download ${exportResolutionLabel} (${dynamicExportDimensions.width}×${dynamicExportDimensions.height})`}</span>
                     </button>
                   </div>
                 </>
@@ -4001,9 +4008,9 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 
                 <div className="grid grid-cols-3 gap-1">
                   {[
-                    { scale: 1, label: '1x Web' },
-                    { scale: 2, label: '2x HD' },
-                    { scale: 4, label: '4K Ultra', isPro: true },
+                    { scale: 1, label: 'Free 1x' },
+                    { scale: 2, label: aspectRatio.id === '16-9' ? 'Free QHD' : 'Free 2x' },
+                    { scale: 4, label: aspectRatio.id === '4-3' ? 'Pro 3.2K' : 'Pro 4K', isPro: true },
                   ].map((res) => (
                     <button
                       key={res.scale}
@@ -4089,7 +4096,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                   className="w-full bg-white hover:bg-white/90 text-black text-xs font-bold py-2.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.98]"
                 >
                   <Download className="w-4 h-4" />
-                  <span>{isExporting ? 'Exporting...' : `Download ${exportScale === 4 ? '4K' : exportScale + 'x'} (${dynamicExportDimensions.width}×${dynamicExportDimensions.height})`}</span>
+                  <span>{isExporting ? 'Exporting...' : `Download ${exportResolutionLabel} (${dynamicExportDimensions.width}×${dynamicExportDimensions.height})`}</span>
                 </button>
 
                 <button
@@ -4103,10 +4110,23 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               </div>
 
               {/* Batch Multi-Size Export Section */}
-              <div className="p-3 bg-white/[0.02] rounded-xl border border-white/[0.06] space-y-3">
+              <div data-batch-export role="group" aria-label="Batch multi-size export" tabIndex={isProUnlocked ? -1 : 0}
+                onClick={event => {
+                  if (!isProUnlocked) {
+                    event.preventDefault();
+                    if (!(event.target as HTMLElement).closest('input, button')) event.currentTarget.focus();
+                    setShowProModal(true);
+                  }
+                }}
+                onKeyDown={event => {
+                  if (!isProUnlocked && event.target === event.currentTarget && ['Enter', ' '].includes(event.key)) {
+                    event.preventDefault(); setShowProModal(true);
+                  }
+                }}
+                className={`p-3 bg-white/[0.02] rounded-xl border space-y-3 ${isProUnlocked ? 'border-white/[0.06]' : 'border-amber-500/20 cursor-pointer'}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5 text-amber-400" />
+                    {isProUnlocked ? <Layers className="w-3.5 h-3.5 text-amber-400" /> : <Lock className="w-3.5 h-3.5 text-amber-400" />}
                     <span>Batch Multi-Size Export</span>
                   </span>
                   {!isProUnlocked && (
@@ -4117,12 +4137,12 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 </div>
 
                 <p className="text-[11px] text-white/50">
-                  Generate all platform sizes in one click with zero layout distortion:
+                  {isProUnlocked ? 'Generate all platform sizes in one click with zero layout distortion:' : 'Upgrade to Pro to export multiple sizes at once.'}
                 </p>
 
                 <div className="space-y-1.5 text-xs">
                   {aspectOptions.map((opt) => {
-                    const isChecked = selectedBatchAspects.includes(opt.id);
+                    const isChecked = isProUnlocked && selectedBatchAspects.includes(opt.id);
                     return (
                       <label
                         key={opt.id}
@@ -4132,7 +4152,9 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                           <input
                             type="checkbox"
                             checked={isChecked}
+                            aria-disabled={!isProUnlocked}
                             onChange={(e) => {
+                              if (!isProUnlocked) return;
                               if (e.target.checked) {
                                 setSelectedBatchAspects([...selectedBatchAspects, opt.id]);
                               } else {
@@ -4157,10 +4179,10 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                     }
                     handleBatchExport();
                   }}
-                  disabled={isExporting || selectedBatchAspects.length === 0}
+                  disabled={isExporting || (isProUnlocked && selectedBatchAspects.length === 0)}
                   className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-bold py-2 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-[0.98]"
                 >
-                  <Download className="w-3.5 h-3.5" />
+                  {isProUnlocked ? <Download className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
                   <span>
                     {!isProUnlocked
                       ? 'Unlock Batch Export in Pro'
@@ -4219,11 +4241,12 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
       {/* Pro Lifetime License Modal (with PayPal Integration) */}
       {showProModal && (
-        <div data-pro-modal role="dialog" aria-modal="true" aria-label="Upgrade to Pro" className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+        <Modal onClose={() => setShowProModal(false)} data-pro-modal aria-label="Upgrade to Pro" className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl md:max-w-2xl lg:max-w-3xl w-full p-5 sm:p-6 shadow-2xl relative my-auto">
             
             <button
               onClick={() => setShowProModal(false)}
+              data-modal-close aria-label="Close upgrade dialog"
               className="absolute top-4 right-4 text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer z-10"
               title="Close"
             >
@@ -4321,15 +4344,15 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             </div>
 
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Pro License Activation & Claim Modal */}
       {showClaimModal && (
-        <div data-claim-modal role="dialog" aria-modal="true" aria-label="License activation" className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <Modal onClose={() => setShowClaimModal(false)} data-claim-modal aria-label="License activation" className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-indigo-500/40 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl relative">
             <button
-              onClick={() => setShowClaimModal(false)} aria-label="Close license dialog" autoFocus
+              onClick={() => setShowClaimModal(false)} aria-label="Close license dialog" data-modal-close
               className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -4444,12 +4467,12 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               Need immediate help? Contact <a href="mailto:support@devsnapkit.com" className="text-indigo-400 underline">support@devsnapkit.com</a>
             </p>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Purchase Success & License Key Delivery Modal */}
       {showSuccessModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <Modal onClose={() => setShowSuccessModal(false)} aria-label="Payment verified" className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl relative">
             <div className="text-center space-y-2">
               <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto">
@@ -4490,21 +4513,22 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
             <button
               onClick={() => setShowSuccessModal(false)}
-              autoFocus
+              data-modal-close
               className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm py-2.5 rounded-xl transition-all cursor-pointer"
             >
               Start Creating Mockups
             </button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Keyboard Shortcuts Modal (F2) */}
       {showShortcutsModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <Modal onClose={() => setShowShortcutsModal(false)} aria-label="Keyboard shortcuts" className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl relative">
             <button
               onClick={() => setShowShortcutsModal(false)}
+              data-modal-close aria-label="Close shortcuts dialog"
               className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -4553,19 +4577,13 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               Got it
             </button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Legal & Support Modals */}
       <LegalModals
         activeModal={activeLegalModal}
         onClose={() => setActiveLegalModal(null)}
-      />
-
-      {/* First-Visit Welcome Overlay */}
-      <WelcomeOverlay
-        onOpenLegal={() => setActiveLegalModal('terms')}
-        onOpenLegalPrivacy={() => setActiveLegalModal('privacy')}
       />
 
     </div>

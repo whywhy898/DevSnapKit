@@ -45,7 +45,7 @@ try {
     await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.querySelectorAll('#studio-canvas img')].map(i=>i.decode()));}); await pause(900);
     await clickButton(page,'Export'); await page.mouse.move(0,0);
     for (const scale of [1,2]) {
-      await clickButton(page,scale===1?'1x Web':'2x HD'); await pause(500);
+      await clickButton(page,scale===1?'Free 1x':'Free 2x'); await pause(500);
       await page.evaluate(()=>{
         window.__measureScene=canvas=>{
           const b=canvas.getBoundingClientRect(), scale=b.width/canvas.offsetWidth;

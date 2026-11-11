@@ -18,7 +18,7 @@ async function fresh(width=1440){const p=await browser.newPage();await p.setView
 async function apply(p){await clickButton(p,'Templates');assert.ok(await p.$('[aria-label="Apply Paper Launch Duo template"]'),'Paper Launch Duo has a real accessible Apply action');await p.click('[aria-label="Apply Paper Launch Duo template"]');await p.waitForFunction(()=>window.__mockupBaseline.snapshot.templateContext?.id==='paper-launch-duo');await settle(p);}
 async function blank(p){const b=await(await p.$('#studio-canvas')).boundingBox();await p.mouse.click(b.x+b.width*.35,b.y+b.height*.95);await p.mouse.move(0,0);await pause(60);}
 async function png(p,name,scale){
- await clickButton(p,'Export');await clickButton(p,scale===1?'1x Web':'2x HD');await settle(p);
+ await clickButton(p,'Export');await clickButton(p,scale===1?'Free 1x':'Free 2x');await settle(p);
  await p.evaluate(()=>{
   const measure=canvas=>{const c=canvas.getBoundingClientRect(),s=c.width/canvas.offsetWidth;return [...canvas.querySelectorAll('[data-canvas-text],[data-composition-object]')].map(n=>{const b=n.getBoundingClientRect();return{id:n.dataset.canvasText||n.dataset.compositionObject,x:(b.x-c.x)/s,y:(b.y-c.y)/s,width:b.width/s,height:b.height/s};});};
   window.__paperPreviewGeometry=measure(document.querySelector('#studio-canvas'));window.__paperExportGeometry=null;

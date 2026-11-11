@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { launchBrowser, preparePage, clickButton, finishTextEditing, discardTextChanges } from './helpers/browser.mjs';
 const url = process.env.TEST_UI_URL;
-const output = path.resolve('../../output/devsnapkit/canvas-text-v1/editing');
+const output = path.resolve(process.env.CANVAS_TEXT_OUTPUT_ROOT || '../../output/devsnapkit/canvas-text-v1', 'editing');
 const snap = page => page.evaluate(() => window.__mockupBaseline.snapshot.textDocument);
 const wait = (page, content) => page.waitForFunction(content => window.__mockupBaseline.snapshot.textDocument.layers.at(-1)?.content === content, {}, content);
 async function input(page, value) { await page.$eval('[aria-label="Text content"]', (el, value) => { const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(el, value); el.dispatchEvent(new Event('input', { bubbles: true })); }, value); }
@@ -47,7 +47,7 @@ test('T3 actual style controls target selection, validate drafts, normalize font
   await page.click('[aria-label="Text italic"]'); await page.select('[aria-label="Text font"]', 'manrope');
   assert.equal((await snap(page)).layers[1].italic, false);
   const size = await page.$('[aria-label="Text size"]'); await size.focus(); await page.keyboard.down('Control'); await size.press('a'); await page.keyboard.up('Control'); await page.keyboard.type('999');
-  assert.equal((await snap(page)).layers[1].fontSize, 99); assert.match(await page.$eval('[role="alert"]', el => el.textContent), /8.*512/);
+  assert.equal((await snap(page)).layers[1].fontSize, 99); assert.match(await page.$eval('[data-text-edit-recovery] [role="alert"]', el => el.textContent), /8.*512/);
   await page.keyboard.down('Control'); await size.press('a'); await page.keyboard.up('Control'); await page.keyboard.type('64'); await size.press('Tab');
   await page.waitForFunction(() => window.__mockupBaseline.snapshot.textDocument.layers[1].fontSize === 64);
   await page.click('[aria-label="Align left"]'); await undo(page); assert.equal((await snap(page)).layers[1].align, 'center');

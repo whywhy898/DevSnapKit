@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { launchBrowser, preparePage, clickButton, finishTextEditing } from './helpers/browser.mjs';
 const url=process.env.TEST_UI_URL;
-const output=path.resolve('../../output/devsnapkit/canvas-text-v1/geometry');
+const output=path.resolve(process.env.CANVAS_TEXT_OUTPUT_ROOT || '../../output/devsnapkit/canvas-text-v1', 'geometry');
 const paint=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
 const percentile=(values,p)=>[...values].sort((a,b)=>a-b)[Math.min(values.length-1,Math.ceil(values.length*p)-1)];
 test('T4 actual handle and native text input response protocol, 3 runs per 1/5/10/20 short and 1000 codepoint case', {skip:!url||!process.env.CANVAS_TEXT_PERF,timeout:240000},async()=>{

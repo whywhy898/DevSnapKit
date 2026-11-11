@@ -61,7 +61,7 @@ async function edit(page, index, value) {
   assert.equal((await state(page)).textDocument.layers[index].content, value);
 }
 async function png(page, filename, width, height) {
-  await clickButton(page, 'Export'); await clickButton(page, '1x Web');
+  await clickButton(page, 'Export'); await clickButton(page, 'Free 1x');
   await page.mouse.move(0, 0); await settle(page);
   await page.evaluate(() => {
     const measure = canvas => {

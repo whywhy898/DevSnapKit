@@ -25,6 +25,25 @@ export function compositionFrame(doc: CompositionDocument, id: string): ObjectFr
   return node.frame;
 }
 
+/** Reserve a text header only when independent media leaves no usable margin. */
+export function reserveCompositionTextMargin(doc: CompositionDocument, size: Size, media: { left: number; top: number; width: number; height: number }[]): CompositionDocument {
+  if (doc.mediaLayout !== 'independent' || !media.length) return doc;
+  const left = Math.min(...media.map(box => box.left)), top = Math.min(...media.map(box => box.top));
+  const width = Math.max(...media.map(box => box.left + box.width)) - left;
+  const height = Math.max(...media.map(box => box.top + box.height)) - top;
+  const header = Math.min(104, Math.max(84, size.height * .24));
+  const scale = Math.min(1, (size.width - 32) / width, (size.height - header - 16) / height);
+  const offsetX = (size.width - width * scale) / 2 - left * scale, offsetY = header - top * scale;
+  const fit = (frame: ObjectFrame): ObjectFrame => ({ ...frame,
+    centerX: (frame.centerX * size.width * scale + offsetX) / size.width,
+    centerY: (frame.centerY * size.height * scale + offsetY) / size.height,
+    widthRatio: frame.widthRatio * scale, heightRatio: frame.heightRatio * scale,
+  });
+  const resolved = materializeMediaPlacements(doc);
+  return { ...resolved, placements: { main: fit(resolved.placements.main), secondary: fit(resolved.placements.secondary) },
+    ...(resolved.singlePlacement ? { singlePlacement: fit(resolved.singlePlacement) } : {}) };
+}
+
 export function moveCompositionObject(doc: CompositionDocument, id: string, patch: Partial<ObjectFrame>, size: Size): CompositionDocument {
   if (id === 'main' || id === 'secondary') doc = materializeMediaPlacements(doc);
   const frame = { ...compositionFrame(doc, id), ...patch };

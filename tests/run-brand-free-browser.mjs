@@ -38,7 +38,7 @@ async function inspectPng(file,scale,opacity){
   assert.equal(decoded?.data,targetUrl,'QR from real exported pixels must decode to the entered URL');
   return{width:meta.width,height:meta.height,logoCenter:center,transparentEdge:edge,qrUrl:decoded.data};
 }
-async function download(name,scale,opacity=1){await clickButton(page,'Export');await clickButton(page,scale===1?'1x Web':'2x HD');await settle();const artifact=await downloadPng(page,output,name,()=>clickButton(page,`Download ${scale}x (${1600*scale}×${1200*scale})`));return{file:artifact.path,...await inspectPng(artifact.path,scale,opacity)};}
+async function download(name,scale,opacity=1){await clickButton(page,'Export');await clickButton(page,scale===1?'Free 1x':'Free 2x');await settle();const artifact=await downloadPng(page,output,name,()=>clickButton(page,`Download ${scale}x (${1600*scale}×${1200*scale})`));return{file:artifact.path,...await inspectPng(artifact.path,scale,opacity)};}
 async function brand(){const tab=await page.evaluateHandle(()=>[...document.querySelectorAll('[data-inspector-tabs] button')].find(n=>[...n.querySelectorAll('span')].some(s=>s.textContent==='Brand')));await tab.click();await tab.dispose();assert.ok(await page.$('[data-brand-controls]'),'free Brand form must be exposed');const text=await page.$eval('[data-brand-controls]',n=>n.textContent);assert.doesNotMatch(text,/PRO SUITE|Unlock|Dynamic QR|\$1|Text Brand Badge/);}
 async function createPage(mode='free',viewport={width:1440,height:1100,deviceScaleFactor:1}){
   page=await browser.newPage();await page.setViewport(viewport);
@@ -97,7 +97,7 @@ try{
   const invalid=path.join(output,'invalid-logo.png');await fs.writeFile(invalid,'deliberately invalid image');
   await brand();await page.click('button.brand-remove');await page.waitForFunction(()=>!window.__mockupBaseline.snapshot.logoDataUrl);
   await(await page.$('[aria-label="Logo file"]')).uploadFile(invalid);await page.waitForFunction(()=>!!document.querySelector('[data-brand-controls] [role="alert"]'));
-  await clickButton(page,'Export');await clickButton(page,'1x Web');await clickButton(page,'Download 1x (1600×1200)');
+  await clickButton(page,'Export');await clickButton(page,'Free 1x');await clickButton(page,'Download 1x (1600×1200)');
   await page.waitForFunction(()=>/Brand logo/i.test(document.querySelector('[data-text-export-error]')?.textContent||''));
   results.push({scenario:'failed-first-logo-blocks-export-until-replace-or-remove',pass:true});
   await brand();

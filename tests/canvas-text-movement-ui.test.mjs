@@ -5,7 +5,7 @@ import path from 'node:path';
 import { launchBrowser, preparePage, clickButton, finishTextEditing } from './helpers/browser.mjs';
 
 const url = process.env.TEST_UI_URL;
-const output = path.resolve('../../output/devsnapkit/canvas-text-v1/movement-fix');
+const output = path.resolve(process.env.CANVAS_TEXT_OUTPUT_ROOT || '../../output/devsnapkit/canvas-text-v1', 'movement-fix');
 const paint = page => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 const doc = page => page.evaluate(() => window.__mockupBaseline.snapshot.textDocument);
 async function drag(page, dx, dy) {

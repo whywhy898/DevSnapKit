@@ -102,13 +102,39 @@ export function validateText(layer: CanvasTextLayer) {
   return layer;
 }
 export type TextCreationBox = { left: number; top: number; width: number; height: number };
+/** Rendered media bounds include device frames and perspective, in canvas pixels. */
+function textCreationMargins(canvas: TextCanvasSize, media: TextCreationBox[]): TextCreationBox[] {
+  if (!media.length) return [{ left: 0, top: 0, ...canvas }];
+  const left = Math.max(0, Math.min(canvas.width, ...media.map(box => box.left)));
+  const top = Math.max(0, Math.min(canvas.height, ...media.map(box => box.top)));
+  const right = Math.min(canvas.width, Math.max(0, ...media.map(box => box.left + box.width)));
+  const bottom = Math.min(canvas.height, Math.max(0, ...media.map(box => box.top + box.height)));
+  const margins = [
+    { left: 0, top: 0, width: canvas.width, height: top - 8 },
+    { left: 0, top: bottom + 8, width: canvas.width, height: canvas.height - bottom - 8 },
+    { left: 0, top: 0, width: left - 8, height: canvas.height },
+    { left: right + 8, top: 0, width: canvas.width - right - 8, height: canvas.height },
+  ];
+  const usable = margins.filter(box => box.width >= 160 && box.height >= 76);
+  if (usable.length) return usable.sort((a, b) => a === margins[0] ? -1 : b === margins[0] ? 1 : b.width * b.height - a.width * a.height);
+  // A minimum-size custom canvas cannot reserve a full 48px line and media.
+  // Use a smaller, still editable placeholder in its largest available margin.
+  if (canvas.height < 288 || canvas.width <= 280) {
+    return margins.filter(box => box.width >= 96 && box.height >= 26)
+      .sort((a, b) => b.width * b.height - a.width * a.height);
+  }
+  return [];
+}
+export function textCreationMargin(canvas: TextCanvasSize, media: TextCreationBox[]): TextCreationBox | null {
+  return textCreationMargins(canvas, media)[0] ?? null;
+}
 /** Prefer free layout space; never move older text to make a new box fit. */
-function creationPosition(canvas: TextCanvasSize, width: number, occupied: TextCreationBox[]) {
-  const height = Math.min(60, canvas.height), gap = 16;
+function creationPosition(canvas: TextCanvasSize, width: number, occupied: TextCreationBox[], lineHeight = 60, preferEdge = false) {
+  const height = Math.min(lineHeight, canvas.height), gap = 16;
   const minX = Math.min(gap, (canvas.width - width) / 2), maxX = canvas.width - width - minX;
   const minY = Math.min(gap, (canvas.height - height) / 2), maxY = canvas.height - height - minY;
   const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-  const preferred = { left: (canvas.width - width) / 2, top: clamp(canvas.height * .2 - height / 2, minY, maxY) };
+  const preferred = { left: preferEdge ? minX : (canvas.width - width) / 2, top: clamp(canvas.height * .2 - height / 2, minY, maxY) };
   const xs = new Set([preferred.left, minX, maxX]), ys = new Set([preferred.top, minY, maxY]);
   for (const box of occupied) {
     xs.add(clamp(box.left + box.width + gap, minX, maxX)); xs.add(clamp(box.left - width - gap, minX, maxX));
@@ -121,19 +147,25 @@ function creationPosition(canvas: TextCanvasSize, width: number, occupied: TextC
   }));
   candidates.sort((a, b) => a.overlap - b.overlap || a.distance - b.distance || b.top - a.top);
   const best = candidates[0];
-  return { x: best.left + width / 2, y: best.top + height / 2 };
+  return { x: best.left + width / 2, y: best.top + height / 2, overlap: best.overlap };
 }
-export function addText(doc: CanvasTextDocument, canvas: TextCanvasSize, color = '#FFFFFF', id = crypto.randomUUID(), measured?: TextCreationBox[]): CanvasTextDocument {
+export function addText(doc: CanvasTextDocument, canvas: TextCanvasSize, color = '#FFFFFF', id = crypto.randomUUID(), measured?: TextCreationBox[], media: TextCreationBox[] = []): CanvasTextDocument {
   if (doc.layers.length >= TEXT_LIMITS.layers) throw new Error('Maximum 20 text boxes. Delete a box before adding another.');
   if (doc.layers.some(x => x.id === id)) throw new Error('Text id already exists.');
   if (!Number.isFinite(canvas.width) || !Number.isFinite(canvas.height) || canvas.width < 32 || canvas.height <= 0) throw new Error('Canvas dimensions are invalid.');
-  const width = Math.min(480, canvas.width - 32);
+  const margins = textCreationMargins(canvas, media);
+  if (!margins.length) throw new Error('Make room in a canvas margin before adding text.');
   const occupied = measured ?? doc.layers.filter(layer => layer.content.trim()).map(layer => {
     const height = layer.fontSize * (layer.lineHeight ?? 1.25) * layer.content.split('\n').length;
     return { left: (layer.centerX - layer.widthRatio / 2) * canvas.width, top: layer.centerY * canvas.height - height / 2, width: layer.widthRatio * canvas.width, height };
   });
-  const { x, y } = creationPosition(canvas, width, occupied);
-  const layer: CanvasTextLayer = { id, content: 'Text', centerX: x / canvas.width, centerY: y / canvas.height, widthRatio: width / canvas.width, font: 'manrope', fontSize: 48, weight: 700, italic: false, color, align: 'center' };
+  const candidates = margins.map(margin => {
+    const width = Math.min(480, margin.width - 32);
+    const fontSize = media.length ? Math.min(48, Math.floor((margin.height - 16) / 1.25), Math.floor(width / 3)) : 48;
+    return { margin, width, fontSize, ...creationPosition(margin, width, occupied.map(box => ({ ...box, left: box.left - margin.left, top: box.top - margin.top })), fontSize * 1.25, media.length > 0 && occupied.length > 0) };
+  });
+  const { x, y, margin, width, fontSize } = candidates.sort((a, b) => a.overlap - b.overlap)[0];
+  const layer: CanvasTextLayer = { id, content: 'Text', centerX: (x + margin.left) / canvas.width, centerY: (y + margin.top) / canvas.height, widthRatio: width / canvas.width, font: 'manrope', fontSize, weight: 700, italic: false, color, align: 'center' };
   validateText(layer);
   return { ...doc, layers: [...doc.layers, layer] };
 }

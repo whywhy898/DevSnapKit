@@ -29,7 +29,7 @@ async function fixture(page, { pro = true, narrow = false } = {}) {
   }, { pro, narrow });
   await page.waitForFunction(() => document.querySelector('#studio-canvas').offsetWidth === 1600);
   await page.evaluate(() => document.fonts.ready); await paint(page);
-  await exportButton(page, '1x Web');
+  await exportButton(page, 'Free 1x');
 }
 async function downloads(page, label) {
   await fs.mkdir(output, { recursive: true });
@@ -167,7 +167,7 @@ test('T5 PNG, WebP and JPEG downloads contain real text at 1x and 2x with correc
     const before = await snapshot(page), rows = [];
     const stream = await downloads(page, 'formats');
     for (const format of ['png', 'webp', 'jpeg']) for (const scale of [1, 2]) {
-      await exportButton(page, format.toUpperCase()); await exportButton(page, scale === 1 ? '1x Web' : '2x HD');
+      await exportButton(page, format.toUpperCase()); await exportButton(page, scale === 1 ? 'Free 1x' : 'Free 2x');
       await exportButton(page, `Download ${scale}x (${1600 * scale}×${1200 * scale})`);
       const file = await takeDownload(stream, `format-${format}-${scale}x.${format}`);
       const metadata = await sharp(file).metadata();
@@ -354,7 +354,7 @@ test('T5 mobile 360/390/430 complete native composition, styles, positioning, hi
       const page = await preparePage(browser, url, { viewport: { width, height: 850, deviceScaleFactor: 1 } });
       await (await page.$('input[aria-label="Main screenshot file"]')).uploadFile(path.resolve('../../output/devsnapkit/honeywerank-original.png'));
       await page.waitForFunction(() => window.__mockupBaseline.snapshot.imageName === 'honeywerank-original.png');
-      await exportButton(page, '1x Web');
+      await exportButton(page, 'Free 1x');
       await fill(page, 'input[aria-label="Canvas width"]', 1600, false); await fill(page, 'input[aria-label="Canvas height"]', 1200, false); await clickButton(page, 'Set');
       await clickButton(page, 'Add text');
       await page.evaluate(() => { window.__imeEvents = []; for (const type of ['compositionstart', 'compositionupdate', 'compositionend', 'input']) document.querySelector('[aria-label="Text content"]').addEventListener(type, event => window.__imeEvents.push({ type: event.type, trusted: event.isTrusted, composing: event.isComposing ?? null, data: event.data })); });
@@ -553,14 +553,14 @@ test('T5 4K and batch stay Pro gated while ordinary text and 1x/2x remain availa
   try {
     const page = await preparePage(browser, url); await fixture(page, { pro: false });
     const stream = await downloads(page, 'pro-gates');
-    await exportButton(page, '4K Ultra');
+    await exportButton(page, 'Pro 4K');
     await page.waitForSelector('button[title="Close"]'); assert.deepEqual(await stream.files(), []);
     await page.click('button[title="Close"]');
     await exportButton(page, 'Unlock Batch Export in Pro'); await page.waitForSelector('button[title="Close"]');
     assert.deepEqual(await stream.files(), []); await page.click('button[title="Close"]');
     const before = (await snapshot(page)).snapshot;
     await page.evaluate(() => window.__mockupBaseline.apply({}, { pro: true }));
-    await exportButton(page, '4K Ultra'); await exportButton(page, 'Download 4K (3840×2880)');
+    await exportButton(page, 'Pro 4K'); await exportButton(page, 'Download 4K (3840×2880)');
     const file = await takeDownload(stream, 'pro-4k.png'), metadata = await sharp(file).metadata();
     assert.equal(metadata.width, 3840); assert.equal(metadata.height, 2880);
     assert.deepEqual((await snapshot(page)).snapshot.textDocument, before.textDocument);

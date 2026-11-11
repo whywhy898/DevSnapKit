@@ -259,7 +259,7 @@ try {
   await clickButton(sizingPage, 'Redo'); await new Promise(resolve => setTimeout(resolve, 300));
   assert.deepEqual(await sizingPage.$eval('[data-canvas-root]', el => ({ width:el.offsetWidth, height:el.offsetHeight })), beforePadding, 'redoing a style keeps Auto canvas stable');
   await clickButton(sizingPage, 'Download');
-  await clickButton(sizingPage, '1x Web');
+  await clickButton(sizingPage, 'Free 1x');
   const exportDir = await fs.mkdtemp(path.join(os.tmpdir(), 'devsnapkit-style-export-'));
   const exportLabel = `Download 1x (${beforePadding.width}×${beforePadding.height})`;
   const exported = await downloadPng(sizingPage, exportDir, 'canvas.png', () => clickButton(sizingPage, exportLabel));

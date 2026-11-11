@@ -44,7 +44,7 @@ try{
     await page.waitForSelector('#studio-canvas img[alt="QR Code"]');
     assert.equal(await page.evaluate(()=>window.__mockupBaseline.artwork().isProUnlocked),mode==='valid-key');
     await clickButton(page,'Export');
-    await clickButton(page,'4K Ultra');
+    await clickButton(page,'Pro 4K');
     if(mode!=='valid-key'){
       await closeUpsell();await clickButton(page,'Unlock Batch Export in Pro');await closeUpsell();
       await clickButton(page,'Canvas');
@@ -62,7 +62,7 @@ try{
       const expected=getCanonicalDimensions('auto',4,0,0,dims.width,dims.height);
       assert.equal(meta.width,Math.round(expected.width));assert.equal(meta.height,Math.round(expected.height));
       results.push({scenario:'verified-pro-existing-4K-with-free-brand',note:'Existing legacy 4K output is not a uniform 4x multiplier; product behavior retained.',...meta,file:downloaded.path});
-      await clickButton(page,'2x HD');const dir=await fs.mkdtemp(path.join(output,'batch-'));
+      await clickButton(page,'Free 2x');const dir=await fs.mkdtemp(path.join(output,'batch-'));
       const client=await page.createCDPSession();await client.send('Page.setDownloadBehavior',{behavior:'allow',downloadPath:dir});
       await clickButton(page,'Export 4 Sizes (2x)');let files=[];
       for(let i=0;i<450;i++){files=(await fs.readdir(dir)).filter(n=>n.endsWith('.png'));if(files.length===4)break;await pause(100)}

@@ -16,7 +16,7 @@ const pass=name=>{results.checks.push({name,passed:true});console.log('PASS '+na
 async function captureState(name){await fs.writeFile(path.join(output,name+'.snapshot.json'),JSON.stringify(await state(page),null,2));}
 async function screenshot(name){await page.mouse.move(0,0);await settle(page);await(await page.$('#studio-canvas')).screenshot({path:path.join(output,name+'.preview.png')});}
 async function nativePng(name,scale=1){
- await clickButton(page,'Export');await clickButton(page,scale===1?'1x Web':'2x HD');await clickButton(page,'PNG');await settle(page);
+ await clickButton(page,'Export');await clickButton(page,scale===1?'Free 1x':'Free 2x');await clickButton(page,'PNG');await settle(page);
  const before=await state(page),hist=await history(page);
  await page.evaluate(()=>{
   const measure=c=>{const b=c.getBoundingClientRect(),s=b.width/c.offsetWidth;return [...c.querySelectorAll('[data-canvas-text],[data-composition-object],[data-media-screen],[data-media-frame],[data-composition-decoration]')].map((n,i)=>{const r=n.getBoundingClientRect(),css=getComputedStyle(n);return {id:i+':'+(n.dataset.canvasText||n.dataset.compositionObject||n.dataset.compositionDecoration||n.tagName),x:(r.x-b.x)/s,y:(r.y-b.y)/s,width:r.width/s,height:r.height/s,shadow:css.boxShadow,radius:css.borderRadius};});};

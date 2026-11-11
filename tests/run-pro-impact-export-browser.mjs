@@ -30,7 +30,7 @@ async function downloads(action,{count=1,allowAtomicRejection=false}={}){
 }
 async function format(fmt){const h=await page.evaluateHandle(fmt=>[...document.querySelectorAll('button')].find(n=>n.getClientRects().length&&n.textContent.trim().toLowerCase()===fmt),fmt);assert.ok(h.asElement(),'Visible format '+fmt);await h.asElement().click();await h.dispose();}
 async function single(fmt,scale){
- await clickButton(page,'Export');await clickButton(page,scale===4?'4K Ultra':'1x Web');await format(fmt);await settle(page);
+ await clickButton(page,'Export');await clickButton(page,scale===4?'Pro 4K':'Free 1x');await format(fmt);await settle(page);
  const label=await page.evaluate(()=>[...document.querySelectorAll('button')].find(n=>n.getClientRects().length&&/^Download (4K|1x) \(/.test(n.innerText.trim()))?.innerText.trim());assert.ok(label,'Actual current-canvas download label');
  const [,w,h]=label.match(/\((\d+)×(\d+)\)/),result=await downloads(()=>clickButton(page,label));
  assert.equal(result.files[0].format,fmt);assert.equal(result.files[0].width,Number(w));assert.equal(result.files[0].height,Number(h));
@@ -38,14 +38,14 @@ async function single(fmt,scale){
  rows.push({scenario:fmt+'-'+scale+'-file-signature-and-actual-visible-dimensions',label,...result,pass:true});
 }
 async function chooseBatch(pattern){
- await clickButton(page,'Export');await clickButton(page,'1x Web');await format('png');
+ await clickButton(page,'Export');await clickButton(page,'Free 1x');await format('png');
  const choices=await page.$$eval('aside input[type="checkbox"]',nodes=>nodes.filter(n=>n.getClientRects().length).map(n=>({label:n.closest('label')?.textContent.trim(),checked:n.checked})));
  for(const checkbox of await page.$$('aside input[type="checkbox"]')){if(!await checkbox.evaluate(n=>!!n.getClientRects().length))continue;const {label,checked}=await checkbox.evaluate(n=>({label:n.closest('label')?.textContent||'',checked:n.checked}));const want=pattern.test(label);if(want!==checked)await checkbox.click();}
  const selected=await page.$$eval('aside input[type="checkbox"]',nodes=>nodes.filter(n=>n.getClientRects().length&&n.checked).map(n=>n.closest('label')?.textContent.trim()));assert.equal(selected.length,2,'Exactly two selected presets '+JSON.stringify({choices,selected}));return selected;
 }
 async function freeGates(mode){
  page=await fresh(mode);page.on('pageerror',e=>errors.push(e.stack||e.message));const before=await state(page),h=await history(page);
- await clickButton(page,'Export');await clickButton(page,'4K Ultra');await page.waitForSelector('input[placeholder="DSK-XXXX-XXXX-XXXX"]',{visible:true});assert.deepEqual(await state(page),before);assert.deepEqual(await history(page),h);assert.notEqual(await page.evaluate(()=>localStorage.getItem('devsnapkit_pro_unlocked')),'true');rows.push({scenario:mode+'-existing-4K-export-gate-before-impact-admission',pass:true});
+ await clickButton(page,'Export');await clickButton(page,'Pro 4K');await page.waitForSelector('input[placeholder="DSK-XXXX-XXXX-XXXX"]',{visible:true});assert.deepEqual(await state(page),before);assert.deepEqual(await history(page),h);assert.notEqual(await page.evaluate(()=>localStorage.getItem('devsnapkit_pro_unlocked')),'true');rows.push({scenario:mode+'-existing-4K-export-gate-before-impact-admission',pass:true});
  if(mode==='free'){
   await fill(page,'input[placeholder="DSK-XXXX-XXXX-XXXX"]','DSK-AAAA-BBBB-CCCC');await clickButton(page,'Activate');await page.waitForFunction(()=>localStorage.getItem('devsnapkit_pro_unlocked')==='true');assert.ok(page.requests.length);assert.deepEqual(await state(page),before,'Activation does not auto-apply a template');await apply(page);assert.equal((await state(page)).templateContext.id,config.id);verification.push(...page.requests);rows.push({scenario:'real-key-input-mock-verification-explicit-template-admission',pass:true});
  }else verification.push(...page.requests);

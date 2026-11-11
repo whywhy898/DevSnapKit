@@ -99,7 +99,7 @@ try {
     }
     assert.equal(stable, true, `${fixture.id}: two consecutive painted frames must match`);
     await clickButton(page, 'Export');
-    await clickButton(page, '1x Web');
+    await clickButton(page, 'Free 1x');
     let downloaded;
     try { downloaded = await downloadPng(page, directory, `${fixture.id}.download.png`, async () => {
       const handle = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(button => button.offsetParent !== null && /^Download 1x/.test(button.innerText.trim())));

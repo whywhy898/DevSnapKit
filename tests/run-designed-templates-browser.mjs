@@ -37,7 +37,7 @@ async function prepareInternalReferenceCard(browser,original){
   }finally{await input.close();}
 }
 async function exportPng(page,name,scale){
-  await clickButton(page,'Export');await clickButton(page,scale===1?'1x Web':'2x HD');await page.mouse.move(0,0);await settle(page);
+  await clickButton(page,'Export');await clickButton(page,scale===1?'Free 1x':'Free 2x');await page.mouse.move(0,0);await settle(page);
   await page.evaluate(()=>{
     const measure=c=>{const b=c.getBoundingClientRect(),s=b.width/c.offsetWidth;return [...c.querySelectorAll('[data-canvas-text],[data-composition-object],[data-scene-bounds]')].map((n,i)=>{const r=n.getBoundingClientRect();return {id:n.dataset.canvasText||n.dataset.compositionObject||'scene-'+i,x:(r.x-b.x)/s,y:(r.y-b.y)/s,w:r.width/s,h:r.height/s};});};
     window.__designedPreview=measure(document.querySelector('#studio-canvas'));window.__designedExport=null;
@@ -100,13 +100,13 @@ try{
   // Diagnostic setup only: fault injection exercises production admission and
   // download, never substitutes the renderer or creates delivery artwork.
   await page.evaluate(()=>{window.__validCompositionSnapshot=structuredClone(window.__mockupBaseline.snapshot);const s=structuredClone(window.__validCompositionSnapshot);s.compositionDocument.objects=s.compositionDocument.objects.map(n=>n.kind==='button'?{...n,autoWidth:true,text:'A'.repeat(400)}:n);window.__mockupBaseline.apply(s);});await settle(page);
-  await clickButton(page,'Export');await clickButton(page,'1x Web');await clickButton(page,'Download 1x (1600×1200)');
+  await clickButton(page,'Export');await clickButton(page,'Free 1x');await clickButton(page,'Download 1x (1600×1200)');
   await page.waitForFunction(()=>document.querySelector('[data-text-export-error]')?.textContent.includes('button text is empty or overflows'));
   results.push({scenario:'auto-width-cta-overflow-blocked',pass:true});
   await page.evaluate(()=>{const s=structuredClone(window.__validCompositionSnapshot);s.secondarySrc=null;s.compositionDocument.detailVisible=true;s.compositionDocument.hiddenIds.push('secondary');window.__mockupBaseline.apply(s);});await settle(page);
   results.push({scenario:'hidden-empty-secondary-allowed',...(await exportPng(page,'hidden-detail-check.png',1))});
   await page.evaluate(()=>{const s=structuredClone(window.__validCompositionSnapshot);s.secondarySrc=null;window.__mockupBaseline.apply(s);});await settle(page);
-  await clickButton(page,'Export');await clickButton(page,'1x Web');await clickButton(page,'Download 1x (1600×1200)');await page.waitForFunction(()=>!!document.querySelector('[data-text-export-error]')?.textContent);results.push({scenario:'visible-empty-secondary-blocked',pass:true});
+  await clickButton(page,'Export');await clickButton(page,'Free 1x');await clickButton(page,'Download 1x (1600×1200)');await page.waitForFunction(()=>!!document.querySelector('[data-text-export-error]')?.textContent);results.push({scenario:'visible-empty-secondary-blocked',pass:true});
   await page.evaluate(()=>{const s=structuredClone(window.__validCompositionSnapshot);s.compositionDocument.allowBleed=true;s.compositionDocument.placements.main.centerX=.98;window.__mockupBaseline.apply(s);});await settle(page);
   let confirmations=0;page.once('dialog',async dialog=>{confirmations++;assert.match(dialog.message(),/clipped/);await dialog.dismiss();});await clickButton(page,'Download 1x (1600×1200)');await pause(1000);assert.equal(confirmations,1,'cropping asks for confirmation');
   page.once('dialog',async dialog=>{confirmations++;await dialog.accept();});results.push({scenario:'image-bleed-confirm-accept',...(await exportPng(page,'confirmed-crop.png',1))});

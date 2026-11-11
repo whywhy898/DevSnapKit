@@ -44,7 +44,7 @@ async function menu(p){if(!await p.$('[data-template-gallery]'))await clickButto
 async function apply(p,name='Pocket Flow Duo'){await menu(p);await p.click(`[aria-label="Apply ${name} template"]`);await p.waitForFunction(name=>window.__mockupBaseline.snapshot.templateContext?.id===name,{},name==='Pocket Flow Duo'?'pocket-flow-duo':'paper-launch-duo');await settle(p);}
 async function fill(p,selector,value){await p.focus(selector);await p.keyboard.down('Control');await p.keyboard.press('A');await p.keyboard.up('Control');await p.keyboard.type(String(value));await p.keyboard.press('Tab');await pause(100);}
 async function png(p,name,scale){
- await clickButton(p,'Export');await clickButton(p,scale===1?'1x Web':'2x HD');await settle(p);
+ await clickButton(p,'Export');await clickButton(p,scale===1?'Free 1x':'Free 2x');await settle(p);
  await p.evaluate(()=>{
   const measure=canvas=>{const b=canvas.getBoundingClientRect(),s=b.width/canvas.offsetWidth;return[...canvas.querySelectorAll('[data-canvas-text],[data-composition-object],[data-media-screen],[data-media-chrome],[data-phone-home],[data-phone-capsule]')].map(n=>{const r=n.getBoundingClientRect(),part=['data-media-screen','data-media-chrome','data-phone-home','data-phone-capsule'].find(key=>n.hasAttribute(key));return{id:n.dataset.canvasText||n.dataset.compositionObject||n.closest('[data-composition-object]')?.dataset.compositionObject+'/'+part,x:(r.x-b.x)/s,y:(r.y-b.y)/s,width:r.width/s,height:r.height/s};});};
   window.__pocketPreviewGeometry=measure(document.querySelector('#studio-canvas'));window.__pocketExportGeometry=null;

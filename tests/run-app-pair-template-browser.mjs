@@ -45,7 +45,7 @@ async function menu(p){if(!await p.$('[data-template-gallery]'))await clickButto
 async function apply(p,name='App Pair'){await menu(p);await p.click(`[aria-label="Apply ${name} template"]`);await p.waitForFunction(name=>window.__mockupBaseline.snapshot.templateContext?.id===name,{},name==='App Pair'?'app-pair':'paper-launch-duo');await settle(p);}
 async function fill(p,selector,value){await p.focus(selector);await p.keyboard.down('Control');await p.keyboard.press('A');await p.keyboard.up('Control');await p.keyboard.type(String(value));await p.click('#studio-canvas');await pause(100);}
 async function png(p,name,scale){
- await clickButton(p,'Export');await clickButton(p,scale===1?'1x Web':'2x HD');await settle(p);
+ await clickButton(p,'Export');await clickButton(p,scale===1?'Free 1x':'Free 2x');await settle(p);
  await p.evaluate(()=>{
   const measure=canvas=>{const b=canvas.getBoundingClientRect(),s=b.width/canvas.offsetWidth;return[...canvas.querySelectorAll('[data-canvas-text],[data-composition-object],[data-media-screen],[data-media-chrome],[data-phone-home],[data-phone-capsule],img[alt="QR Code"],img[alt="Brand Logo"]')].map(n=>{const r=n.getBoundingClientRect(),part=['data-media-screen','data-media-chrome','data-phone-home','data-phone-capsule'].find(key=>n.hasAttribute(key));return{id:n.dataset.canvasText||n.dataset.compositionObject||n.getAttribute('alt')||n.closest('[data-composition-object]')?.dataset.compositionObject+'/'+part,x:(r.x-b.x)/s,y:(r.y-b.y)/s,width:r.width/s,height:r.height/s};});};
   window.__appPairPreviewGeometry=measure(document.querySelector('#studio-canvas'));window.__appPairExportGeometry=null;

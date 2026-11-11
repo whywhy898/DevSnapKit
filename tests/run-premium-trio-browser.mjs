@@ -69,7 +69,7 @@ async function measure(p){
  });
 }
 async function png(p,c,dir,name,scale=1){
- await button(p,'Export');await button(p,scale===1?'1x Web':'2x HD');await button(p,'PNG');await settle(p);
+ await button(p,'Export');await button(p,scale===1?'Free 1x':'Free 2x');await button(p,'PNG');await settle(p);
  const before=await state(p),hist=await history(p),preview=await measure(p);
  await p.evaluate(()=>{
   window.__trioExportGeometry=null;
@@ -91,7 +91,7 @@ async function png(p,c,dir,name,scale=1){
  return {path:d.path,width:metadata.width,height:metadata.height,maxDelta};
 }
 async function otherFormat(p,c,dir,format){
- await button(p,'Export');await button(p,'1x Web');await button(p,format.toUpperCase());
+ await button(p,'Export');await button(p,'Free 1x');await button(p,format.toUpperCase());
  const folder=await fs.mkdtemp(path.join(dir,'.'+format+'-'));
  const client=await p.createCDPSession();await client.send('Page.setDownloadBehavior',{behavior:'allow',downloadPath:folder});
  try{

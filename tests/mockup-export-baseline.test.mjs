@@ -14,7 +14,7 @@ async function exportCurrent(page, filename) {
   await page.waitForFunction(() => [...document.querySelectorAll('#studio-canvas img')].every(img => img.complete && img.naturalWidth > 0));
   await page.evaluate(() => document.fonts.ready);
   await clickButton(page, 'Export');
-  await clickButton(page, '1x Web');
+  await clickButton(page, 'Free 1x');
   await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => /^Download 1x/.test(b.innerText.trim())));
   return downloadPng(page, output, filename, async () => {
     const handle = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(b => b.offsetParent !== null && /^Download 1x/.test(b.innerText.trim())));

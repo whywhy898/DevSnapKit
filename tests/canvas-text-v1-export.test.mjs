@@ -6,10 +6,10 @@ import sharp from 'sharp';
 import { launchBrowser, preparePage, clickButton, downloadPng, finishTextEditing } from './helpers/browser.mjs';
 
 const url = process.env.TEST_UI_URL;
-const output = path.resolve('../../output/devsnapkit/canvas-text-v1/m1');
+const output = path.resolve(process.env.CANVAS_TEXT_OUTPUT_ROOT || '../../output/devsnapkit/canvas-text-v1', 'm1');
 const raster = ['--disable-gpu', '--force-color-profile=srgb', '--disable-lcd-text', '--disable-skia-runtime-opts', '--font-render-hinting=none'];
 async function exportPNG(page, name, scale = 1) {
-  await clickButton(page, 'Export'); await clickButton(page, scale === 1 ? '1x Web' : '2x HD');
+  await clickButton(page, 'Export'); await clickButton(page, scale === 1 ? 'Free 1x' : 'Free 2x');
   return downloadPng(page, output, name, () => page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.offsetParent !== null && /^Download /.test(b.innerText.trim())).click()));
 }
 test('M1 real upload, plain canvas text, separate Add/edit undo, 1x and 2x PNG under production CSP', { skip: !url, timeout: 90000 }, async () => {
@@ -41,6 +41,7 @@ test('M1 real upload, plain canvas text, separate Add/edit undo, 1x and 2x PNG u
     await (await page.$('#studio-canvas')).screenshot({ path: path.join(output, 'launch-preview.png') });
     const rows = [];
     const snapshot = await page.evaluate(() => JSON.stringify(window.__mockupBaseline.snapshot));
+    const headline = await page.$eval('[data-canvas-text]', node => ({ left: Math.floor(node.offsetLeft - node.offsetWidth / 2), top: Math.floor(node.offsetTop - node.offsetHeight / 2), right: Math.ceil(node.offsetLeft + node.offsetWidth / 2), bottom: Math.ceil(node.offsetTop + node.offsetHeight / 2) }));
     for (const scale of [1, 2]) {
       await page.$eval('[data-text-hit]', button => button.click());
       assert.ok(await page.$('[aria-label="Text content"]'), 'Valid content is still being edited immediately before export');
@@ -49,7 +50,7 @@ test('M1 real upload, plain canvas text, separate Add/edit undo, 1x and 2x PNG u
       assert.equal(info.width, 1600 * scale); assert.equal(info.height, 1200 * scale);
       assert.equal(data[(20 * scale * info.width + 200 * scale) * 4 + 3], 0, 'PNG retains transparent padding');
       let textInk = 0;
-      for (let y = 210 * scale; y < 270 * scale; y++) for (let x = 560 * scale; x < 1040 * scale; x++) { const i = (y * info.width + x) * 4; if (data[i] > 220 && data[i+1] > 220 && data[i+2] > 220 && data[i+3] > 100) textInk++; }
+      for (let y = headline.top * scale; y < headline.bottom * scale; y++) for (let x = headline.left * scale; x < headline.right * scale; x++) { const i = (y * info.width + x) * 4; if (data[i] > 220 && data[i+1] > 220 && data[i+2] > 220 && data[i+3] > 100) textInk++; }
       assert.ok(textInk > 100 * scale, 'Actual downloaded pixels contain the white headline');
       rows.push({ ...file, width: info.width, height: info.height, textInk });
     }
@@ -58,7 +59,7 @@ test('M1 real upload, plain canvas text, separate Add/edit undo, 1x and 2x PNG u
     let changed = 0, outside = 0;
     for (let y = 0; y < 1200; y++) for (let x = 0; x < 1600; x++) {
       const i = (y * 1600 + x) * 4;
-      if ([0, 1, 2, 3].some(c => blank[i+c] !== text[i+c])) { changed++; if (x < 560 || x >= 1040 || y < 210 || y >= 270) outside++; }
+      if ([0, 1, 2, 3].some(c => blank[i+c] !== text[i+c])) { changed++; if (x < headline.left || x >= headline.right || y < headline.top || y >= headline.bottom) outside++; }
     }
     assert.ok(changed > 1000, 'Adding the headline changes actual downloaded text pixels');
     assert.equal(outside, 0, 'Adding text preserves every pixel outside its logical box');
@@ -168,7 +169,7 @@ test('real missing font, invalid text box and missing image report named actiona
     const layers = [{ id:'outside', content:'Outside headline', centerX:.99, centerY:.2, widthRatio:.7, font:'manrope', fontSize:48, weight:700, italic:false, color:'#FFFFFF', align:'center' }];
     await page.evaluate(layers => window.__mockupBaseline.apply({ textDocument: { version:1, layers } }), layers);
     await page.waitForFunction(() => document.querySelector('[data-canvas-text]')?.textContent === 'Outside headline');
-    const clickDownload = async () => { await clickButton(page,'Export'); await clickButton(page,'1x Web'); await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.offsetParent !== null && /^Download /.test(b.innerText.trim())).click()); };
+    const clickDownload = async () => { await clickButton(page,'Export'); await clickButton(page,'Free 1x'); await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.offsetParent !== null && /^Download /.test(b.innerText.trim())).click()); };
     await clickDownload();
     await page.waitForFunction(() => [...document.querySelectorAll('[role=alert]')].some(n => /Outside headline.*outside the canvas/i.test(n.textContent)));
     await page.waitForFunction(() => !document.querySelector('[aria-busy=true]'));
@@ -195,7 +196,7 @@ test('delayed real font embedding freezes editor tools, keyboard, paste and Insp
     await exportPNGWithHold();
     async function exportPNGWithHold() {
       await finishTextEditing(page);
-      await page.click('.export-trigger-btn'); await clickButton(page,'1x Web');
+      await page.click('.export-trigger-btn'); await clickButton(page,'Free 1x');
       await downloadPng(page,output,'frozen-export.png',async () => {
         await page.evaluate(() => [...document.querySelectorAll('button')].find(b=>b.offsetParent!==null && /^Download /.test(b.innerText.trim())).click());
         await page.waitForFunction(()=>document.querySelector('[aria-busy=true]')?.inert);
@@ -238,7 +239,7 @@ test('one failed embedded italic face blocks actual PNG even when another used f
     const cdp=await page.createCDPSession();await cdp.send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:output,eventsEnabled:true});cdp.on('Browser.downloadWillBegin',()=>downloaded++);
     await page.setCacheEnabled(false);await page.setRequestInterception(true);
     page.on('request',request=>{if(failItalic&&request.url().includes('/poster/fonts/Gelasio-Italic.ttf')){failed++;request.abort('failed');}else request.continue();});
-    await clickButton(page,'Export');await clickButton(page,'1x Web');
+    await clickButton(page,'Export');await clickButton(page,'Free 1x');
     await page.evaluate(()=>[...document.querySelectorAll('button')].find(b=>b.offsetParent!==null&&/^Download /.test(b.innerText.trim())).click());
     await page.waitForFunction(()=>[...document.querySelectorAll('[role=alert]')].some(n=>/Poster Gelasio/.test(n.textContent)&&/embedded/.test(n.textContent)));
     assert.ok(failed>0,'Actual italic font embedding resource fails after the preview face has loaded');
@@ -268,7 +269,7 @@ test('a failed initial owned CSS font load recovers on the next click in the sam
     for(let i=0;i<50&&!failed;i++)await new Promise(resolve=>setTimeout(resolve,100));
     assert.ok(failed>0,'Actual initial CSS face load is rejected before export');
     const snapshot=await page.evaluate(()=>JSON.stringify(window.__mockupBaseline.snapshot));
-    await clickButton(page,'Export');await clickButton(page,'1x Web');await page.evaluate(()=>[...document.querySelectorAll('button')].find(b=>b.offsetParent!==null&&/^Download /.test(b.innerText.trim())).click());
+    await clickButton(page,'Export');await clickButton(page,'Free 1x');await page.evaluate(()=>[...document.querySelectorAll('button')].find(b=>b.offsetParent!==null&&/^Download /.test(b.innerText.trim())).click());
     await page.waitForFunction(()=>[...document.querySelectorAll('[role=alert]')].some(n=>/italic 600.*Poster Gelasio.*could not be loaded/i.test(n.textContent)));
     await page.waitForFunction(()=>!document.querySelector('[aria-busy=true]'));
     const firstError=await page.$eval('[data-text-export-error]',n=>n.textContent);

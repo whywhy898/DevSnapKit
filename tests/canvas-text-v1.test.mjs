@@ -70,6 +70,26 @@ test('new text uses available space without moving existing text and handles a f
   assert.ok(crowded.layers.every(l => l.centerX >= 0 && l.centerX <= 1 && l.centerY >= .15 && l.centerY <= .85));
 });
 
+test('new text prefers the margin above screenshots and falls back to the largest free margin', async () => {
+  const d = await load('text/document');
+  const size = { width: 960, height: 600 };
+  const media = [{ left: 64, top: 110, width: 832, height: 420 }];
+  const top = d.addText(d.emptyTextDocument(), size, '#FFFFFF', 'top', [], media).layers[0];
+  assert.ok(top.centerY * size.height + 30 <= 110 - 8, 'Default text clears the screenshot above it');
+  const bottom = d.addText(d.emptyTextDocument(), size, '#FFFFFF', 'bottom', [], [{ left: 20, top: 10, width: 920, height: 400 }]).layers[0];
+  assert.ok(bottom.centerY * size.height - 30 >= 418, 'Insufficient top space uses the bottom margin');
+  const side = d.addText(d.emptyTextDocument(), size, '#FFFFFF', 'side', [], [{ left: 400, top: 0, width: 560, height: 600 }]).layers[0];
+  assert.ok((side.centerX + side.widthRatio / 2) * size.width <= 392, 'Largest side margin keeps the full text box clear');
+  for (const layer of [top, bottom, side]) {
+    assert.ok(layer.centerY * size.height >= 30 && layer.centerY * size.height <= 570);
+  }
+  assert.throws(() => d.addText(d.emptyTextDocument(), size, '#FFFFFF', 'full', [], [{ left: 0, top: 0, width: 960, height: 600 }]), /margin/i);
+  const small = d.addText(d.emptyTextDocument(), { width: 320, height: 200 }, '#FFFFFF', 'small', [], [{ left: 40, top: 40, width: 240, height: 120 }]).layers[0];
+  assert.ok(small.fontSize >= 8 && small.centerY * 200 + small.fontSize * .625 <= 32, 'Small canvases use text sized to the reserved margin');
+  const nextMargin = d.addText(d.emptyTextDocument(), size, '#FFFFFF', 'next-margin', [{ left: 0, top: 0, width: 960, height: 110 }], [{ left: 64, top: 110, width: 832, height: 350 }]).layers[0];
+  assert.ok(nextMargin.centerY * 600 - 30 >= 468, 'A filled top margin uses a different free margin before overlapping older text');
+});
+
 test('whole editor history flushes mixed values, groups updates, preserves redo for no-ops and cancels', async () => {
   const { EditorHistory } = await load('editorHistory');
   const original = { gradientId: 'a', textDocument: { layers: [] }, position: 0 };

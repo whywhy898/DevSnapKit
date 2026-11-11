@@ -5,7 +5,7 @@ import path from 'node:path';
 import { launchBrowser, preparePage, finishTextEditing } from './helpers/browser.mjs';
 
 const url = process.env.TEST_UI_URL;
-const output = path.resolve('../../output/devsnapkit/canvas-text-v1/ux-review-fix');
+const output = path.resolve(process.env.CANVAS_TEXT_OUTPUT_ROOT || '../../output/devsnapkit/canvas-text-v1', 'ux-review-fix');
 const paint = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 async function click(page, selector, text) {
   const handle = await page.evaluateHandle(({ selector, text }) => [...document.querySelectorAll(selector)].find(node => node.getClientRects().length && (!text || node.textContent.trim() === text)), { selector, text });

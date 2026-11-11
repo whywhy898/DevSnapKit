@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { launchBrowser, preparePage, downloadPng, clickButton } from './helpers/browser.mjs';
 const url = process.env.TEST_UI_URL;
-const output = path.resolve('../../output/devsnapkit/canvas-text-v1/inspector-polish');
+const output = path.resolve(process.env.CANVAS_TEXT_OUTPUT_ROOT || '../../output/devsnapkit/canvas-text-v1', 'inspector-polish');
 const paint = page => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 async function click(page, selector) { const el = await page.$(selector); assert.ok(el, selector); await el.evaluate(n => n.scrollIntoView({ block: 'center' })); await el.click(); await paint(page); }
 async function textTab(page) { await clickButton(page, 'Text'); await paint(page); }
@@ -76,13 +76,14 @@ test('Polish invalid drafts have an explicit discard recovery without normal Don
 
 test('Detail consecutive Add text finds visible space after multiline text and deletion at desktop and mobile', { skip: !url, timeout: 120000 }, async () => {
   const browser = await launchBrowser();
-  const directory = path.resolve('../../output/devsnapkit/canvas-text-v1/review-details');
+  const directory = path.resolve(process.env.CANVAS_TEXT_OUTPUT_ROOT || '../../output/devsnapkit/canvas-text-v1', 'review-details');
   const results = [];
   try {
     for (const width of [1440, 390]) {
       const page = await preparePage(browser, url, { viewport: { width, height: width < 600 ? 850 : 1100, deviceScaleFactor: 1 } });
       await clickButton(page, 'Add text');
       await page.type('[aria-label="Text content"]', 'First line\nSecond line\nThird line'); await textTab(page);
+      await page.evaluate(() => { const layer = window.__mockupBaseline.snapshot.textDocument.layers[0]; window.__mockupBaseline.apply({ textDocument: { version: 1, layers: [{ ...layer, centerY: .2 }] } }); }); await paint(page);
       const firstPosition = await page.$eval('[data-canvas-text]', n => n.getAttribute('style'));
       for (let i = 2; i <= 5; i++) {
         await clickButton(page, 'Add text'); await page.type('[aria-label="Text content"]', `Text ${i}`); await textTab(page);
@@ -90,13 +91,14 @@ test('Detail consecutive Add text finds visible space after multiline text and d
       assert.equal(await page.$eval('[data-canvas-text]', n => n.getAttribute('style')), firstPosition, 'Adding must preserve existing placement');
       const measure = () => page.$$eval('[data-canvas-text]', nodes => nodes.map(n => { const r = n.getBoundingClientRect(); return { id: n.dataset.canvasText, text: n.textContent, left: r.left, right: r.right, top: r.top, bottom: r.bottom }; }));
       const nonoverlapping = boxes => { for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) { const a = boxes[i], b = boxes[j]; assert.ok(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top, `Text ${i + 1} and ${j + 1} overlap`); } };
-      nonoverlapping(await measure());
+      const initialBoxes = await measure();
+      try { nonoverlapping(initialBoxes); } catch (error) { throw new Error(JSON.stringify({ width, boxes: initialBoxes }), { cause: error }); }
       await click(page, '[aria-label="Delete text"]');
       await clickButton(page, 'Add text'); await page.type('[aria-label="Text content"]', 'Replacement'); await textTab(page);
       const boxes = await measure(); assert.equal(boxes.length, 5); nonoverlapping(boxes);
       assert.equal(await page.$('[data-text-layout-errors]'), null);
       await fs.mkdir(directory, { recursive: true }); await page.screenshot({ path: path.join(directory, `multiple-${width}.png`), fullPage: true });
-      await clickButton(page, 'Export'); await clickButton(page, '1x Web');
+      await clickButton(page, 'Export'); await clickButton(page, 'Free 1x');
       const file = await downloadPng(page, directory, `multiple-${width}-actual.png`, () => page.evaluate(() => [...document.querySelectorAll('button')].find(n => n.getClientRects().length && /^Download 1x/.test(n.textContent.trim())).click()));
       results.push({ width, boxes, file }); await page.close();
     }

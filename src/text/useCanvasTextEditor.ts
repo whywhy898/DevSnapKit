@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { EditorSnapshot } from '../useHistory';
 import type { CanvasTextDocument, CanvasTextLayer, TextCanvasSize, TextFont, TextRunStyle, TextReplacementRange } from './types';
-import { addText, changeTextFont, deleteText, initialTextColor, updateText, emphasizeTextRange } from './document';
+import { addText, changeTextFont, deleteText, initialTextColor, updateText, emphasizeTextRange, textCreationMargin, type TextCreationBox } from './document';
 import { clampTextPosition, geometryPatch, moveTextByScreenDelta, resizeTextByScreenDelta, textHorizontalExtent, type GeometryField, type TextMovementLayout } from './geometry';
 
 type History = {
@@ -14,7 +14,7 @@ type Session = { id: string; kind: 'content' | Field; value: string; composing: 
 type Gesture = { token: number; id: string; kind: 'move' | 'left' | 'right' | 'keyboard'; layer: CanvasTextLayer; size: TextCanvasSize; scale: number; layout: TextMovementLayout };
 
 /** Ephemeral editor state never enters the document or history. */
-export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc: CanvasTextDocument) => void, size: TextCanvasSize, history: History, root: React.RefObject<HTMLDivElement>) {
+export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc: CanvasTextDocument) => void, size: TextCanvasSize, history: History, root: React.RefObject<HTMLDivElement>, reserveTextSpace?: (media: TextCreationBox[]) => void) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [message, setMessage] = useState('');
@@ -22,6 +22,9 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
   const nextGestureToken = useRef(0);
   const [gesturing, setGesturing] = useState(false);
   const latest = useRef(snapshot); latest.current = snapshot;
+  const latestSize = useRef(size); latestSize.current = size;
+  const pendingAdd = useRef<number>();
+  useEffect(() => () => { if (pendingAdd.current !== undefined) cancelAnimationFrame(pendingAdd.current); }, []);
   const liveSession = useRef(session);
   const compositionRange = useRef<TextReplacementRange>();
   // Native textarea undo groups input on its own. Retain observed run snapshots
@@ -85,11 +88,24 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
     saveSession({ ...current, value, composing, error }); setMessage(error);
   };
   const select = (id: string | null) => { if (finish()) { setActiveId(id); setMessage(''); } };
-  const add = () => {
+  const add = (reserved = false) => {
+    if (pendingAdd.current !== undefined) return;
     if (!finish()) return;
     try {
       const canvas = root.current, bounds = canvas?.getBoundingClientRect();
       const scale = canvas && bounds && canvas.offsetWidth ? bounds.width / canvas.offsetWidth : 0;
+      const media = canvas && bounds && scale > 0 ? Array.from(canvas.querySelectorAll<HTMLElement>('[data-media-surface]')).map(node => {
+        const rect = node.getBoundingClientRect();
+        return { left: (rect.left - bounds.left) / scale, top: (rect.top - bounds.top) / scale, width: rect.width / scale, height: rect.height / scale };
+      }).filter(box => box.width > 0 && box.height > 0) : [];
+      if (!textCreationMargin(latestSize.current, media) && reserveTextSpace && !reserved) {
+        reserveTextSpace(media);
+        // Let React and the fitted scene settle before measuring the new padding.
+        pendingAdd.current = requestAnimationFrame(() => {
+          pendingAdd.current = requestAnimationFrame(() => { pendingAdd.current = undefined; add(true); });
+        });
+        return;
+      }
       const occupied = canvas && bounds && scale > 0 ? Array.from(canvas.querySelectorAll<HTMLElement>('[data-canvas-text]')).map(node => {
         const rect = node.getBoundingClientRect(), horizontal = textHorizontalExtent(node, scale);
         return { left: (rect.left - bounds.left) / scale + horizontal.left, top: (rect.top - bounds.top) / scale,
@@ -97,7 +113,7 @@ export function useCanvasTextEditor(snapshot: EditorSnapshot, setDocument: (doc:
       }) : undefined;
       const source = latest.current.primaryMediaOrigin;
       const lightStarter = source?.kind === 'builtin' && source.sampleId === 'workspace' && !latest.current.compositionDocument && latest.current.bgType === 'gradient';
-      const next = addText(latest.current.textDocument, size, lightStarter ? '#111827' : initialTextColor(latest.current.bgType, latest.current.solidColor), crypto.randomUUID(), occupied);
+      const next = addText(latest.current.textDocument, latestSize.current, lightStarter ? '#111827' : initialTextColor(latest.current.bgType, latest.current.solidColor), crypto.randomUUID(), occupied, media);
       history.beginTransaction(latest.current); applyDocument(next); history.commitTransaction(latest.current);
       edit(next.layers[next.layers.length - 1].id);
     } catch (e) { setMessage((e as Error).message); }

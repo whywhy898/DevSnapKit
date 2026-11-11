@@ -12,7 +12,7 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
 let server,browser;const results=[],errors=[];
 async function settle(page){await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.querySelectorAll('#studio-canvas img')].map(i=>i.decode()));});await pause(400);}
 async function exportPng(page,name,scale){
-  await clickButton(page,'Export');await clickButton(page,scale===1?'1x Web':'2x HD');await page.mouse.move(0,0);await settle(page);
+  await clickButton(page,'Export');await clickButton(page,scale===1?'Free 1x':'Free 2x');await page.mouse.move(0,0);await settle(page);
   await page.evaluate(()=>{
     const measure=c=>{const b=c.getBoundingClientRect(),s=b.width/c.offsetWidth;return [...c.querySelectorAll('[data-canvas-text],[data-composition-object],[data-scene-bounds]')].map((n,i)=>{const r=n.getBoundingClientRect();return {id:n.dataset.canvasText||n.dataset.compositionObject||'scene-'+i,x:(r.x-b.x)/s,y:(r.y-b.y)/s,w:r.width/s,h:r.height/s};});};
     window.__wholePreview=measure(document.querySelector('#studio-canvas'));window.__wholeExport=null;

@@ -51,7 +51,7 @@ async function menu(p){if(!await p.$('[data-template-gallery]'))await clickButto
 async function apply(p,name=config.name){await menu(p);await p.click(`[aria-label="Apply ${name} template"]`);await p.waitForFunction(name=>window.__mockupBaseline.snapshot.templateContext?.id===name,{},name===config.name?config.id:'paper-launch-duo');await settle(p);}
 async function fill(p,selector,value){await p.focus(selector);await p.keyboard.down('Control');await p.keyboard.press('A');await p.keyboard.up('Control');await p.keyboard.type(String(value));await p.keyboard.press('Tab');await pause(100);}
 async function png(p,name,scale){
- await clickButton(p,'Export');await clickButton(p,scale===1?'1x Web':'2x HD');await settle(p);
+ await clickButton(p,'Export');await clickButton(p,scale===1?'Free 1x':'Free 2x');await settle(p);
  const cropEvidence=await p.evaluate(()=>{const canvas=document.querySelector('#studio-canvas'),bounds=canvas.getBoundingClientRect();const rect=r=>({left:r.left,top:r.top,right:r.right,bottom:r.bottom});const media=[...canvas.querySelectorAll('[data-composition-object="main"],[data-composition-object="secondary"]')].map(n=>({slot:n.dataset.compositionObject,...rect(n.getBoundingClientRect())}));return{allowBleed:window.__mockupBaseline.snapshot.compositionDocument.allowBleed,canvas:rect(bounds),media,outside:media.some(r=>r.left<bounds.left-.5||r.top<bounds.top-.5||r.right>bounds.right+.5||r.bottom>bounds.bottom+.5)};});
  const dialogStart=p.dialogs.length;
  await p.evaluate(()=>{
