@@ -51,7 +51,7 @@
 .elements-panel-heading h3, .elements-object-heading h3 { color:var(--editor-text); font-size:15px; font-weight:750; letter-spacing:-.015em; }
 .elements-panel-heading p, .elements-object-heading p { margin-top:4px; color:var(--editor-muted); font-size:11px; line-height:1.5; }
 .elements-panel-heading svg { color:#8b7cff; margin-top:2px; }
-.elements-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; margin-top:15px; padding:4px; background:var(--editor-soft); border:1px solid var(--editor-border); border-radius:11px; }
+.elements-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; margin-top:15px; padding:4px; background:var(--editor-soft); border:1px solid var(--editor-border); border-radius:11px; }
 .elements-tabs button { min-height:34px; border-radius:8px; color:var(--editor-muted); font-size:12px; font-weight:700; cursor:pointer; transition:background .18s,color .18s,box-shadow .18s; }
 .elements-tabs button[aria-pressed="true"] { background:#6655e9; color:#fff; box-shadow:0 3px 10px #5445cf40; }
 .elements-tabs button:focus-visible, .elements-add:focus-visible, .elements-object-panel select:focus-visible { outline:2px solid #9588ff; outline-offset:2px; }

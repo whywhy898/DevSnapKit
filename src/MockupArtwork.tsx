@@ -68,12 +68,16 @@ export interface MockupArtworkProps extends Pick<EditorSnapshot,
   preview?: boolean;
   editingTextId?: string | null;
   onObjectPointerDown?: (id: string, event: React.PointerEvent<HTMLDivElement>) => void;
+  onObjectPointerMove?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onObjectPointerEnd?: (event: React.PointerEvent<HTMLDivElement>) => void;
 }
 
 /** Original artwork tree; App retains the stage, state, history and export ownership. */
 export function MockupArtwork({
   compositionDocument,
   onObjectPointerDown,
+  onObjectPointerMove,
+  onObjectPointerEnd,
   textDocument,
   templateContext,
   preview = true,
@@ -227,11 +231,11 @@ export function MockupArtwork({
         />
       )}
 
-      {compositionDocument ? <CompositionRenderer document={compositionDocument} size={canvasLogicalSize} textDocument={textDocument}
+      {compositionDocument ? <CompositionRenderer document={compositionDocument} size={canvasLogicalSize} textDocument={textDocument} emptySlot={emptySlot} templateContext={templateContext}
         imageSrc={imageSrc} imageName={imageName} secondarySrc={secondarySrc} secondaryName={secondaryName}
         windowTheme={windowTheme} windowTitle={windowTitle} shadowLevel={shadowLevel} shadowOpacity={shadowOpacity}
         cornerStyle={cornerStyle} roundedCorners={roundedCorners} hideMockup={hideMockup} layoutPreset={layoutPreset}
-        preview={preview} editingTextId={editingTextId} onReplace={onReplace} onReplaceSecondary={onReplaceSecondary} onObjectPointerDown={onObjectPointerDown}
+        preview={preview} editingTextId={editingTextId} onReplace={onReplace} onReplaceSecondary={onReplaceSecondary} onObjectPointerDown={onObjectPointerDown} onObjectPointerMove={onObjectPointerMove} onObjectPointerEnd={onObjectPointerEnd}
         legacy={{ effectivePaddingX, effectivePaddingY, layoutMode, duoLayout, mockupZoom, mockupOffsetX, mockupOffsetY, isPhoneTheme, zoomStyle, handleNaturalSceneSize }}
         isProUnlocked={isProUnlocked} logoDataUrl={logoDataUrl} logoOpacity={logoOpacity}
       /> : <FittedScene

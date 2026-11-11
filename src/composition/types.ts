@@ -22,6 +22,11 @@ export interface ButtonObject extends GraphicBase {
   radius: number; padding: number; autoWidth: boolean; arrow: boolean; border?: string;
 }
 export interface ShapeObject extends GraphicBase {
+  /** User annotations share the composition order and editor history. */
+  annotation?: 'arrow' | 'rectangle' | 'highlight';
+  referenceWidth?: number;
+  start?: { x: number; y: number };
+  end?: { x: number; y: number };
   /** Optional logical-pixel blur for native soft decorations. Legacy shapes stay unfiltered. */
   blur?: number;
   markVariant?: 'orbit';

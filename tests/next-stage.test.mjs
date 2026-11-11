@@ -54,11 +54,11 @@ test('a native proof can be a single reversible history command',()=>{
 test('NEXT is published as a 9:16 Pro template through the shared access policy',()=>{
  const {CURATED_TEMPLATE_CATALOG:c,getCuratedTemplate}=load('templates/collection/catalog.ts');
  const {canApplyCuratedTemplate}=load('templates/collection/access.ts');
- assert.equal(c.length,16);
+ assert.equal(c.length,19);
  const next=getCuratedTemplate('next-stage');assert.ok(next);
  assert.equal(next.name,'NEXT Stage');assert.equal(next.tier,'pro');
  assert.equal(next.width,1080);assert.equal(next.height,1920);
  assert.equal(next.thumbnail,'/designed/collection/next-stage.webp');
  assert.equal(canApplyCuratedTemplate('next-stage',false),false);assert.equal(canApplyCuratedTemplate('next-stage',true),true);
- assert.equal(c.filter(t=>t.tier==='free').length,5);
+ assert.equal(c.filter(t=>t.tier==='free').length,8);
 });
