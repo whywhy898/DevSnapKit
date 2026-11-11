@@ -30,6 +30,31 @@ function waitForRetry(ms: number, signal: AbortSignal) {
   });
 }
 
+type PendingOrderCheck = { status: 'paid'; licenseKey: string } | { status: 'unpaid' | 'retry' };
+
+export async function checkPendingPayPalOrder(orderId: string, signal: AbortSignal, options: {
+  fetch?: typeof fetch;
+} = {}): Promise<PendingOrderCheck> {
+  if (!isOrder(orderId) || signal.aborted) return { status: 'retry' };
+  try {
+    // Check PayPal itself, including completed orders whose webhook has not arrived.
+    const response = await (options.fetch || fetch)('/api/paypal-capture-order', {
+      method: 'POST', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId }),
+    });
+    const data = await response.json();
+    if (signal.aborted) return { status: 'retry' };
+    if (response.ok && data?.success === true && typeof data.licenseKey === 'string'
+      && /^DSK-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/.test(data.licenseKey)) {
+      return { status: 'paid', licenseKey: data.licenseKey };
+    }
+    if (response.status === 403 || response.status === 422
+      || (response.ok && data?.success === false && data.unpaid === true && data.pending === false)) {
+      return { status: 'unpaid' };
+    }
+  } catch { /* An unavailable check is never proof that the order is unpaid. */ }
+  return { status: 'retry' };
+}
+
 export async function recoverPayPalLicense(orderId: string, signal: AbortSignal, options: {
   fetch?: typeof fetch; wait?: (ms: number, signal: AbortSignal) => Promise<void>; attempts?: number;
 } = {}): Promise<string | null> {

@@ -72,8 +72,11 @@ function purchaseAmount(amount: any): bigint | null {
 
 function acceptedPurchaseAmount(amount: any): boolean {
   const cents = purchaseAmount(amount);
-  return cents !== null && proPricing.acceptedAmounts.some(value =>
-    purchaseAmount({ currency_code: proPricing.currency, value }) === cents);
+  if (cents === null) return false;
+  const matches = (value: string) => purchaseAmount({ currency_code: proPricing.currency, value }) === cents;
+  if (matches(proPricing.amount)) return true;
+  const previous = proPricing.previousPrice;
+  return !!previous && Date.now() < Date.parse(previous.acceptedUntil) && matches(previous.amount);
 }
 
 export function validatePurchase(order: any) {
@@ -86,7 +89,7 @@ export function validatePurchase(order: any) {
   return units[0];
 }
 
-export async function completedOrder(_env: PayPalEnv, session: Session, orderId: string, allowCapture: boolean) {
+export async function completedOrder(_env: PayPalEnv, session: Session, orderId: string, allowCapture: boolean, includeIncomplete = false) {
   let order = await readOrder(session, orderId);
   validatePurchase(order);
   if (order.status === 'APPROVED' && allowCapture) {
@@ -105,9 +108,9 @@ export async function completedOrder(_env: PayPalEnv, session: Session, orderId:
       }
     }
   }
-  if (order.status !== 'COMPLETED') return null;
+  if (order.status !== 'COMPLETED') return includeIncomplete ? order : null;
   validatePurchase(order);
-  if (allowCapture && order.purchase_units[0].payments?.captures?.some((capture: any) => capture.status === 'PENDING')) return null;
+  if (allowCapture && order.purchase_units[0].payments?.captures?.some((capture: any) => capture.status === 'PENDING')) return includeIncomplete ? order : null;
   return order;
 }
 
@@ -118,7 +121,7 @@ export async function fulfillOrder(env: PayPalEnv, order: any, expectedCaptureId
   const capture = Array.isArray(captures) && captures.length === 1 ? captures[0] : null;
   if (order.status !== 'COMPLETED' || !capture || capture.status !== 'COMPLETED'
     || typeof capture.id !== 'string' || !capture.id
-    // The capture must match an accepted checkout price, including grace-period prices.
+    // The capture must match this order's amount, even when both prices are accepted.
     || purchaseAmount(capture.amount) !== purchaseAmount(unit.amount)
     || capture.final_capture === false || (expectedCaptureId && capture.id !== expectedCaptureId)
     || (capture.payee?.merchant_id && capture.payee.merchant_id !== unit.payee.merchant_id)) {

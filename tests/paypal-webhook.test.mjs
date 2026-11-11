@@ -186,6 +186,24 @@ test('pending provider capture returns processing without issuing a key', async 
   const s = setup(t, { order: pending }); const r = await s.capture();
   assert.equal(r.status, 202); assert.equal((await r.json()).pending, true); assert.equal(s.count(), 0);
 });
+
+for (const status of ['CREATED', 'SAVED', 'PAYER_ACTION_REQUIRED', 'VOIDED']) {
+  test('server recovery confirms an unpaid ' + status + ' order can be discarded', async t => {
+    const order = canonical(status); delete order.purchase_units[0].payments;
+    const s = setup(t, { order }); const r = await s.capture();
+    assert.equal(r.status, 202);
+    const result = await r.json();
+    assert.equal(result.unpaid, true); assert.equal(result.pending, false);
+    assert.equal(s.count(), 0);
+    assert.equal(s.calls.some(x => x.url.endsWith('/capture')), false);
+  });
+}
+
+test('pending provider capture must not be reported as safe to discard', async t => {
+  const order = canonical(); order.purchase_units[0].payments.captures[0].status = 'PENDING';
+  const s = setup(t, { order }); const result = await (await s.capture()).json();
+  assert.notEqual(result.unpaid, true); assert.equal(result.pending, true);
+});
 test('minimal capture response uses the canonical order metadata', async t => {
   const approved = canonical('APPROVED'); delete approved.purchase_units[0].payments;
   const minimal = { id: orderId, status: 'COMPLETED', purchase_units: [{ payments: canonical().purchase_units[0].payments }] };

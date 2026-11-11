@@ -12,7 +12,11 @@ const require = createRequire(import.meta.url), ts = require('typescript');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const secret = 'pricing-test-only-secret-at-least-32-characters';
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
-function loader(pricingOverride = {}) {
+const priceChange = Date.parse('2026-11-11T00:00:00.000Z');
+const acceptedUntil = '2026-11-12T00:00:00.000Z';
+const expiry = Date.parse(acceptedUntil);
+function loader(pricingOverride = {}, now = Date.now) {
+  class ClockDate extends Date { static now() { return now(); } }
   const cache = new Map();
   function load(file) {
     let filename = path.resolve(root, file);
@@ -23,8 +27,8 @@ function loader(pricingOverride = {}) {
     const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: {
       target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX,
     } }).outputText;
-    new Function('require', 'module', 'exports', code)(name => name.startsWith('.')
-      ? load(path.resolve(path.dirname(filename), name)) : require(name), mod, mod.exports);
+    new Function('require', 'module', 'exports', 'Date', code)(name => name.startsWith('.')
+      ? load(path.resolve(path.dirname(filename), name)) : require(name), mod, mod.exports, ClockDate);
     if (filename === path.join(root, 'shared/pricing.ts')) {
       mod.exports.proPricing = { ...mod.exports.proPricing, ...pricingOverride };
     }
@@ -55,8 +59,8 @@ function order(amount = '1.00') {
 test('one config defines the unchanged offer and stable product identity', () => {
   const { proPricing } = loader()('shared/pricing.ts');
   assert.equal(proPricing.amount, '1.00'); assert.equal(proPricing.currency, 'USD');
-  assert.deepEqual(proPricing.acceptedAmounts, ['1.00']);
-  assert.ok(proPricing.acceptedAmounts.includes(proPricing.amount));
+  assert.equal(proPricing.previousPrice, undefined);
+  assert.equal('acceptedAmounts' in proPricing, false);
   assert.equal(proPricing.displayPrice, '$1'); assert.equal(proPricing.compareAtPrice, '$29');
   assert.equal(proPricing.productName, 'DevSnapKit Pro');
   assert.equal(proPricing.description, 'DevSnapKit Pro Lifetime Pass');
@@ -120,8 +124,9 @@ test('admin defaults use config while recorded historical amounts are preserved'
 });
 
 for (const [configured, purchased, captured] of [['1.00', '7.50', '7.50'], ['7.50', '1.00', '01.0']]) {
-  test(`fulfillment accepts the previous allowed ${purchased} after config becomes ${configured} and keeps license activation`, async t => {
-    const load = loader({ amount: configured, acceptedAmounts: [configured, purchased] }); const { DB, sql } = database(t);
+  test(`fulfillment accepts previous ${purchased} before expiry after config becomes ${configured} and keeps license activation`, async t => {
+    const load = loader({ amount: configured, previousPrice: { amount: purchased, acceptedUntil } }, () => expiry - 1);
+    const { DB, sql } = database(t);
     const purchase = order(purchased); purchase.purchase_units[0].payments.captures[0].amount.value = captured;
     assert.equal(load('functions/lib/paypal.ts').validatePurchase(purchase), purchase.purchase_units[0]);
     const result = await load('functions/lib/paypal.ts').fulfillOrder({ DB, DSK_SERVER_SECRET: secret }, purchase);
@@ -131,6 +136,29 @@ for (const [configured, purchased, captured] of [['1.00', '7.50', '7.50'], ['7.5
     assert.equal((await response.json()).valid, true);
   });
 }
+
+for (const [name, now, deadline] of [
+  ['at expiry', expiry, acceptedUntil],
+  ['after expiry', expiry + 1, acceptedUntil],
+  ['with an invalid expiry', priceChange, 'invalid'],
+]) {
+  test(`previous price is rejected ${name} without persisting a license`, async t => {
+    const load = loader({ amount: '7.50', previousPrice: { amount: '1.00', acceptedUntil: deadline } }, () => now);
+    const { DB, sql } = database(t); const purchase = order('1.00');
+    const { validatePurchase, fulfillOrder } = load('functions/lib/paypal.ts');
+    assert.throws(() => validatePurchase(purchase), error => error.status === 422);
+    await assert.rejects(() => fulfillOrder({ DB, DSK_SERVER_SECRET: secret }, purchase), error => error.status === 422);
+    assert.equal(sql.prepare('SELECT COUNT(*) n FROM orders').get().n, 0);
+  });
+}
+
+test('current price remains accepted after the previous price expires', async t => {
+  const load = loader({ amount: '7.50', previousPrice: { amount: '1.00', acceptedUntil } }, () => expiry + 1);
+  const { DB } = database(t); const purchase = order('7.50');
+  const { validatePurchase, fulfillOrder } = load('functions/lib/paypal.ts');
+  assert.equal(validatePurchase(purchase), purchase.purchase_units[0]);
+  assert.equal((await fulfillOrder({ DB, DSK_SERVER_SECRET: secret }, purchase)).amount, '7.50');
+});
 
 for (const [name, mutate] of [
   ['unaccepted one-cent order with matching capture', o => {
@@ -159,20 +187,23 @@ for (const [name, mutate] of [
   });
 }
 
-test('purchase validation compares allowed amounts in cents and rejects unaccepted positive prices', () => {
+test('purchase validation compares current amounts in cents and rejects unaccepted positive prices', () => {
   const { validatePurchase } = loader()('functions/lib/paypal.ts');
   for (const amount of ['1', '1.0', '01.00']) assert.doesNotThrow(() => validatePurchase(order(amount)));
   for (const amount of ['0.01', '7.50']) assert.throws(() => validatePurchase(order(amount)), error => error.status === 422);
 });
 
 for (const endpoint of ['paypal-webhook', 'paypal-ipn']) {
-  for (const [name, configured, acceptedAmounts, purchased, captured, expected] of [
-    ['previous accepted price', '7.50', ['7.50', '1.00'], '1.00', '01.0', 200],
-    ['one-cent order with matching capture', '1.00', ['1.00'], '0.01', '0.01', 422],
-    ['mismatched capture at another accepted price', '7.50', ['7.50', '1.00'], '7.50', '1.00', 422],
+  for (const [name, configured, previousPrice, now, purchased, captured, expected] of [
+    ['previous price before expiry', '7.50', { amount: '1.00', acceptedUntil }, expiry - 1, '1.00', '01.0', 200],
+    ['previous price at expiry', '7.50', { amount: '1.00', acceptedUntil }, expiry, '1.00', '1.00', 422],
+    ['previous price after expiry', '7.50', { amount: '1.00', acceptedUntil }, expiry + 1, '1.00', '1.00', 422],
+    ['current price after expiry', '7.50', { amount: '1.00', acceptedUntil }, expiry + 1, '7.50', '7.50', 200],
+    ['one-cent order with matching capture', '1.00', undefined, priceChange, '0.01', '0.01', 422],
+    ['mismatched capture at another accepted price', '7.50', { amount: '1.00', acceptedUntil }, expiry - 1, '7.50', '1.00', 422],
   ]) {
     test(`${endpoint} validates ${name} before making a license claimable`, async t => {
-      const load = loader({ amount: configured, acceptedAmounts }); const { DB, sql } = database(t);
+      const load = loader({ amount: configured, previousPrice }, () => now); const { DB, sql } = database(t);
       const purchase = order(purchased), unit = purchase.purchase_units[0], capture = unit.payments.captures[0];
       capture.amount.value = captured;
       const kv = new Map(); const original = globalThis.fetch;

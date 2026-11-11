@@ -60,3 +60,72 @@ test('a browser that denies access to localStorage itself does not break recover
     assert.doesNotThrow(() => savePurchasedLicense('DSK-AAAA-BBBB-CCCC'));
   } finally { delete globalThis.localStorage; }
 });
+
+test('checking a pending order recovers a completed purchase through server capture', async () => {
+  const { checkPendingPayPalOrder } = load();
+  assert.equal(typeof checkPendingPayPalOrder, 'function');
+  const signal = new AbortController().signal;
+  const result = await checkPendingPayPalOrder('ORDER1234567890123', signal, {
+    fetch: async (url, init) => {
+      assert.equal(url, '/api/paypal-capture-order');
+      assert.equal(init.method, 'POST');
+      assert.equal(init.signal, signal);
+      assert.deepEqual(JSON.parse(init.body), { orderId: 'ORDER1234567890123' });
+      return Response.json({ success: true, status: 'COMPLETED', licenseKey: 'DSK-AAAA-BBBB-CCCC' });
+    },
+  });
+  assert.deepEqual(result, { status: 'paid', licenseKey: 'DSK-AAAA-BBBB-CCCC' });
+});
+
+for (const [name, status, body] of [
+  ['unapproved order', 202, { success: false, unpaid: true, pending: false, status: 'CREATED' }],
+  ['unverified order', 403, { success: false }],
+  ['nonmatching order', 422, { success: false }],
+]) {
+  test('checking a pending order allows discarding a server-confirmed ' + name, async () => {
+    const { checkPendingPayPalOrder } = load();
+    assert.equal(typeof checkPendingPayPalOrder, 'function');
+    assert.deepEqual(await checkPendingPayPalOrder('ORDER1234567890123', new AbortController().signal, {
+      fetch: async () => Response.json(body, { status }),
+    }), { status: 'unpaid' });
+  });
+}
+
+for (const [name, response] of [
+  ['network error', () => { throw new TypeError('Failed to fetch'); }],
+  ['server failure', () => Response.json({ success: false, unpaid: true }, { status: 503 })],
+  ['pending capture', () => Response.json({ success: false, pending: true }, { status: 202 })],
+  ['missing license', () => Response.json({ success: true, status: 'COMPLETED' })],
+  ['invalid license', () => Response.json({ success: true, licenseKey: 'unverified' })],
+  ['unknown result', () => Response.json({ success: false })],
+  ['invalid JSON', () => new Response('unavailable')],
+  ['rate limit', () => Response.json({ success: false }, { status: 429 })],
+]) {
+  test('checking a pending order keeps it for retry after ' + name, async () => {
+    const { checkPendingPayPalOrder } = load();
+    assert.equal(typeof checkPendingPayPalOrder, 'function');
+    assert.deepEqual(await checkPendingPayPalOrder('ORDER1234567890123', new AbortController().signal, {
+      fetch: async () => response(),
+    }), { status: 'retry' });
+  });
+}
+
+test('invalid or aborted status checks cannot authorize discarding an order', async () => {
+  const { checkPendingPayPalOrder } = load();
+  assert.equal(typeof checkPendingPayPalOrder, 'function');
+  const controller = new AbortController(); controller.abort();
+  let count = 0;
+  const options = { fetch: async () => { count++; return Response.json({ unpaid: true }); } };
+  assert.deepEqual(await checkPendingPayPalOrder('ORDER1234567890123', controller.signal, options), { status: 'retry' });
+  assert.deepEqual(await checkPendingPayPalOrder('invalid', new AbortController().signal, options), { status: 'retry' });
+  assert.equal(count, 0);
+});
+
+test('a status check aborted during the request cannot authorize discarding', async () => {
+  const { checkPendingPayPalOrder } = load();
+  assert.equal(typeof checkPendingPayPalOrder, 'function');
+  const controller = new AbortController();
+  assert.deepEqual(await checkPendingPayPalOrder('ORDER1234567890123', controller.signal, {
+    fetch: async () => { controller.abort(); return Response.json({ unpaid: true }, { status: 202 }); },
+  }), { status: 'retry' });
+});

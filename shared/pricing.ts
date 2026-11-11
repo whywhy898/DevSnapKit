@@ -2,11 +2,13 @@ export interface ProPricing {
   currency: 'USD';
   amount: string;
   /**
-   * Amounts in this currency valid for fulfillment; must include the current amount.
-   * When changing price, keep the previous amount here for a grace period so
-   * in-flight checkouts still verify, then remove it.
+   * When changing price, replace this with the old current amount and set
+   * acceptedUntil to the change time + 24 hours as an ISO timestamp (UTC).
+   * Update amount/displayPrice together. Only the current price and this one
+   * previous price are accepted; the previous price expires automatically.
+   * Omit when no previous price needs a grace period. Keep referenceId stable.
    */
-  acceptedAmounts: string[];
+  previousPrice?: { amount: string; acceptedUntil: string };
   displayPrice: string;
   productName: string;
   description: string;
@@ -18,7 +20,6 @@ export interface ProPricing {
 export const proPricing: ProPricing = {
   currency: 'USD',
   amount: '1.00',
-  acceptedAmounts: ['1.00'],
   displayPrice: '$1',
   productName: 'DevSnapKit Pro',
   description: 'DevSnapKit Pro Lifetime Pass',
