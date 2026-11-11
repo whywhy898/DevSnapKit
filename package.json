@@ -20,6 +20,8 @@
     "test:text:v1": "npm run test:canvas-text:v1",
     "test:text:v1:browser": "npm run test:canvas-text:v1:browser",
     "test:seo": "node --test tests/seo-landing-pages.test.mjs tests/seo-landing-assets.test.mjs tests/seo-attribution.test.mjs tests/seo-funnel.test.mjs tests/seo-legal-pages.test.mjs tests/seo-guide-pages.test.mjs tests/seo-cache-versioning.test.mjs",
+    "test:scenes": "node --test tests/scene-templates.test.mjs",
+    "test:scenes:browser": "node tests/run-editor-onboarding-browser.mjs tests/scene-templates-ui.test.mjs",
     "test:seo:attribution:browser": "node tests/run-seo-attribution-browser.mjs",
     "test:seo:browser": "node tests/run-seo-browser.mjs",
     "test:seo:entry:browser": "node tests/run-seo-entry-browser.mjs"

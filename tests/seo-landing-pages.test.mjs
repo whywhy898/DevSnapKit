@@ -8,8 +8,8 @@ const slugs = ['screenshot-beautifier', 'og-image-generator', 'product-hunt-imag
 const read = path => readFileSync(new URL(path, publicRoot), 'utf8');
 const editorEntries = {
   'screenshot-beautifier': '/?editor=1',
-  'og-image-generator': '/?editor=1&amp;aspect=og',
-  'product-hunt-image-maker': '/?editor=1&amp;mode=duo&amp;aspect=og',
+  'og-image-generator': '/?editor=1&amp;aspect=og&amp;scene=og',
+  'product-hunt-image-maker': '/?editor=1&amp;mode=duo&amp;aspect=og&amp;scene=producthunt',
   'add-text-to-image': '/?editor=1&amp;tool=text',
 };
 

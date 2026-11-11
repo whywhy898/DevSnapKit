@@ -63,19 +63,19 @@
     "slug": "product-hunt-gallery-image-size",
     "kind": "use",
     "title": "Product Hunt Gallery Image Size (1270×760) | DevSnapKit",
-    "cta": "/?editor=1"
+    "cta": "/?editor=1&scene=producthunt"
   },
   {
     "slug": "app-store-screenshot-generator",
     "kind": "use",
     "title": "App Store Screenshot Generator & Sizes (2026) | DevSnapKit",
-    "cta": "/?editor=1"
+    "cta": "/?editor=1&scene=appstore"
   },
   {
     "slug": "twitter-x-post-image-size",
     "kind": "use",
     "title": "X (Twitter) Post Image Size Guide | DevSnapKit",
-    "cta": "/?editor=1&aspect=twitter"
+    "cta": "/?editor=1&aspect=twitter&scene=og"
   },
   {
     "slug": "linkedin-post-image-size",

@@ -5,6 +5,9 @@ export type { SlotFrame, SlotPresentation } from '../../composition/types';
 
 /** Stable identifiers describe the collection; availability is decided by the catalog. */
 export type CuratedTemplateId =
+  | 'scene-producthunt'
+  | 'scene-og'
+  | 'scene-appstore'
   | 'editorial-honey'
   | 'paper-launch-duo'
   | 'calm-split'
@@ -57,6 +60,8 @@ export interface CuratedTemplateBlueprint {
   name: string;
   tier: 'free' | 'pro';
   canvas: TextCanvasSize;
+  /** A single-screenshot scene keeps any existing secondary source dormant. */
+  singleScreenshot?: boolean;
   examples: Record<MediaSlot, CuratedMediaExample>;
   placements: Record<MediaSlot, ObjectFrame>;
   /** Main screenshot placement used when an adaptive template has no visible secondary. */

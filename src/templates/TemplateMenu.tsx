@@ -5,6 +5,8 @@ import { CURATED_TEMPLATE_CATALOG } from './collection/catalog';
 import type { CuratedTemplateId } from './collection/types';
 import { groupTemplates, matchCanvasGroup } from './templateGroups';
 import { TemplatePreview } from './TemplatePreview';
+import { SceneArtwork } from './SceneArtwork';
+import { getSceneTemplate } from './collection/scenes';
 
 type Template = typeof CURATED_TEMPLATE_CATALOG[number];
 const groups = groupTemplates(CURATED_TEMPLATE_CATALOG);
@@ -19,7 +21,7 @@ export function TemplateMenu({ canvasSize, onDesignedApply, onClose, suspended =
   const [matchingGroup] = useState(() => matchCanvasGroup(groups, canvasSize));
   const visibleGroups = filter === 'all'
     ? matchingGroup ? [matchingGroup, ...groups.filter(group => group.key !== matchingGroup.key)] : groups
-    : groups.filter(group => group.key === filter);
+    : filter === 'scenes' ? groupTemplates(CURATED_TEMPLATE_CATALOG.filter(template => getSceneTemplate(template.id))) : groups.filter(group => group.key === filter);
   const dialog = useRef<HTMLDialogElement>(null);
   const galleryScroll = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
@@ -57,6 +59,7 @@ export function TemplateMenu({ canvasSize, onDesignedApply, onClose, suspended =
       </header>
       <div className="template-filters" aria-label="Filter templates by aspect ratio">
         <button type="button" data-template-filter="all" aria-pressed={filter === 'all'} onClick={() => chooseFilter('all')}>All</button>
+        <button type="button" data-template-filter="scenes" aria-pressed={filter === 'scenes'} onClick={() => chooseFilter('scenes')}>Scenes · Free</button>
         {groups.map(group => <button key={group.key} type="button" data-template-filter={group.key} aria-pressed={filter === group.key} onClick={() => chooseFilter(group.key)}>{group.key}</button>)}
       </div>
       {matchingGroup && <div className="template-recommendation" data-template-recommendation>
@@ -70,12 +73,12 @@ export function TemplateMenu({ canvasSize, onDesignedApply, onClose, suspended =
       {busy && <p role="status" className="template-gallery-status">Preparing artwork…</p>}
       {error && <p role="alert" className="template-gallery-error">{error}</p>}
       <div ref={galleryScroll} className="template-gallery-scroll">
-        {!groups.some(group => filter === 'all' || group.key === filter) && <p className="template-gallery-note">No templates in this size yet. <button type="button" onClick={() => chooseFilter('all')}>View all templates</button></p>}
+        {!visibleGroups.length && <p className="template-gallery-note">No templates in this size yet. <button type="button" onClick={() => chooseFilter('all')}>View all templates</button></p>}
         {visibleGroups.map(group => <section className="template-group" key={group.key}>
           <div className="template-group-heading"><h3>{group.key}</h3><span>{group.items.length} {group.items.length === 1 ? 'template' : 'templates'}</span></div>
-          <div className="template-gallery-grid">{group.items.map(template => <article className="template-card" key={template.id}>
+          <div className="template-gallery-grid">{group.items.map(template => <article className="template-card" key={template.id} data-scene={getSceneTemplate(template.id)?.scene}>
             <button type="button" aria-label={`Preview ${template.name} template`} onClick={() => setPreview(template)} className={`template-card-image ${template.height > template.width ? 'is-portrait' : template.height === template.width ? 'is-square' : 'is-landscape'}`}>
-              <img className="object-contain" src={template.thumbnail} width={template.width} height={template.height} alt={`${template.name} exported in DevSnapKit`} loading="lazy" />
+              {getSceneTemplate(template.id) ? <SceneArtwork id={template.id} /> : <img className="object-contain" src={template.thumbnail} width={template.width} height={template.height} alt={`${template.name} exported in DevSnapKit`} loading="lazy" />}
             </button>
             <div className="template-card-body">
               <div className="flex justify-between gap-2 text-sm font-semibold"><span>{template.name}</span><span className={template.tier === 'free' ? 'template-tier-free' : 'template-tier-pro'}>{template.tier === 'free' ? 'Free' : 'Pro'}</span></div>

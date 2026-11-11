@@ -14,6 +14,7 @@ import { ELECTRIC_PAIR } from './definitions/electric-pair';
 import { PEACH_EDITORIAL } from './definitions/peach-editorial';
 import { NEXT_STAGE } from './definitions/next-stage';
 import type { CuratedTemplateId } from './types';
+import { SCENE_TEMPLATES } from './scenes';
 
 /** Only implemented templates are available; declared future IDs are not listings. */
 export const CURATED_TEMPLATE_CATALOG = [
@@ -33,6 +34,8 @@ export const CURATED_TEMPLATE_CATALOG = [
   { id: ELECTRIC_PAIR.id, version: ELECTRIC_PAIR.version, name: ELECTRIC_PAIR.name, tier: ELECTRIC_PAIR.tier, width: 1920, height: 1080, thumbnail: '/designed/collection/electric-pair.webp', description: 'A cobalt and navy canvas connecting a desktop overview with a foreground phone.' },
   { id: PEACH_EDITORIAL.id, version: PEACH_EDITORIAL.version, name: PEACH_EDITORIAL.name, tier: PEACH_EDITORIAL.tier, width: 1080, height: 1350, thumbnail: '/designed/collection/peach-editorial.webp', description: 'An expressive peach editorial cover with large serif typography and two independent journal views.' },
   { id: NEXT_STAGE.id, version: NEXT_STAGE.version, name: NEXT_STAGE.name, tier: NEXT_STAGE.tier, width: NEXT_STAGE.canvas.width, height: NEXT_STAGE.canvas.height, thumbnail: '/designed/collection/next-stage.webp', description: 'Oversized acid-lime typography on black with two overlapping, independently editable phone screens.' },
+  ...SCENE_TEMPLATES.map(({ blueprint, scene }) => ({ id: blueprint.id, version: blueprint.version, name: blueprint.name, tier: blueprint.tier, width: blueprint.canvas.width, height: blueprint.canvas.height,
+    thumbnail: blueprint.examples.main.src, scene, description: 'Scene · Replace the screenshot and edit the title and subtitle. Canvas size, background and placement are ready.' })),
 ];
 export const getCuratedTemplate = (id: string) => CURATED_TEMPLATE_CATALOG.find(template => template.id === id);
 export const isCuratedTemplateAvailable = (id: string): id is CuratedTemplateId => !!getCuratedTemplate(id);

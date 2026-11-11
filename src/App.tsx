@@ -5,6 +5,7 @@ import { restoreTemplateLayout, releaseTemplateMediaRegion } from './templates/a
 import { getTemplate } from './templates/catalog';
 import { equalValues } from './editorHistory';
 import { TemplateMenu } from './templates/TemplateMenu';
+import { sceneTemplateId } from './templates/collection/scenes';
 import { createHoneyComposition } from './composition/designedCatalog';
 import { buildCuratedSnapshot, restoreCuratedLayout, resetCuratedStyles } from './templates/collection/apply';
 import { isCuratedTemplateAvailable } from './templates/collection/catalog';
@@ -499,6 +500,7 @@ const CuratedThumbnail: React.FC<{
 export default function App() {
   // Entry presets are read once; subsequent user edits and history own the state.
   const [entryParams] = useState(() => new URLSearchParams(window.location.search));
+  const entrySceneApplied = useRef(false);
   // A clean, borderless product screenshot demonstrates the editor on first load.
   const initialPreset = MOCKUP_PRESETS.find(p => p.id === 'workspace') || MOCKUP_PRESETS[0];
   const [selectedPreset, setSelectedPreset] = useState<string>(initialPreset.id);
@@ -1902,6 +1904,13 @@ export default function App() {
     } catch (error) { if (request === templateRequest.current) setTextError(error instanceof Error ? error.message : 'Could not prepare designed template.'); }
     finally { if (request === templateRequest.current) { applyingTemplate.current = false; setPreparingTemplate(false); } }
   };
+
+  useEffect(() => {
+    const scene = sceneTemplateId(entryParams);
+    if (!scene || entrySceneApplied.current || assetBusy) return;
+    entrySceneApplied.current = true;
+    void handleApplyDesignedTemplate(scene);
+  }, [entryParams, assetBusy]);
 
   const handleRestoreTemplateLayout = () => {
     if (applyingTemplate.current || exportLock.current || artworkTasks.current!.pending || sizingAction.current?.active) return;

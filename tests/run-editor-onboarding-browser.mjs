@@ -16,6 +16,7 @@ try {
   }
   if (!ready) throw new Error('Vite did not become ready');
   const pattern = process.env.EDITOR_ONBOARDING_TEST_PATTERN ? [`--test-name-pattern=${process.env.EDITOR_ONBOARDING_TEST_PATTERN}`] : [];
-  const runner = spawn(process.execPath, ['--test', '--test-concurrency=1', ...pattern, 'tests/editor-onboarding-ui.test.mjs'], { cwd: root, env: { ...process.env, TEST_UI_URL: origin }, windowsHide: true, stdio: 'inherit' });
+  const files = process.argv.slice(2);
+  const runner = spawn(process.execPath, ['--test', '--test-concurrency=1', ...pattern, ...(files.length ? files : ['tests/editor-onboarding-ui.test.mjs'])], { cwd: root, env: { ...process.env, TEST_UI_URL: origin }, windowsHide: true, stdio: 'inherit' });
   process.exitCode = await new Promise(resolve => runner.on('exit', code => resolve(code ?? 1)));
 } finally { server.kill(); }

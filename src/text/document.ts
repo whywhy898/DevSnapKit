@@ -149,7 +149,7 @@ function creationPosition(canvas: TextCanvasSize, width: number, occupied: TextC
   const best = candidates[0];
   return { x: best.left + width / 2, y: best.top + height / 2, overlap: best.overlap };
 }
-export function addText(doc: CanvasTextDocument, canvas: TextCanvasSize, color = '#FFFFFF', id = crypto.randomUUID(), measured?: TextCreationBox[], media: TextCreationBox[] = []): CanvasTextDocument {
+export function addText(doc: CanvasTextDocument, canvas: TextCanvasSize, color = '#FFFFFF', id: string = crypto.randomUUID(), measured?: TextCreationBox[], media: TextCreationBox[] = []): CanvasTextDocument {
   if (doc.layers.length >= TEXT_LIMITS.layers) throw new Error('Maximum 20 text boxes. Delete a box before adding another.');
   if (doc.layers.some(x => x.id === id)) throw new Error('Text id already exists.');
   if (!Number.isFinite(canvas.width) || !Number.isFinite(canvas.height) || canvas.width < 32 || canvas.height <= 0) throw new Error('Canvas dimensions are invalid.');

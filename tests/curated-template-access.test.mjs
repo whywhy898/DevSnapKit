@@ -27,7 +27,7 @@ test('premium templates add one ability without changing free branding or existi
 test('gallery lists only implemented designs with complete-image preview and separate application controls', () => {
   const { TemplateMenu } = load('src/templates/TemplateMenu.tsx');
   const html = renderToStaticMarkup(createElement(TemplateMenu, { onApply() {}, onDesignedApply() {}, disabled: false, busy: false }));
-  assert.equal((html.match(/<article/g) || []).length, 16);
+  assert.equal((html.match(/<article/g) || []).length, 19);
   for (const name of ['Editorial Honey', 'Paper Launch Duo', 'Calm Split', 'App Pair', 'Night Signal Duo', 'Pocket Flow Duo', 'Big Type Launch', 'Cover Story', 'Feature Spotlight', 'Web &amp; Mobile', 'Metric Focus', 'Before &amp; After', 'Violet Launch', 'Electric Pair', 'Peach Editorial', 'NEXT Stage']) {
     assert.ok(html.includes(`Apply ${name} template`), name);
     assert.ok(html.includes(`Preview ${name} template`), name);

@@ -22,7 +22,7 @@ test('production HTML versions every SEO stylesheet and script with its content 
   // The existing legal-page generator normalizes Windows line endings.
   const sourceHash = file => hash(readFileSync(file, 'utf8').replace(/\r\n/g, '\n'));
   const sources = sourceFiles.map(sourceHash);
-  execSync('npm run build', { cwd: root, stdio: 'pipe', timeout: 170_000 });
+  execSync('npm --prefix . --workspaces=false run build', { cwd: root, stdio: 'pipe', timeout: 170_000 });
   sourceFiles.forEach((file, i) => assert.equal(sourceHash(file), sources[i], `${file}: build changed public HTML`));
 
   const dist = path.join(root, 'dist');

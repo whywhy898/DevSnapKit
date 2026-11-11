@@ -2,7 +2,8 @@ import type { EditorSnapshot } from '../../useHistory';
 import { buildDesignedSnapshot, restoreDesignedLayout, resetDesignedStyles } from '../../composition/designedCatalog';
 import { createIndependentComposition } from '../../composition/document';
 import { validateText } from '../../text/document';
-import type { ObjectFrame } from '../../composition/types';
+import type { GraphicObject, ObjectFrame } from '../../composition/types';
+import type { CuratedTemplateBlueprint } from './types';
 import { PAPER_LAUNCH_DUO, PAPER_BRAND_MARK } from './definitions/paper-launch-duo';
 import { NIGHT_SIGNAL_DUO, NIGHT_BRAND_MARK } from './definitions/night-signal-duo';
 import { POCKET_FLOW_DUO, POCKET_BRAND_MARK } from './definitions/pocket-flow-duo';
@@ -18,8 +19,9 @@ import { VIOLET_LAUNCH } from './definitions/violet-launch';
 import { ELECTRIC_PAIR } from './definitions/electric-pair';
 import { PEACH_EDITORIAL } from './definitions/peach-editorial';
 import { NEXT_STAGE } from './definitions/next-stage';
+import { SCENE_TEMPLATES } from './scenes';
 
-const templates = [
+const templates: { blueprint: CuratedTemplateBlueprint; background: string; brandMark?: GraphicObject }[] = [
   { blueprint: PAPER_LAUNCH_DUO, brandMark: PAPER_BRAND_MARK, background: '#F6F3EC' },
   { blueprint: CALM_SPLIT, brandMark: CALM_BRAND_MARK, background: '#EEF2EE' },
   { blueprint: APP_PAIR, brandMark: APP_PAIR_BRAND_MARK, background: '#EAF2FA' },
@@ -35,6 +37,7 @@ const templates = [
   { blueprint: ELECTRIC_PAIR, background: '#071D54' },
   { blueprint: PEACH_EDITORIAL, background: '#F7D1BC' },
   { blueprint: NEXT_STAGE, background: '#0D120D' },
+  ...SCENE_TEMPLATES,
 ];
 const templateFor = (id: string | undefined) => templates.find(template => template.blueprint.id === id);
 const blueprintFor = (id: string | undefined) => templateFor(id)?.blueprint;
@@ -45,7 +48,7 @@ export function buildCuratedSnapshot(before: EditorSnapshot, id: string, prefix:
   if (!template) throw new Error('Unknown or unavailable curated template');
   const paper = template.blueprint;
   const replaceMain = !before.imageSrc || before.primaryMediaOrigin?.kind === 'builtin';
-  const hiddenSecondary = before.compositionDocument?.detailVisible === false || !!before.compositionDocument?.hiddenIds.includes('secondary');
+  const hiddenSecondary = paper.singleScreenshot || before.compositionDocument?.detailVisible === false || !!before.compositionDocument?.hiddenIds.includes('secondary');
   const replaceSecondary = !hiddenSecondary && (before.secondarySrc ? before.secondaryMediaOrigin?.kind === 'builtin' : replaceMain);
   const imageSrc = replaceMain ? paper.examples.main.src : before.imageSrc;
   const secondarySrc = replaceSecondary ? paper.examples.secondary.src : before.secondarySrc;

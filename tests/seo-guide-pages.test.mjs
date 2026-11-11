@@ -19,6 +19,7 @@ const supported = {
   editor: ['1'],
   aspect: ['og', 'twitter'],
   mode: ['duo'],
+  scene: ['producthunt', 'og', 'appstore'],
 };
 
 test('guide fixture lists fifteen distinct slugs, nine use cases and six comparisons', () => {
@@ -30,6 +31,7 @@ test('guide fixture lists fifteen distinct slugs, nine use cases and six compari
 });
 
 test('supported editor params are really read by the studio', () => {
+  assert.match(appSource, /sceneTemplateId\(entryParams\)/);
   assert.match(appSource, /\['og', 'twitter'\]\.includes\(entryParams\.get\('aspect'\)/);
   assert.match(appSource, /entryParams\.get\('mode'\) === 'duo'/);
 });
