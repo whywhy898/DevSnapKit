@@ -60,15 +60,35 @@ if (!reducedMotion.matches && 'IntersectionObserver' in window) {
   const body = document.body;
   const href = body.dataset.studioCta || '/?editor=1';
   const label = body.dataset.studioCtaLabel || 'Open the Studio';
-  const compact = matchMedia('(max-width: 640px)').matches;
+  const compact = matchMedia('(max-width: 640px)');
   let started = false;
   let timer = 0;
-  const onScroll = () => { if (scrollY > innerHeight * (compact ? 0.6 : 0.25)) start(); };
+  let card;
+  let dismissed = false;
+  const nearEnd = () => {
+    // Exclude the bar's reserved space so showing it cannot move its own scroll threshold.
+    const padding = body.classList.contains('has-studio-cta') ? parseFloat(getComputedStyle(body).paddingBottom) || 0 : 0;
+    return scrollY + innerHeight >= (root.scrollHeight - padding) * 0.75;
+  };
+  function syncVisibility() {
+    if (!card || dismissed) return;
+    const visible = !compact.matches || nearEnd();
+    card.hidden = !visible;
+    body.classList.toggle('has-studio-cta', visible);
+    if (!visible) card.classList.remove('is-shown');
+    else requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (!card.hidden && !dismissed) card.classList.add('is-shown');
+    }));
+  }
+  const onScroll = () => {
+    if (dismissed) return;
+    if (compact.matches ? nearEnd() : scrollY > innerHeight * 0.25) start();
+    syncVisibility();
+  };
   function start() {
-    if (started) return;
+    if (started || dismissed) return;
     started = true;
     clearTimeout(timer);
-    removeEventListener('scroll', onScroll);
     const css = document.createElement('link');
     css.rel = 'stylesheet';
     css.href = '/seo/studio-cta.css';
@@ -76,7 +96,7 @@ if (!reducedMotion.matches && 'IntersectionObserver' in window) {
     document.head.appendChild(css);
   }
   function mount() {
-    const card = document.createElement('aside');
+    card = document.createElement('aside');
     card.className = 'studio-cta';
     card.setAttribute('aria-label', 'DevSnapKit Studio');
     card.innerHTML = '<button class="studio-cta__close" type="button" aria-label="Dismiss the studio card"><span aria-hidden="true">×</span></button>'
@@ -91,15 +111,24 @@ if (!reducedMotion.matches && 'IntersectionObserver' in window) {
     link.setAttribute('href', href);
     link.firstChild.textContent = label;
     card.querySelector('.studio-cta__close').addEventListener('click', () => {
+      dismissed = true;
       try { localStorage.setItem(KEY, String(Date.now() + DISMISS_MS)); } catch {}
       card.remove();
       body.classList.remove('has-studio-cta');
+      removeEventListener('scroll', onScroll);
+      removeEventListener('resize', onScroll);
     });
     body.appendChild(card);
-    body.classList.add('has-studio-cta');
-    requestAnimationFrame(() => requestAnimationFrame(() => card.classList.add('is-shown')));
+    syncVisibility();
   }
-  // Desktop: after 2.5 s or a little scroll. Mobile: after scrolling past most of the hero (or 6 s).
-  timer = setTimeout(start, compact ? 6000 : 2500);
+  // Desktop: after 2.5 s or a little scroll. Mobile: only while in the last quarter of the page.
+  if (!compact.matches) timer = setTimeout(start, 2500);
+  compact.addEventListener('change', () => {
+    clearTimeout(timer);
+    if (!compact.matches && !started && !dismissed) timer = setTimeout(start, 2500);
+    onScroll();
+  });
   addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', onScroll);
+  if (compact.matches) onScroll();
 })();

@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+
+const { parse } = createRequire(import.meta.url)('postcss');
 
 const root = new URL('../', import.meta.url);
 const publicRoot = new URL('public/', root);
@@ -161,4 +164,56 @@ test('guide example provenance lists every new example image with hashes', () =>
     assert.ok(files.has(src), `${g.slug}: ${src}`);
   }
   for (const e of manifest.examples) assert.match(e.sha256, /^[0-9a-f]{64}$/);
+});
+
+test('guide and tool caption boxes use theme surfaces with WCAG AA dark contrast', () => {
+  const css = parse(read('seo/landing.css'));
+  const tokens = {};
+  css.walkRules(rule => {
+    if ([':root', ':root:not([data-theme=light])', ':root[data-theme=dark]'].includes(rule.selector)) {
+      tokens[rule.selector] = { ...tokens[rule.selector], ...Object.fromEntries(rule.nodes.filter(n => n.type === 'decl').map(n => [n.prop, n.value])) };
+    }
+  });
+  assert.equal(tokens[':root']['--studio-backdrop'], "url('/seo/studio-backdrop.webp')", 'keep the light backdrop unchanged');
+  const luminance = hex => {
+    const [r, g, b] = hex.slice(1).match(/../g).map(value => {
+      const channel = parseInt(value, 16) / 255;
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  for (const theme of [':root:not([data-theme=light])', ':root[data-theme=dark]']) {
+    const colors = tokens[theme];
+    assert.equal(colors['--studio-backdrop'], 'none', `${theme}: no light bitmap behind captions`);
+    for (const foreground of ['--muted', '--ink', '--accent']) {
+      for (const background of ['--bg', '--surface', '--raised']) {
+        const ratio = (luminance(colors[foreground]) + 0.05) / (luminance(colors[background]) + 0.05);
+        assert.ok(ratio >= 4.5, `${theme} ${foreground} on ${background}: ${ratio.toFixed(2)}:1`);
+      }
+    }
+  }
+  for (const [file, selector] of [['seo/landing.css', '.hero-stage'], ['seo/guide.css', '.guide-figure']]) {
+    let background;
+    parse(read(file)).walkRules(selector, rule => {
+      rule.walkDecls('background', decl => { background = decl.value; });
+    });
+    assert.equal(background, 'var(--surface) var(--studio-backdrop) center/cover', selector);
+  }
+  for (const [file, selectors] of [
+    ['seo/landing.css', ['.source-shot figcaption', '.image-caption']],
+    ['seo/guide.css', ['.guide-figure figcaption']],
+    ['seo/text-guide.css', ['.guide-steps figcaption', '.demo-caption']],
+  ]) {
+    const sheet = parse(read(file));
+    for (const selector of selectors) {
+      let color;
+      sheet.walkRules(selector, rule => rule.walkDecls('color', decl => { color = decl.value; }));
+      assert.equal(color, 'var(--muted)', `${selector}: use the tested caption color`);
+    }
+  }
+  for (const slug of [...guides.map(g => g.slug), ...tools]) {
+    const html = read(`${slug}/index.html`);
+    assert.ok(html.includes('href="/seo/landing.css"'), `${slug}: shared theme styles`);
+    assert.doesNotMatch(html, /style="[^"]*(?:background|color):/i, `${slug}: no inline caption color overrides`);
+  }
 });

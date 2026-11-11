@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 
 const publicRoot = new URL('../public/', import.meta.url);
 const slugs = ['screenshot-beautifier', 'og-image-generator', 'product-hunt-image-maker', 'add-text-to-image'];
@@ -111,4 +112,134 @@ test('shared presentation keeps new image ratios intrinsic and reduced-motion co
   const script = read('seo/landing.js');
   assert.match(script, /aria-valuetext/);
   assert.match(script, /reducedMotion/);
+});
+
+// Execute the shipped script with a small DOM fixture; no browser or wall-clock waits required.
+function studioFixture({ width = 640, scrollY = 0, height = 800, pageHeight = 4000, dismissedUntil = 0 } = {}) {
+  const events = new Map();
+  const timers = new Map();
+  const storage = new Map([['dsk_studio_cta_dismissed_until', String(dismissedUntil)]]);
+  const classes = () => {
+    const values = new Set();
+    return { contains: value => values.has(value), add: value => values.add(value), remove: value => values.delete(value),
+      toggle(value, enabled) { if (enabled) values.add(value); else values.delete(value); } };
+  };
+  const body = { dataset: {}, classList: classes(), appendChild(node) { card = node; } };
+  const root = { dataset: {}, classList: classes(), get scrollHeight() {
+    return pageHeight + (compact.matches && body.classList.contains('has-studio-cta') ? 76 : 0);
+  } };
+  const compact = { matches: width <= 640, addEventListener(type, handler) { this.change = handler; } };
+  let card;
+  let stylesheet;
+  let nextTimer = 0;
+  const context = {
+    document: { documentElement: root, body, querySelector: () => null, querySelectorAll: () => [],
+      head: { appendChild(node) { stylesheet = node; } },
+      createElement(tag) {
+        if (tag === 'link') return {};
+        const close = { addEventListener(type, handler) { this.click = handler; } };
+        const link = { setAttribute() {}, firstChild: {} };
+        return { hidden: false, classList: classes(), setAttribute() {}, close,
+          querySelector: selector => selector.includes('close') ? close : link,
+          remove() { card = undefined; } };
+      } },
+    window: {}, scrollY, innerHeight: height, localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
+    getComputedStyle: () => ({ paddingBottom: compact.matches && body.classList.contains('has-studio-cta') ? '76px' : '0px' }),
+    matchMedia: query => query.includes('max-width') ? compact : { matches: false, addEventListener() {} },
+    addEventListener(type, handler) { events.set(type, handler); },
+    removeEventListener(type) { events.delete(type); },
+    setTimeout(handler, delay) { timers.set(++nextTimer, { handler, delay }); return nextTimer; },
+    clearTimeout: id => timers.delete(id), requestAnimationFrame: handler => handler(),
+  };
+  runInNewContext(read('seo/landing.js'), context);
+  return {
+    get card() { return card; }, body, timers, storage,
+    get visible() { return Boolean(card && !card.hidden && card.classList.contains('is-shown')); },
+    scroll(y) { context.scrollY = y; events.get('scroll')?.(); },
+    resize(newWidth, newHeight = context.innerHeight) {
+      const changed = compact.matches !== (newWidth <= 640);
+      compact.matches = newWidth <= 640;
+      context.innerHeight = newHeight;
+      if (changed) compact.change?.();
+      events.get('resize')?.();
+    },
+    loadCss() {
+      const onload = stylesheet?.onload;
+      if (onload) { stylesheet.onload = null; onload(); }
+    },
+    runTimers() { for (const [id, timer] of [...timers]) { timers.delete(id); timer.handler(); } },
+  };
+}
+
+test('mobile studio bar has no timer and follows the 75% threshold in both directions', () => {
+  const f = studioFixture();
+  assert.equal(f.timers.size, 0, 'waiting at the top must never show the mobile bar');
+  f.scroll(2199); f.loadCss();
+  assert.equal(f.visible, false);
+  f.scroll(2200); f.loadCss();
+  assert.equal(f.visible, true, 'viewport bottom is exactly 75% of the unpadded page');
+  f.scroll(2200);
+  assert.equal(f.visible, true, 'reserved bottom padding must not move the threshold');
+  f.scroll(2199);
+  assert.equal(f.visible, false);
+  assert.equal(f.card.hidden, true, 'hidden bar links must not be focusable');
+  assert.equal(f.body.classList.contains('has-studio-cta'), false);
+  f.scroll(2200);
+  assert.equal(f.visible, true);
+  assert.equal(f.body.classList.contains('has-studio-cta'), true);
+  assert.match(read('seo/studio-cta.css'), /\.studio-cta\[hidden\]\s*\{\s*display:none/);
+});
+
+test('mobile bar checks restored scroll position, viewport changes and late stylesheet loading', () => {
+  const restored = studioFixture({ scrollY: 2200 });
+  restored.loadCss();
+  assert.equal(restored.visible, true);
+  restored.resize(640, 799);
+  assert.equal(restored.visible, false);
+  restored.resize(640, 800);
+  assert.equal(restored.visible, true);
+  const delayed = studioFixture();
+  delayed.scroll(2200); delayed.scroll(0); delayed.loadCss();
+  assert.equal(delayed.visible, false, 'scrolling up before CSS arrives must cancel visibility');
+});
+
+test('desktop studio card retains its 2.5 second or quarter-viewport scroll triggers', () => {
+  const timed = studioFixture({ width: 641 });
+  assert.deepEqual([...timed.timers.values()].map(timer => timer.delay), [2500]);
+  timed.runTimers(); timed.loadCss();
+  assert.equal(timed.visible, true);
+  timed.scroll(0);
+  assert.equal(timed.visible, true);
+  const scrolled = studioFixture({ width: 641 });
+  scrolled.scroll(200); scrolled.loadCss();
+  assert.equal(scrolled.visible, false);
+  scrolled.scroll(201); scrolled.loadCss();
+  assert.equal(scrolled.visible, true);
+  assert.equal(scrolled.timers.size, 0);
+  scrolled.resize(640);
+  assert.equal(scrolled.visible, false);
+  scrolled.resize(641);
+  assert.equal(scrolled.visible, true);
+  const resized = studioFixture({ width: 641 });
+  resized.resize(640); resized.runTimers(); resized.loadCss();
+  assert.equal(resized.visible, false, 'desktop timer must not leak into mobile');
+});
+
+test('studio dismissal lasts seven days and prevents scroll or resize from remounting it', () => {
+  const f = studioFixture();
+  f.scroll(2200); f.loadCss();
+  const before = Date.now();
+  f.card.close.click();
+  const until = Number(f.storage.get('dsk_studio_cta_dismissed_until'));
+  const sevenDays = 7 * 24 * 60 * 60 * 1000;
+  assert.ok(until >= before + sevenDays && until <= Date.now() + sevenDays);
+  f.scroll(3000); f.resize(641); f.runTimers(); f.loadCss();
+  assert.equal(f.card, undefined);
+  assert.equal(f.body.classList.contains('has-studio-cta'), false);
+  const dismissed = studioFixture({ dismissedUntil: until, scrollY: 3000 });
+  dismissed.runTimers(); dismissed.loadCss();
+  assert.equal(dismissed.card, undefined);
+  const expired = studioFixture({ dismissedUntil: Date.now() - 1, scrollY: 3000 });
+  expired.loadCss();
+  assert.equal(expired.visible, true);
 });
