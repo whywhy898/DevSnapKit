@@ -45,6 +45,13 @@ export const SCENE_TEMPLATES = [
 
 export const getSceneTemplate = (id: string) => SCENE_TEMPLATES.find(item => item.blueprint.id === id);
 
+/** App Store submissions need native pixels; other scenes retain the free 2x default. */
+export function sceneExportDefaults(id?: string): { scale: number; exactSizeLabel?: string } {
+  return id === 'scene-appstore'
+    ? { scale: 1, exactSizeLabel: 'Exact size App Store requires (1290×2796)' }
+    : { scale: 2 };
+}
+
 /** Read without consuming or rewriting marketing/attribution parameters. */
 export function sceneTemplateId(params: { get(name: string): string | null }): CuratedTemplateId | undefined {
   return SCENE_TEMPLATES.find(item => item.scene === params.get('scene'))?.blueprint.id;

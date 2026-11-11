@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { launchBrowser, clickButton } from './helpers/browser.mjs';
 
 const origin = process.env.TEST_UI_URL;
-async function withPage(run) {
+async function withPage(run, { claimSuccess = false } = {}) {
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
@@ -11,6 +11,10 @@ async function withPage(run) {
     await page.setRequestInterception(true);
     page.on('request', request => {
       const url = new URL(request.url());
+      if (claimSuccess && url.pathname === '/api/claim-license') {
+        void request.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, licenseKey: 'DSK-AAAA-BBBB-CCCC' }) });
+        return;
+      }
       if (url.pathname.startsWith('/api/') || (url.protocol.startsWith('http') && url.origin !== new URL(origin).origin)) {
         void request.respond({ status: 200, contentType: 'application/json', body: '{}' });
       } else void request.continue();
@@ -146,3 +150,82 @@ test('upgrade, claim, shortcuts and legal dialogs dismiss with Esc from fields a
   await page.keyboard.press('Escape');
   await page.waitForSelector('[role="dialog"]', { hidden: true });
 }));
+
+test('header license, Pro and shortcuts dialogs return focus after every dismissal path', { skip: !origin }, () => withPage(async page => {
+  for (const [opener, dialog] of [
+    ['.pro-key-button', '[data-claim-modal]'],
+    ['.pro-upgrade-button', '[data-pro-modal]'],
+    ['[title="Keyboard Shortcuts (?)"]', '[aria-label="Keyboard shortcuts"]'],
+    ['footer button', '[aria-label="Refund policy"]'],
+  ]) {
+    for (const dismissal of ['Escape', 'close', 'backdrop']) {
+      await page.focus(opener);
+      const original = await page.$(opener);
+      await page.keyboard.press('Enter');
+      await page.waitForSelector(dialog);
+      assert.equal(await original.evaluate(el => el.isConnected), true, `${opener} stays mounted`);
+      if (dismissal === 'Escape') {
+        if (await page.$(`${dialog} input`)) await page.focus(`${dialog} input`);
+        await page.keyboard.press('Escape');
+      } else if (dismissal === 'close') await page.click(`${dialog} [data-modal-close]`);
+      else await page.click(dialog, { offset: { x: 5, y: 5 } });
+      await page.waitForSelector(dialog, { hidden: true, timeout: 2000 });
+      await page.waitForFunction(el => document.activeElement === el, { timeout: 2000 }, original);
+      await original.dispose();
+    }
+  }
+}));
+
+test('license Key mouse opener also restores focus when closing from a field', { skip: !origin }, () => withPage(async page => {
+  await page.click('.pro-key-button');
+  await page.waitForSelector('[data-claim-modal]');
+  await page.focus('[data-claim-modal] input');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('[data-claim-modal]', { hidden: true });
+  await page.waitForFunction(() => document.activeElement === document.querySelector('.pro-key-button'), { timeout: 2000 });
+}));
+
+test('Key opener replaces a pending Pro focus restoration', { skip: !origin }, () => withPage(async page => {
+  await page.click('.pro-upgrade-button');
+  await page.waitForSelector('[data-pro-modal]');
+  await page.evaluate(() => {
+    document.querySelector('[data-pro-modal] [data-modal-close]').click();
+    const key = document.querySelector('.pro-key-button');
+    key.focus(); key.click();
+  });
+  await page.waitForSelector('[data-claim-modal]');
+  await page.focus('[data-claim-modal] input');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('[data-claim-modal]', { hidden: true });
+  await page.waitForFunction(() => document.activeElement === document.querySelector('.pro-key-button'), { timeout: 2000 });
+}));
+
+test('legal dialog restores the previously focused license field underneath it', { skip: !origin }, () => withPage(async page => {
+  await page.click('.pro-key-button');
+  await page.waitForSelector('[data-claim-modal]');
+  await page.focus('[data-claim-modal] input');
+  await page.evaluate(() => [...document.querySelectorAll('footer button')].find(el => el.textContent.trim() === 'Contact Founder').click());
+  await page.waitForSelector('[aria-label="Contact & support"]');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('[aria-label="Contact & support"]', { hidden: true });
+  await page.waitForFunction(() => document.activeElement === document.querySelector('[data-claim-modal] input'), { timeout: 2000 });
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('[data-claim-modal]', { hidden: true });
+  await page.waitForFunction(() => document.activeElement === document.querySelector('.pro-key-button'), { timeout: 2000 });
+}));
+
+test('success dialog returns focus to its surviving opener after a license claim', { skip: !origin }, () => withPage(async page => {
+  // The free Key opener is replaced on activation. Use a surviving editor control
+  // as the original focus target to verify the claim -> success handoff.
+  const opener = '[title="Keyboard Shortcuts (?)"]';
+  await page.focus(opener);
+  await page.$eval('.pro-key-button', el => el.click());
+  await page.waitForSelector('[data-claim-modal]');
+  await clickButton(page, 'Claim via PayPal');
+  await page.type('[data-claim-modal] input', 'ORDER1234567890123');
+  await clickButton(page, 'Verify Purchase & Retrieve Key');
+  await page.waitForSelector('[aria-label="Payment verified"]');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('[role="dialog"]', { hidden: true });
+  await page.waitForFunction(selector => document.activeElement === document.querySelector(selector), { timeout: 2000 }, opener);
+}, { claimSuccess: true }));

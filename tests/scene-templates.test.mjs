@@ -19,6 +19,18 @@ const json = value => JSON.parse(JSON.stringify(value));
 const base = { imageSrc: 'mine.png', imageName: 'My screenshot', primaryMediaOrigin: { kind: 'user' }, secondarySrc: 'detail.png', secondaryName: 'Detail', secondaryMediaOrigin: { kind: 'user' }, textDocument: { version: 1, layers: [] }, windowTitle: 'My app', layoutMode: 'duo' };
 const clear = (a, b) => a.left + a.width <= b.left || b.left + b.width <= a.left || a.top + a.height <= b.top || b.top + b.height <= a.top;
 
+test('scene export defaults reserve exact 1x for App Store and keep 2x elsewhere', () => {
+  const { sceneExportDefaults } = load('templates/collection/scenes.ts');
+  for (const id of ['scene-producthunt', 'scene-og', 'other-template', undefined]) {
+    const defaults = sceneExportDefaults(id);
+    assert.equal(defaults.scale, 2);
+    assert.equal(defaults.exactSizeLabel, undefined);
+  }
+  const defaults = sceneExportDefaults('scene-appstore');
+  assert.equal(defaults.scale, 1);
+  assert.equal(defaults.exactSizeLabel, 'Exact size App Store requires (1290×2796)');
+});
+
 for (const [scene, width, height] of scenes) {
   test(`${scene}: free catalog blueprint applies exact size, background, one screenshot and editable title/subtitle`, () => {
     const id = `scene-${scene}`;

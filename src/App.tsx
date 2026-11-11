@@ -5,7 +5,7 @@ import { restoreTemplateLayout, releaseTemplateMediaRegion } from './templates/a
 import { getTemplate } from './templates/catalog';
 import { equalValues } from './editorHistory';
 import { TemplateMenu } from './templates/TemplateMenu';
-import { sceneTemplateId } from './templates/collection/scenes';
+import { getSceneTemplate, sceneExportDefaults, sceneTemplateId } from './templates/collection/scenes';
 import { createHoneyComposition } from './composition/designedCatalog';
 import { buildCuratedSnapshot, restoreCuratedLayout, resetCuratedStyles } from './templates/collection/apply';
 import { isCuratedTemplateAvailable } from './templates/collection/catalog';
@@ -655,6 +655,11 @@ export default function App() {
 
   // Export Settings (Resolution & Format)
   const [exportScale, setExportScale] = useState<number>(2); // 1 = 1x, 2 = 2x HD, 4 = 4K Ultra HD
+  const activeSceneId = getSceneTemplate(templateContext?.id ?? '')?.blueprint.id;
+  const sceneExport = sceneExportDefaults(activeSceneId);
+  useEffect(() => {
+    setExportScale(sceneExportDefaults(activeSceneId).scale);
+  }, [activeSceneId]);
   const [exportFormat, setExportFormat] = useState<'png' | 'webp' | 'jpeg'>('png');
   const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
   const [showDemoTemplatesMenu, setShowDemoTemplatesMenu] = useState<boolean>(false);
@@ -2243,7 +2248,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                           {dynamicExportDimensions.width} × {dynamicExportDimensions.height}
                         </span>
                       </div>
-                      <div className="grid grid-cols-3 gap-1.5">
+                      <div className={`grid ${sceneExport.exactSizeLabel ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5`}>
                         {[
                           { scale: 1, label: 'Free 1x' },
                           { scale: 2, label: aspectRatio.id === '16-9' ? 'Free QHD' : 'Free 2x' },
@@ -2252,6 +2257,8 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                           <button
                             key={res.scale}
                             type="button"
+                            data-export-scale={res.scale}
+                            aria-pressed={exportScale === res.scale}
                             onClick={() => {
                               if (res.isPro && !isProUnlocked) {
                                 setShowProModal(true);
@@ -2259,13 +2266,14 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                               }
                               setExportScale(res.scale);
                             }}
-                            className={`py-1.5 px-1 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-[0.98] ${
+                            className={`${res.scale === 1 && sceneExport.exactSizeLabel ? 'col-span-2 flex-wrap' : ''} py-1.5 px-1 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-[0.98] ${
                               exportScale === res.scale
                                 ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200 font-bold'
                                 : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
                             }`}
                           >
                             <span>{res.label}</span>
+                            {res.scale === 1 && sceneExport.exactSizeLabel && <span className="text-[10px] font-normal">{sceneExport.exactSizeLabel}</span>}
                             {res.isPro && !isProUnlocked && <Lock className="w-2.5 h-2.5 text-amber-400" />}
                           </button>
                         ))}
@@ -4015,7 +4023,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                   </span>
                 </div>
                 
-                <div className="grid grid-cols-3 gap-1">
+                <div className={`grid ${sceneExport.exactSizeLabel ? 'grid-cols-2' : 'grid-cols-3'} gap-1`}>
                   {[
                     { scale: 1, label: 'Free 1x' },
                     { scale: 2, label: aspectRatio.id === '16-9' ? 'Free QHD' : 'Free 2x' },
@@ -4023,6 +4031,8 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                   ].map((res) => (
                     <button
                       key={res.scale}
+                      data-export-scale={res.scale}
+                      aria-pressed={exportScale === res.scale}
                       onClick={() => {
                         if (res.isPro && !isProUnlocked) {
                           setShowProModal(true);
@@ -4030,13 +4040,14 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                         }
                         setExportScale(res.scale);
                       }}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-[0.98] ${
+                      className={`${res.scale === 1 && sceneExport.exactSizeLabel ? 'col-span-2 flex-wrap' : ''} py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-[0.98] ${
                         exportScale === res.scale
                           ? 'bg-white/[0.12] border-white/30 text-white font-bold shadow-sm'
                           : 'bg-white/[0.02] border-white/[0.06] text-white/60 hover:text-white hover:bg-white/[0.05]'
                       }`}
                     >
                       <span>{res.label}</span>
+                      {res.scale === 1 && sceneExport.exactSizeLabel && <span className="text-[10px] font-normal">{sceneExport.exactSizeLabel}</span>}
                       {res.isPro && !isProUnlocked && <Lock className="w-2.5 h-2.5 text-amber-400" />}
                     </button>
                   ))}

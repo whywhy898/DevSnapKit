@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { launchBrowser } from './helpers/browser.mjs';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { launchBrowser, clickButton, downloadPng } from './helpers/browser.mjs';
 
 const origin = process.env.TEST_UI_URL;
 const scenes = [['producthunt', 1270, 760], ['og', 1200, 630], ['appstore', 1290, 2796]];
@@ -103,4 +106,48 @@ test('invalid scene values keep the ordinary CTA editor', { skip: !origin }, () 
   await page.waitForSelector('#studio-canvas');
   assert.equal(await page.evaluate(() => window.__mockupBaseline.snapshot.templateContext), null);
   assert.equal(await page.$('[data-testid="welcome-overlay"], .welcome-container'), null);
+}));
+
+test('scene exports default to exact App Store pixels or 2x and follow gallery changes', { skip: !origin }, () => withPage(async page => {
+  for (const [scene, width, height] of scenes) {
+    await page.goto(new URL(`/?editor=1&scene=${scene}`, origin).href, { waitUntil: 'networkidle0' });
+    await waitScene(page, scene);
+    await clickButton(page, 'Export');
+    const scale = scene === 'appstore' ? 1 : 2;
+    await page.waitForFunction(({ width, height, scale }) => [...document.querySelectorAll('button')].some(el => el.textContent.trim() === `Download ${scale}x (${width * scale}×${height * scale})`), {}, { width, height, scale });
+  }
+  const exact = 'Exact size App Store requires (1290×2796)';
+  await page.click('.export-trigger-btn');
+  await page.waitForSelector('.export-popover');
+  assert.equal(await page.$$eval('[data-export-scale="1"]', nodes => nodes.length), 2, 'both export surfaces offer 1x');
+  assert.equal(await page.$$eval('[data-export-scale="1"]', (nodes, exact) => nodes.every(node => node.textContent.includes(exact) && node.getAttribute('aria-pressed') === 'true'), exact), true);
+  await page.click('.export-popover [title="Close"]');
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dsk-appstore-export-'));
+  try {
+    const result = await downloadPng(page, directory, 'appstore.png', () => clickButton(page, 'Download 1x (1290×2796)'));
+    const png = await fs.readFile(result.path);
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1290, 2796]);
+    await fs.unlink(result.path);
+  } finally { await fs.rmdir(directory).catch(() => {}); }
+  await page.click('[data-export-scale="4"]');
+  await page.waitForSelector('[data-pro-modal]');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('[data-pro-modal]', { hidden: true });
+  assert.equal(await page.$eval('[data-export-scale="1"]', el => el.getAttribute('aria-pressed')), 'true');
+  await clickButton(page, 'Free 2x');
+  for (const scene of ['og', 'appstore', 'producthunt', 'appstore']) {
+    await page.click('[data-template-trigger]');
+    await page.click('[data-template-filter="scenes"]');
+    await page.click(`[data-scene="${scene}"] [aria-label^="Apply "]`);
+    await waitScene(page, scene);
+    const scale = scene === 'appstore' ? '1' : '2';
+    await clickButton(page, 'Export');
+    await page.waitForFunction(scale => [...document.querySelectorAll(`[data-export-scale="${scale}"]`)].every(el => el.getAttribute('aria-pressed') === 'true'), {}, scale);
+    assert.equal(await page.$$eval('[data-export-scale="1"]', (nodes, exact) => nodes.some(el => el.textContent.includes(exact)), exact), scene === 'appstore');
+    // Manual choices survive ordinary edits within this scene.
+    await clickButton(page, scene === 'appstore' ? 'Free 2x' : 'Free 1x');
+    await page.evaluate(() => window.__mockupBaseline.apply({ imageName: 'Edited screenshot' }));
+    const chosen = scene === 'appstore' ? '2' : '1';
+    assert.equal(await page.$$eval(`[data-export-scale="${chosen}"]`, nodes => nodes.every(el => el.getAttribute('aria-pressed') === 'true')), true);
+  }
 }));
