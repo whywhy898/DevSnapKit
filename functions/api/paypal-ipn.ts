@@ -2,14 +2,16 @@
 // Handles incoming PayPal Instant Payment Notification (IPN) webhooks
 
 import { markTransactionVerified } from './claim-license';
+import { completedOrder, fulfillOrder, PaymentError, paymentFailure, paypalRequest, paypalToken,
+  requirePaymentStorage, validOrderId, type PayPalEnv } from '../lib/paypal';
 
-interface Env {
-  DSK_SERVER_SECRET?: string;
+interface Env extends PayPalEnv {
   DSK_ORDERS?: any;
 }
 
 export const onRequestPost = async ({ request, env }: { request: Request; env: Env }) => {
   try {
+    requirePaymentStorage(env);
     const rawBody = await request.text();
     const params = new URLSearchParams(rawBody);
 
@@ -27,6 +29,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     });
 
     const verifyStatus = await paypalVerifyRes.text();
+    if (!paypalVerifyRes.ok) throw new PaymentError('PayPal IPN verification is temporarily unavailable.');
 
     if (verifyStatus.trim() === 'VERIFIED') {
       const paymentStatus = params.get('payment_status');
@@ -38,13 +41,25 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
       console.log(`[PayPal IPN VERIFIED] Tx: ${txnId}, Email: ${payerEmail}, Status: ${paymentStatus}, Gross: ${mcGross}, Receiver: ${receiverEmail}`);
 
       if (txnId && paymentStatus === 'Completed') {
+        if (!validOrderId(txnId)) throw new PaymentError('Invalid PayPal capture ID.', 422);
+        const session = await paypalToken(env);
+        const { response, data } = await paypalRequest(session, `/v2/payments/captures/${encodeURIComponent(txnId)}`);
+        if (!response.ok) throw new PaymentError('Could not verify the PayPal capture.');
+        const orderId = data.supplementary_data?.related_ids?.order_id;
+        if (data.id !== txnId || !validOrderId(orderId)) {
+          throw new PaymentError('PayPal capture does not match this purchase.', 422);
+        }
+        const order = await completedOrder(env, session, orderId, false);
+        if (!order) throw new PaymentError('Completed payment is not yet available from PayPal.');
+        // IPN authenticity alone is not proof of the product, accepted price, or matching capture.
+        const record = await fulfillOrder(env, order, txnId);
         markTransactionVerified(txnId);
 
         if (env.DSK_ORDERS) {
           await env.DSK_ORDERS.put(`order:${txnId}`, JSON.stringify({
             txnId,
-            payerEmail,
-            mcGross,
+            payerEmail: record.payerEmail,
+            mcGross: record.amount,
             paymentStatus,
             verifiedAt: new Date().toISOString(),
           }));
@@ -58,6 +73,6 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     }
   } catch (err: any) {
     console.error('[PayPal IPN Error]', err);
-    return new Response('Error processing IPN', { status: 500 });
+    return paymentFailure(err);
   }
 };

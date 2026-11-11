@@ -18,6 +18,8 @@ import { ElementPicker } from './inspector/ElementPicker';
 import { inspectorTabFor } from './inspector/model';
 import { BrandControls } from './inspector/BrandControls';
 import { productCopy } from './productCopy';
+import { proPricing } from '../shared/pricing';
+import { ProPrice } from './ProPrice';
 import { ProUpsellContent } from './ProUpsellContent';
 import { templateLogo, resizeTemplateLogo, moveTemplateLogo } from './inspector/brandModel';
 import { CompositionOverlay } from './composition/CompositionOverlay';
@@ -1202,7 +1204,7 @@ export default function App() {
         if (!document.getElementById(scriptId)) {
           const script = document.createElement('script');
           script.id = scriptId;
-          script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(config.clientId)}&currency=USD&components=buttons`;
+          script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(config.clientId)}&currency=${proPricing.currency}&components=buttons`;
           script.async = true;
           document.body.appendChild(script);
         }
@@ -2016,7 +2018,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                   title={productCopy.tooltip}
                 >
                   <Sparkles size={15} />
-                  <span className="pro-upgrade-label">Upgrade to Pro</span><span className="pro-price">$1</span>
+                  <span className="pro-upgrade-label">Upgrade to Pro</span><span className="pro-price">{proPricing.displayPrice}</span>
                 </button>
 
                 {/* Hairline Divider inside combo */}
@@ -4265,8 +4267,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               </div>
               <div className="flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center gap-1 shrink-0 pt-0.5">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-3xl sm:text-4xl font-black text-white">$1</span>
-                  <span className="text-sm text-slate-500 line-through">$29</span>
+                  <ProPrice />
                 </div>
                 <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                   Lifetime Access

@@ -8,6 +8,7 @@
     "build": "node scripts/build-legal-pages.mjs && tsc && vite build && node scripts/version-seo-assets.mjs",
     "preview": "vite preview",
     "test:security": "node --test tests/security*.test.mjs",
+    "test:pricing": "node --test tests/pricing.test.mjs",
     "test:ui:browser": "node tests/run-editor-ui-evolution-browser.mjs",
     "test:license": "node --test tests/preview-admin-license.test.mjs tests/security.test.mjs",
     "test:license:browser": "node --test tests/admin-pro-browser.test.mjs",

@@ -2,6 +2,7 @@
 // Returns aggregated metrics, traffic trends, and real-time orders for the Admin Dashboard
 import { requireSecret, verifyAdminToken } from '../../lib/security';
 import { readSeoFunnel } from '../../lib/seo-funnel';
+import { proPricing } from '../../../shared/pricing';
 
 interface Env {
   ADMIN_SECRET?: string;
@@ -257,8 +258,8 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
           orderId: row.order_id,
           txnId: row.txn_id || row.order_id,
           payerEmail: row.payer_email || 'anonymous',
-          amount: row.amount || '1.00',
-          currency: row.currency || 'USD',
+          amount: row.amount || proPricing.amount,
+          currency: row.currency || proPricing.currency,
           status: row.status || 'COMPLETED',
           licenseKey: row.license_key || 'N/A',
           createdAt: row.created_at,

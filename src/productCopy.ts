@@ -1,10 +1,12 @@
+import { proPricing } from '../shared/pricing';
+
 /** Shared purchase copy; export presets retain their existing canvas-specific rules. */
 export const productCopy = {
-  title: 'Unlock DevSnapKit Pro',
-  price: 'One-time payment of $1 USD. Lifetime Pro access. No recurring subscriptions.',
+  title: `Unlock ${proPricing.productName}`,
+  price: `One-time payment of ${proPricing.displayPrice} ${proPricing.currency}. Lifetime Pro access. No recurring subscriptions.`,
   freeBrand: 'Add your logo and a QR code. Included in Free.',
   free: 'Text, logo uploads and QR codes are included in Free.',
-  tooltip: 'Pro: premium templates, high-resolution export presets, batch export and premium gradient backgrounds — $1 lifetime.',
+  tooltip: `Pro: premium templates, high-resolution export presets, batch export and premium gradient backgrounds — ${proPricing.displayPrice} lifetime.`,
   activation: 'License Key Verified! DevSnapKit Pro is activated: premium templates, high-resolution export presets, batch export and premium gradient backgrounds.',
   success: 'DevSnapKit Pro is active. Premium templates, high-resolution export presets, batch export and premium gradient backgrounds are unlocked for life.',
   benefits: [

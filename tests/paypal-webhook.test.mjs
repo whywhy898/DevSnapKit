@@ -149,7 +149,7 @@ test('signed approved event recovers a lost browser callback with idempotent cap
   assert.equal(s.count(), 1); assert.equal(s.calls.find(x => x.url.endsWith('/capture')).headers['PayPal-Request-Id'], 'dsk-capture-' + orderId);
 });
 test('bad approved order must not be captured', async t => {
-  const order = canonical('APPROVED'); order.purchase_units[0].amount.value = '99.00';
+  const order = canonical('APPROVED'); order.purchase_units[0].reference_id = 'OTHER_PRODUCT';
   const s = setup(t, { order }); assert.equal((await s.webhook(event('CHECKOUT.ORDER.APPROVED'))).status, 422);
   assert.equal(s.calls.some(x => x.url.endsWith('/capture')), false);
 });
