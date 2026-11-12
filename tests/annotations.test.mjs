@@ -80,7 +80,7 @@ test('selected arrows show only endpoint handles while boxes and highlights keep
     if (kind === 'arrow') {
       assert.equal((html.match(/<button/g) || []).length, 2);
       assert.match(html, /Arrow start endpoint/); assert.match(html, /Arrow end endpoint/);
-      assert.doesNotMatch(html, /outline:|box-shadow:|Move selected object|Scale selected object/);
+      assert.doesNotMatch(html, /<div\b[^>]*(?:outline:|box-shadow:)|Move selected object|Scale selected object/);
     } else {
       assert.match(html, /outline:2px solid/); assert.match(html, /box-shadow:/);
       assert.match(html, /Move selected object/); assert.match(html, /Scale selected object/);

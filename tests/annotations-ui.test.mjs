@@ -42,6 +42,33 @@ test('Annotate opens and focuses the tools; cascaded annotations and endpoint-on
         return { handles: frame.querySelectorAll('button').length, outline: style.outlineStyle, shadow: style.boxShadow };
       });
       assert.deepEqual(selection, { handles: 2, outline: 'none', shadow: 'none' });
+      const endpoints = await page.$$eval('[aria-label^="Arrow "][aria-label$=" endpoint"]', nodes => nodes.map(node => {
+        const style = getComputedStyle(node), ring = node.firstElementChild;
+        const ringStyle = ring && getComputedStyle(ring);
+        const scale = node.getBoundingClientRect().width / node.offsetWidth;
+        return {
+          label: node.getAttribute('aria-label'), fill: style.backgroundColor, border: style.borderTopWidth,
+          hitWidth: node.getBoundingClientRect().width, hitHeight: node.getBoundingClientRect().height,
+          ring: ringStyle && {
+            fill: ringStyle.backgroundColor, width: ring.getBoundingClientRect().width, height: ring.getBoundingClientRect().height,
+            stroke: ringStyle.borderTopColor, strokeWidth: parseFloat(ringStyle.borderTopWidth) * scale,
+            contrast: ringStyle.boxShadow, pointerEvents: ringStyle.pointerEvents,
+          },
+        };
+      }));
+      assert.equal(endpoints.length, 2);
+      for (const endpoint of endpoints) {
+        assert.equal(endpoint.fill, 'rgba(0, 0, 0, 0)', `${theme} ${endpoint.label}: invisible grab area`);
+        assert.equal(endpoint.border, '0px');
+        assert.ok(endpoint.hitWidth >= 24 && endpoint.hitHeight >= 24, 'retain a generous hit area');
+        assert.ok(endpoint.ring, 'render a separate hollow endpoint ring');
+        assert.equal(endpoint.ring.fill, 'rgba(0, 0, 0, 0)', 'leave the arrowhead visible through the ring');
+        assert.ok(endpoint.ring.width >= 8 && endpoint.ring.width <= 12 && endpoint.ring.height === endpoint.ring.width, 'small circular marker');
+        assert.ok(endpoint.ring.strokeWidth > 0 && endpoint.ring.strokeWidth <= 2, 'thin ring stroke');
+        assert.equal(endpoint.ring.stroke, 'rgb(30, 27, 75)');
+        assert.match(endpoint.ring.contrast, /rgb\(255, 255, 255\)/, 'white outer edge contrasts on dark backgrounds');
+        assert.equal(endpoint.ring.pointerEvents, 'none');
+      }
       const box = await page.$eval('[data-annotation="rectangle"] rect', node => ({ stroke: node.getAttribute('stroke'), width: Number(node.getAttribute('stroke-width')) }));
       assert.deepEqual(box, { stroke: '#ef4444', width: 8 });
       if (process.env.ANNOTATIONS_EVIDENCE_DIR) {
@@ -106,17 +133,18 @@ test('annotation tools, gesture history, typing guard and native scaled exports 
     };
     const undo = async () => { await page.evaluate(() => document.activeElement?.blur()); await page.keyboard.down('Control'); await page.keyboard.press('z'); await page.keyboard.up('Control'); };
     const redo = async () => { await page.keyboard.down('Control'); await page.keyboard.press('y'); await page.keyboard.up('Control'); };
-    const drag = async (selector, dx, dy) => {
+    const drag = async (selector, dx, dy, grabOffset = 0) => {
       const node = await page.$(selector), box = await node.boundingBox();
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
-      await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy, { steps: 8 }); await page.mouse.up();
+      await page.mouse.move(box.x + box.width / 2 + grabOffset, box.y + box.height / 2); await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + grabOffset + dx, box.y + box.height / 2 + dy, { steps: 8 }); await page.mouse.up();
     };
     await page.waitForSelector('[aria-label="Arrow start endpoint"]');
     const initial = await snapshot();
-    await drag('[aria-label="Arrow start endpoint"]', -50, -30);
+    // Grab outside the small visible ring, within the transparent hit area.
+    await drag('[aria-label="Arrow start endpoint"]', -50, -30, 10);
     const endpoint = await snapshot(); assert.notDeepEqual(endpoint, initial);
     await undo(); assert.deepEqual(await snapshot(), initial); await redo(); assert.deepEqual(await snapshot(), endpoint);
-    await drag('[aria-label="Arrow end endpoint"]', 25, 20);
+    await drag('[aria-label="Arrow end endpoint"]', 25, 20, 10);
     const endMoved = await snapshot(); assert.notDeepEqual(endMoved, endpoint);
     await undo(); assert.deepEqual(await snapshot(), endpoint); await redo();
     await drag('[data-annotation="arrow"]', 30, 15);
