@@ -168,7 +168,7 @@ body.theme-light .min-h-screen {
   background-color: #f1f5f9 !important;
 }
 
-/* Header Pro ($1) button - High Contrast Amber Theme */
+/* Header Pro button - High Contrast Amber Theme */
 .theme-light header button.text-amber-300,
 .theme-light header button[class*="from-amber-500"] {
   background: linear-gradient(to right, #fef3c7, #fed7aa) !important;

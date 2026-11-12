@@ -2,10 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { createTypeScriptLoader } from './helpers/load-typescript.mjs';
+import { fileURLToPath } from 'node:url';
 
 const { parse } = createRequire(import.meta.url)('postcss');
 
 const root = new URL('../', import.meta.url);
+const { proPricing } = createTypeScriptLoader(fileURLToPath(root))('shared/pricing.ts');
 const publicRoot = new URL('public/', root);
 const read = path => readFileSync(new URL(path, publicRoot), 'utf8');
 const guides = JSON.parse(readFileSync(new URL('tests/fixtures/seo-guides.json', root), 'utf8'));
@@ -128,7 +131,7 @@ test('comparison pages carry a dated, sourced comparison table and the verified 
     assert.match(html, /<p class="table-note last-checked">[\s\S]*?href="https:\/\/[^"]+" rel="nofollow noopener"/, guide.slug);
     const text = strip(html);
     assert.match(text, /no watermark/i, guide.slug);
-    assert.match(text, /\$1/, guide.slug);
+    assert.ok(text.includes(proPricing.displayPrice), guide.slug);
     assert.match(text, /not uploaded|never uploaded|without uploading|never leave/i, guide.slug);
   }
   const pika = read('pika-style-alternative/index.html');
@@ -137,7 +140,8 @@ test('comparison pages carry a dated, sourced comparison table and the verified 
 
 test('verified product claims stay true to the code', () => {
   const paypal = readFileSync(new URL('functions/api/paypal-create-order.ts', root), 'utf8');
-  assert.match(paypal, /value: ['"]1\.00['"]/);
+  assert.match(paypal, /value: proPricing\.amount/);
+  assert.match(readFileSync(new URL('shared/pricing.ts', root), 'utf8'), /amount: ['"]1\.00['"]/);
   assert.match(read('privacy/index.html'), /Zero-Upload/);
   const themes = readFileSync(new URL('src/themes.ts', root), 'utf8');
   for (const name of ['Aurora Borealis', 'Sunset Coral', 'Cyberpunk', 'Emerald Glow', 'Midnight Neon', 'Nordic Glacier', 'Tokyo Dusk', 'Studio Silver']) assert.ok(themes.includes(`name: '${name}'`), name);

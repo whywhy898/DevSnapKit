@@ -1,11 +1,13 @@
 import { ConfigurationError, generateSignedKey, requireSecret } from './security';
 import { sendOrderNotification, type NotifyEnv } from '../api/notify';
+import { proPricing } from '../../shared/pricing';
 
 export interface PayPalEnv extends NotifyEnv {
   PAYPAL_CLIENT_ID?: string;
   PAYPAL_CLIENT_SECRET?: string;
   PAYPAL_MODE?: string;
   PAYPAL_WEBHOOK_ID?: string;
+  PRICE_CHANGED_AT?: string;
   DSK_SERVER_SECRET?: string;
   DB?: any;
 }
@@ -61,23 +63,45 @@ export async function readOrder(session: Session, orderId: string) {
   return data;
 }
 
-function oneDollar(amount: any) {
-  return amount?.currency_code === 'USD' && typeof amount.value === 'string' && /^0*1(?:\.0{1,2})?$/.test(amount.value);
+function purchaseAmount(amount: any): bigint | null {
+  if (amount?.currency_code !== proPricing.currency || typeof amount.value !== 'string'
+    || !/^\d+(?:\.\d{1,2})?$/.test(amount.value)) return null;
+  const [whole, fraction = ''] = amount.value.split('.');
+  const cents = BigInt(whole + fraction.padEnd(2, '0'));
+  return cents > 0n ? cents : null;
 }
 
-export function validatePurchase(order: any) {
+function acceptedPurchaseAmount(amount: any, env: PayPalEnv): boolean {
+  const cents = purchaseAmount(amount);
+  if (cents === null) return false;
+  const matches = (value: string) => purchaseAmount({ currency_code: proPricing.currency, value }) === cents;
+  if (matches(proPricing.amount)) return true;
+  const previous = proPricing.previousPrice;
+  if (!previous || !matches(previous.amount)) return false;
+  const changedAt = env.PRICE_CHANGED_AT;
+  const changedAtMs = typeof changedAt === 'string' ? Date.parse(changedAt) : NaN;
+  // Require an explicit UTC timestamp and reject dates that Date.parse normalizes (e.g. February 30).
+  if (!changedAt || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)$/.test(changedAt)
+    || !Number.isFinite(changedAtMs) || new Date(changedAtMs).toISOString().slice(0, 19) !== changedAt.slice(0, 19)) {
+    console.warn('[Payment] PRICE_CHANGED_AT is missing or invalid; previous price is disabled.');
+    return false;
+  }
+  return Date.now() < changedAtMs + previous.graceHours * 60 * 60 * 1000;
+}
+
+export function validatePurchase(order: any, env: PayPalEnv) {
   const units = order?.purchase_units;
   if (order?.intent !== 'CAPTURE' || !Array.isArray(units) || units.length !== 1
-    || units[0].reference_id !== 'DSK_PRO_LIFETIME' || !oneDollar(units[0].amount)
+    || units[0]?.reference_id !== proPricing.referenceId || !acceptedPurchaseAmount(units[0].amount, env)
     || typeof units[0].payee?.merchant_id !== 'string' || !units[0].payee.merchant_id) {
-    throw new PaymentError('This PayPal order does not match the DevSnapKit $1 USD purchase.', 422);
+    throw new PaymentError(`This PayPal order does not match the ${proPricing.productName} ${proPricing.currency} purchase.`, 422);
   }
   return units[0];
 }
 
-export async function completedOrder(_env: PayPalEnv, session: Session, orderId: string, allowCapture: boolean) {
+export async function completedOrder(env: PayPalEnv, session: Session, orderId: string, allowCapture: boolean, includeIncomplete = false) {
   let order = await readOrder(session, orderId);
-  validatePurchase(order);
+  validatePurchase(order, env);
   if (order.status === 'APPROVED' && allowCapture) {
     const { response, data } = await paypalRequest(session, `/v2/checkout/orders/${orderId}/capture`, {
       method: 'POST', headers: { 'PayPal-Request-Id': `dsk-capture-${orderId}` }, body: '{}',
@@ -94,26 +118,28 @@ export async function completedOrder(_env: PayPalEnv, session: Session, orderId:
       }
     }
   }
-  if (order.status !== 'COMPLETED') return null;
-  validatePurchase(order);
-  if (allowCapture && order.purchase_units[0].payments?.captures?.some((capture: any) => capture.status === 'PENDING')) return null;
+  if (order.status !== 'COMPLETED') return includeIncomplete ? order : null;
+  validatePurchase(order, env);
+  if (allowCapture && order.purchase_units[0].payments?.captures?.some((capture: any) => capture.status === 'PENDING')) return includeIncomplete ? order : null;
   return order;
 }
 
 export async function fulfillOrder(env: PayPalEnv, order: any, expectedCaptureId?: string) {
   requirePaymentStorage(env);
-  const unit = validatePurchase(order);
+  const unit = validatePurchase(order, env);
   const captures = unit.payments?.captures;
   const capture = Array.isArray(captures) && captures.length === 1 ? captures[0] : null;
   if (order.status !== 'COMPLETED' || !capture || capture.status !== 'COMPLETED'
-    || typeof capture.id !== 'string' || !capture.id || !oneDollar(capture.amount)
+    || typeof capture.id !== 'string' || !capture.id
+    // The capture must match this order's amount, even when both prices are accepted.
+    || purchaseAmount(capture.amount) !== purchaseAmount(unit.amount)
     || capture.final_capture === false || (expectedCaptureId && capture.id !== expectedCaptureId)
     || (capture.payee?.merchant_id && capture.payee.merchant_id !== unit.payee.merchant_id)) {
     throw new PaymentError('PayPal has not confirmed a matching completed capture.', 422);
   }
   const licenseKey = await generateSignedKey(capture.id, requireSecret(env, 'DSK_SERVER_SECRET'));
   const record = { orderId: order.id, txnId: capture.id, payerEmail: order.payer?.email_address || '',
-    amount: capture.amount.value, currency: 'USD', status: 'COMPLETED', licenseKey,
+    amount: capture.amount.value, currency: proPricing.currency, status: 'COMPLETED', licenseKey,
     createdAt: capture.create_time || new Date().toISOString() };
   let inserted: any, stored: any;
   try {

@@ -16,7 +16,8 @@ test('upgrade presents exactly four paid abilities and explicitly includes brand
 });
 test('dynamic sales and success surfaces use the shared copy', () => {
   const { productCopy } = load('productCopy.ts');
-  assert.match(productCopy.price, /\$1 USD/);
+  const { proPricing } = load('../shared/pricing.ts');
+  assert.ok(productCopy.price.includes(`${proPricing.displayPrice} ${proPricing.currency}`));
   const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
   assert.match(app, /productCopy\.price/);
   assert.match(app, /productCopy\.activation/);

@@ -10,6 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const { proPricing } = loader()('shared/pricing.ts');
 function loader() {
   const cache = new Map();
   function load(relative) {
@@ -37,9 +38,9 @@ const headers = {
 function canonical(status = 'COMPLETED') {
   return {
     id: orderId, status, intent: 'CAPTURE', payer: { email_address: 'buyer@example.test' },
-    purchase_units: [{ reference_id: 'DSK_PRO_LIFETIME', amount: { value: '1.00', currency_code: 'USD' },
+    purchase_units: [{ reference_id: 'DSK_PRO_LIFETIME', amount: { value: proPricing.amount, currency_code: proPricing.currency },
       payee: { merchant_id: 'OUR-MERCHANT' }, payments: { captures: [{ id: captureId, status: 'COMPLETED',
-        final_capture: true, amount: { value: '1.00', currency_code: 'USD' }, payee: { merchant_id: 'OUR-MERCHANT' } }] } }],
+        final_capture: true, amount: { value: proPricing.amount, currency_code: proPricing.currency }, payee: { merchant_id: 'OUR-MERCHANT' } }] } }],
   };
 }
 function event(type = 'PAYMENT.CAPTURE.COMPLETED') {
@@ -149,7 +150,7 @@ test('signed approved event recovers a lost browser callback with idempotent cap
   assert.equal(s.count(), 1); assert.equal(s.calls.find(x => x.url.endsWith('/capture')).headers['PayPal-Request-Id'], 'dsk-capture-' + orderId);
 });
 test('bad approved order must not be captured', async t => {
-  const order = canonical('APPROVED'); order.purchase_units[0].amount.value = '99.00';
+  const order = canonical('APPROVED'); order.purchase_units[0].reference_id = 'OTHER_PRODUCT';
   const s = setup(t, { order }); assert.equal((await s.webhook(event('CHECKOUT.ORDER.APPROVED'))).status, 422);
   assert.equal(s.calls.some(x => x.url.endsWith('/capture')), false);
 });
@@ -186,6 +187,24 @@ test('pending provider capture returns processing without issuing a key', async 
   const s = setup(t, { order: pending }); const r = await s.capture();
   assert.equal(r.status, 202); assert.equal((await r.json()).pending, true); assert.equal(s.count(), 0);
 });
+
+for (const status of ['CREATED', 'SAVED', 'PAYER_ACTION_REQUIRED', 'VOIDED']) {
+  test('server recovery confirms an unpaid ' + status + ' order can be discarded', async t => {
+    const order = canonical(status); delete order.purchase_units[0].payments;
+    const s = setup(t, { order }); const r = await s.capture();
+    assert.equal(r.status, 202);
+    const result = await r.json();
+    assert.equal(result.unpaid, true); assert.equal(result.pending, false);
+    assert.equal(s.count(), 0);
+    assert.equal(s.calls.some(x => x.url.endsWith('/capture')), false);
+  });
+}
+
+test('pending provider capture must not be reported as safe to discard', async t => {
+  const order = canonical(); order.purchase_units[0].payments.captures[0].status = 'PENDING';
+  const s = setup(t, { order }); const result = await (await s.capture()).json();
+  assert.notEqual(result.unpaid, true); assert.equal(result.pending, true);
+});
 test('minimal capture response uses the canonical order metadata', async t => {
   const approved = canonical('APPROVED'); delete approved.purchase_units[0].payments;
   const minimal = { id: orderId, status: 'COMPLETED', purchase_units: [{ payments: canonical().purchase_units[0].payments }] };
@@ -204,7 +223,7 @@ test('creation uses server credentials and the unchanged one-dollar CAPTURE purc
   assert.equal(r.status, 200); assert.equal((await r.json()).id, orderId);
   const request = s.calls.find(x => x.url.endsWith('/v2/checkout/orders'));
   const body = JSON.parse(request.body); assert.equal(body.intent, 'CAPTURE');
-  assert.deepEqual(body.purchase_units[0].amount, { value: '1.00', currency_code: 'USD' });
+  assert.deepEqual(body.purchase_units[0].amount, { value: proPricing.amount, currency_code: proPricing.currency });
   assert.equal(body.purchase_units[0].reference_id, 'DSK_PRO_LIFETIME');
   assert.ok(request.headers['PayPal-Request-Id']); assert.equal(s.count(), 0);
 });

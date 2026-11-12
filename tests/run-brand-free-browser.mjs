@@ -39,7 +39,7 @@ async function inspectPng(file,scale,opacity){
   return{width:meta.width,height:meta.height,logoCenter:center,transparentEdge:edge,qrUrl:decoded.data};
 }
 async function download(name,scale,opacity=1){await clickButton(page,'Export');await clickButton(page,scale===1?'Free 1x':'Free 2x');await settle();const artifact=await downloadPng(page,output,name,()=>clickButton(page,`Download ${scale}x (${1600*scale}×${1200*scale})`));return{file:artifact.path,...await inspectPng(artifact.path,scale,opacity)};}
-async function brand(){const tab=await page.evaluateHandle(()=>[...document.querySelectorAll('[data-inspector-tabs] button')].find(n=>[...n.querySelectorAll('span')].some(s=>s.textContent==='Brand')));await tab.click();await tab.dispose();assert.ok(await page.$('[data-brand-controls]'),'free Brand form must be exposed');const text=await page.$eval('[data-brand-controls]',n=>n.textContent);assert.doesNotMatch(text,/PRO SUITE|Unlock|Dynamic QR|\$1|Text Brand Badge/);}
+async function brand(){const tab=await page.evaluateHandle(()=>[...document.querySelectorAll('[data-inspector-tabs] button')].find(n=>[...n.querySelectorAll('span')].some(s=>s.textContent==='Brand')));await tab.click();await tab.dispose();assert.ok(await page.$('[data-brand-controls]'),'free Brand form must be exposed');const text=await page.$eval('[data-brand-controls]',n=>n.textContent);assert.doesNotMatch(text,/PRO SUITE|Unlock|Dynamic QR|\$\d|Text Brand Badge/);}
 async function createPage(mode='free',viewport={width:1440,height:1100,deviceScaleFactor:1}){
   page=await browser.newPage();await page.setViewport(viewport);
   const verification=[],uploads=[];page.on('pageerror',e=>errors.push(e.message));

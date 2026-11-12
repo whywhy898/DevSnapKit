@@ -19,6 +19,8 @@ import { ElementPicker } from './inspector/ElementPicker';
 import { inspectorTabFor } from './inspector/model';
 import { BrandControls } from './inspector/BrandControls';
 import { productCopy } from './productCopy';
+import { proPricing } from '../shared/pricing';
+import { ProPrice } from './ProPrice';
 import { ProUpsellContent } from './ProUpsellContent';
 import { templateLogo, resizeTemplateLogo, moveTemplateLogo } from './inspector/brandModel';
 import { CompositionOverlay } from './composition/CompositionOverlay';
@@ -37,7 +39,7 @@ import {
 import { MOCKUP_PRESETS } from './templates';
 import { GRADIENTS, PresetGradient } from './themes';
 import { verifyLicenseWithServer, claimLicenseViaApi } from './license';
-import { readPendingOrder, rememberPendingOrder, savePurchasedLicense, recoverPayPalLicense } from './paypalCheckout';
+import { readPendingOrder, rememberPendingOrder, savePurchasedLicense, recoverPayPalLicense, checkPendingPayPalOrder } from './paypalCheckout';
 import { LegalModals, LegalModalType } from './LegalModals';
 import { Modal } from './Modal';
 import { trackEvent } from './telemetry';
@@ -701,9 +703,13 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const paypalContainerRef = useRef<HTMLDivElement>(null);
   const [isCapturingPayment, setIsCapturingPayment] = useState<boolean>(false);
+  const [isPayPalCheckoutActive, setIsPayPalCheckoutActive] = useState(false);
   const [paymentError, setPaymentError] = useState('');
+  const [showPaymentDiscardedNotice, setShowPaymentDiscardedNotice] = useState(false);
+  const paymentNoticeSession = useRef(0);
   const [pendingPayPalOrder, setPendingPayPalOrder] = useState(readPendingOrder);
   const [paymentRecoveryAttempt, setPaymentRecoveryAttempt] = useState(0);
+  const [pendingPaymentAction, setPendingPaymentAction] = useState<'recover' | 'discard' | null>(null);
   const purchaseCompleted = useRef(false);
   const [canvasDomSize, setCanvasDomSize] = useState<{ width: number; height: number }>({ width: 960, height: 600 });
 
@@ -1179,20 +1185,52 @@ export default function App() {
     setIsProUnlocked(true);
     savePurchasedLicense(key);
     setPendingPayPalOrder('');
+    setPendingPaymentAction(null);
     setPaymentError('');
+    setShowPaymentDiscardedNotice(false);
     setIsCapturingPayment(false);
+    setIsPayPalCheckoutActive(false);
     setShowProModal(false);
     setShowSuccessModal(true);
   }, []);
 
   useEffect(() => {
+    // Keep the confirmation until another checkout starts or this modal closes.
+    if (!showProModal) {
+      paymentNoticeSession.current += 1;
+      setShowPaymentDiscardedNotice(false);
+    }
+  }, [showProModal]);
+
+  useEffect(() => {
     if (!pendingPayPalOrder) return;
     const controller = new AbortController();
+    if (pendingPaymentAction) {
+      const noticeSession = paymentNoticeSession.current;
+      void checkPendingPayPalOrder(pendingPayPalOrder, controller.signal).then(result => {
+        if (controller.signal.aborted || purchaseCompleted.current) return;
+        if (result.status === 'paid') {
+          completePurchase(result.licenseKey);
+        } else if (result.status === 'unpaid' && pendingPaymentAction === 'discard') {
+          rememberPendingOrder('');
+          setPendingPayPalOrder('');
+          setPaymentError('');
+          // A check started before closing must not add a notice to a later modal.
+          setShowPaymentDiscardedNotice(noticeSession === paymentNoticeSession.current);
+        } else {
+          setPaymentError(result.status === 'unpaid'
+            ? 'This order has not been paid. You can discard it and pay again.'
+            : 'Payment could not be confirmed. Please retry before paying again.');
+        }
+        setPendingPaymentAction(null);
+      });
+      return () => controller.abort();
+    }
     void recoverPayPalLicense(pendingPayPalOrder, controller.signal).then(key => {
       if (key && !controller.signal.aborted) completePurchase(key);
     });
     return () => controller.abort();
-  }, [pendingPayPalOrder, paymentRecoveryAttempt, completePurchase]);
+  }, [pendingPayPalOrder, paymentRecoveryAttempt, pendingPaymentAction, completePurchase]);
 
   // Dynamically load PayPal JavaScript SDK using client ID from server config
   useEffect(() => {
@@ -1209,7 +1247,7 @@ export default function App() {
         if (!document.getElementById(scriptId)) {
           const script = document.createElement('script');
           script.id = scriptId;
-          script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(config.clientId)}&currency=USD&components=buttons`;
+          script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(config.clientId)}&currency=${proPricing.currency}&components=buttons`;
           script.async = true;
           document.body.appendChild(script);
         }
@@ -1221,7 +1259,7 @@ export default function App() {
 
   // Render PayPal Smart Payment Buttons inside Pro Modal
   useEffect(() => {
-    if (!showProModal || !paypalContainerRef.current) return;
+    if (!showProModal || pendingPayPalOrder || !paypalContainerRef.current) return;
 
     paypalContainerRef.current.innerHTML = '';
 
@@ -1238,6 +1276,8 @@ export default function App() {
             },
             createOrder: async () => {
               purchaseCompleted.current = false;
+              setShowPaymentDiscardedNotice(false);
+              setIsPayPalCheckoutActive(true);
               setPaymentError('');
               trackEvent('checkout_click');
               const res = await fetch('/api/paypal-create-order', { method: 'POST' });
@@ -1248,6 +1288,7 @@ export default function App() {
               return data.id;
             },
             onApprove: async (data: any) => {
+              setIsPayPalCheckoutActive(false);
               setIsCapturingPayment(true);
               rememberPendingOrder(data.orderID);
               setPendingPayPalOrder(data.orderID);
@@ -1271,12 +1312,14 @@ export default function App() {
               }
             },
             onCancel: () => {
+              setIsPayPalCheckoutActive(false);
               rememberPendingOrder('');
               setPendingPayPalOrder('');
               setIsCapturingPayment(false);
               setPaymentError('Checkout was cancelled. No license has been issued.');
             },
             onError: () => {
+              setIsPayPalCheckoutActive(false);
               if (!purchaseCompleted.current) setPaymentError('PayPal checkout could not complete. If your card shows a charge, use Recover payment below before trying again.');
             }
           }).render(paypalContainerRef.current);
@@ -1297,7 +1340,7 @@ export default function App() {
       }, 300);
       return () => clearInterval(timer);
     }
-  }, [showProModal, completePurchase]);
+  }, [showProModal, pendingPayPalOrder, completePurchase]);
 
   // Theme list
   const filteredGradients = GRADIENTS;
@@ -2030,7 +2073,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                   title={productCopy.tooltip}
                 >
                   <Sparkles size={15} />
-                  <span className="pro-upgrade-label">Upgrade to Pro</span><span className="pro-price">$1</span>
+                  <span className="pro-upgrade-label">Upgrade to Pro</span><span className="pro-early-bird">Early bird</span><span className="pro-price">{proPricing.displayPrice}</span>
                 </button>
 
                 {/* Hairline Divider inside combo */}
@@ -4285,8 +4328,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               </div>
               <div className="flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center gap-1 shrink-0 pt-0.5">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-3xl sm:text-4xl font-black text-white">$1</span>
-                  <span className="text-sm text-slate-500 line-through">$29</span>
+                  <ProPrice />
                 </div>
                 <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                   Lifetime Access
@@ -4307,7 +4349,8 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
                   {/* PayPal Smart Payment Buttons Container */}
                   <div className="w-full min-h-[44px] space-y-1.5">
-                    <div ref={paypalContainerRef} className="w-full" />
+                    {showPaymentDiscardedNotice && <p role="status" aria-live="polite" className="text-xs leading-relaxed text-emerald-200">Previous payment discarded. You can pay again now.</p>}
+                    <div ref={paypalContainerRef} className={pendingPayPalOrder ? 'hidden' : 'w-full'} />
                     {isCapturingPayment && (
                       <div className="text-center py-2 text-xs font-semibold text-cyan-400 animate-pulse bg-cyan-950/40 border border-cyan-800/40 rounded-lg flex items-center justify-center gap-1.5">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -4316,11 +4359,17 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                     )}
                     {paymentError && <p role="alert" className="text-xs leading-relaxed text-rose-200 bg-rose-950/30 border border-rose-800/50 rounded-lg p-3">{paymentError}</p>}
                     {pendingPayPalOrder && <div className="text-xs text-slate-300 rounded-lg border border-slate-700 p-3 space-y-2">
-                      <p>An unfinished payment is being checked. A pending card authorization alone does not confirm payment.</p>
-                      <button type="button" className="font-semibold text-cyan-300 underline" onClick={() => {
-                        setPaymentError('Checking your PayPal receipt. Your key will appear after the payment is confirmed.');
-                        setPaymentRecoveryAttempt(value => value + 1);
-                      }}>Recover payment</button>
+                      <p>{isPayPalCheckoutActive ? 'Finish or close the PayPal window to continue.' : 'An unfinished payment is being checked. A pending card authorization alone does not confirm payment.'}</p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-2">
+                        <button type="button" className="font-semibold text-cyan-300 underline disabled:opacity-50" disabled={!!pendingPaymentAction || isCapturingPayment || isPayPalCheckoutActive} onClick={() => {
+                          setPaymentError('Checking your PayPal receipt...');
+                          setPendingPaymentAction('recover');
+                        }}>Recover payment</button>
+                        <button type="button" className="font-semibold text-cyan-300 underline disabled:opacity-50" disabled={!!pendingPaymentAction || isCapturingPayment || isPayPalCheckoutActive} onClick={() => {
+                          setPaymentError('Checking your PayPal receipt...');
+                          setPendingPaymentAction('discard');
+                        }}>Discard and pay again</button>
+                      </div>
                     </div>}
                   </div>
 
