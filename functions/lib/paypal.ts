@@ -7,6 +7,7 @@ export interface PayPalEnv extends NotifyEnv {
   PAYPAL_CLIENT_SECRET?: string;
   PAYPAL_MODE?: string;
   PAYPAL_WEBHOOK_ID?: string;
+  PRICE_CHANGED_AT?: string;
   DSK_SERVER_SECRET?: string;
   DB?: any;
 }
@@ -70,28 +71,37 @@ function purchaseAmount(amount: any): bigint | null {
   return cents > 0n ? cents : null;
 }
 
-function acceptedPurchaseAmount(amount: any): boolean {
+function acceptedPurchaseAmount(amount: any, env: PayPalEnv): boolean {
   const cents = purchaseAmount(amount);
   if (cents === null) return false;
   const matches = (value: string) => purchaseAmount({ currency_code: proPricing.currency, value }) === cents;
   if (matches(proPricing.amount)) return true;
   const previous = proPricing.previousPrice;
-  return !!previous && Date.now() < Date.parse(previous.acceptedUntil) && matches(previous.amount);
+  if (!previous || !matches(previous.amount)) return false;
+  const changedAt = env.PRICE_CHANGED_AT;
+  const changedAtMs = typeof changedAt === 'string' ? Date.parse(changedAt) : NaN;
+  // Require an explicit UTC timestamp and reject dates that Date.parse normalizes (e.g. February 30).
+  if (!changedAt || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)$/.test(changedAt)
+    || !Number.isFinite(changedAtMs) || new Date(changedAtMs).toISOString().slice(0, 19) !== changedAt.slice(0, 19)) {
+    console.warn('[Payment] PRICE_CHANGED_AT is missing or invalid; previous price is disabled.');
+    return false;
+  }
+  return Date.now() < changedAtMs + previous.graceHours * 60 * 60 * 1000;
 }
 
-export function validatePurchase(order: any) {
+export function validatePurchase(order: any, env: PayPalEnv) {
   const units = order?.purchase_units;
   if (order?.intent !== 'CAPTURE' || !Array.isArray(units) || units.length !== 1
-    || units[0]?.reference_id !== proPricing.referenceId || !acceptedPurchaseAmount(units[0].amount)
+    || units[0]?.reference_id !== proPricing.referenceId || !acceptedPurchaseAmount(units[0].amount, env)
     || typeof units[0].payee?.merchant_id !== 'string' || !units[0].payee.merchant_id) {
     throw new PaymentError(`This PayPal order does not match the ${proPricing.productName} ${proPricing.currency} purchase.`, 422);
   }
   return units[0];
 }
 
-export async function completedOrder(_env: PayPalEnv, session: Session, orderId: string, allowCapture: boolean, includeIncomplete = false) {
+export async function completedOrder(env: PayPalEnv, session: Session, orderId: string, allowCapture: boolean, includeIncomplete = false) {
   let order = await readOrder(session, orderId);
-  validatePurchase(order);
+  validatePurchase(order, env);
   if (order.status === 'APPROVED' && allowCapture) {
     const { response, data } = await paypalRequest(session, `/v2/checkout/orders/${orderId}/capture`, {
       method: 'POST', headers: { 'PayPal-Request-Id': `dsk-capture-${orderId}` }, body: '{}',
@@ -109,14 +119,14 @@ export async function completedOrder(_env: PayPalEnv, session: Session, orderId:
     }
   }
   if (order.status !== 'COMPLETED') return includeIncomplete ? order : null;
-  validatePurchase(order);
+  validatePurchase(order, env);
   if (allowCapture && order.purchase_units[0].payments?.captures?.some((capture: any) => capture.status === 'PENDING')) return includeIncomplete ? order : null;
   return order;
 }
 
 export async function fulfillOrder(env: PayPalEnv, order: any, expectedCaptureId?: string) {
   requirePaymentStorage(env);
-  const unit = validatePurchase(order);
+  const unit = validatePurchase(order, env);
   const captures = unit.payments?.captures;
   const capture = Array.isArray(captures) && captures.length === 1 ? captures[0] : null;
   if (order.status !== 'COMPLETED' || !capture || capture.status !== 'COMPLETED'

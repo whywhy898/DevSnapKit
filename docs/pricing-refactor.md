@@ -1,8 +1,24 @@
 # Shared Pro pricing
 
-The single offer config is `shared/pricing.ts`: `currency: 'USD'`, `amount: '1.00'`, `displayPrice: '$1'`, product name/description, stable `referenceId: 'DSK_PRO_LIFETIME'`, and optional `compareAtPrice: '$29'`. The current text, price spans, classes, and appearance are preserved. Removing or emptying `compareAtPrice` hides the strikethrough span.
+The single offer config is `shared/pricing.ts`: `currency: 'USD'`, `amount: '9.90'`, `displayPrice: '$9.9'`, stable product identity, and `previousPrice: { amount: '1.00', graceHours: 24 }`. Public copy and structured offers advertise the current price with an early-bird label.
 
-Payment verification reads canonical PayPal order details through the existing authenticated order lookup. It checks the stable product reference and positive USD order amount, then compares the completed capture against that order's own amount using exact integer cents. It never compares payment amounts with today's configured offer. This permits in-flight and historical purchases at a different price. Existing order/capture status, single-unit/single-capture, capture ID, final-capture, merchant, persistence, and license checks remain in place. License format, signing, validation, and activation code are unchanged.
+Payment verification accepts the current price at all times. The previous price is accepted only while `now < Date.parse(PRICE_CHANGED_AT) + graceHours * 60 * 60 * 1000`; it is rejected at the exact expiry boundary. Browser capture, webhook, and IPN paths use this same server validator. The completed capture must match its order's amount using exact integer cents. Other amount rejection and all existing status, merchant, capture, persistence, and license checks remain unchanged.
+
+## Release configuration
+
+Right before deploying the price change, set `PRICE_CHANGED_AT` to the actual ISO 8601 UTC release timestamp for **both preview and production**. Use:
+
+```sh
+wrangler pages secret put PRICE_CHANGED_AT
+```
+
+Enter the release timestamp when prompted, and select the intended Pages project/environment. Repeat for preview and production. Alternatively, set the `PRICE_CHANGED_AT` environment variable in the Pages project's Preview and Production settings before deploying each environment. Do not edit `wrangler.toml` or local `.env*` files.
+
+Use a UTC timestamp such as `2030-04-05T12:00:00Z`; fractional seconds and `+00:00` are supported. A missing, empty, malformed, non-UTC, or impossible timestamp disables previous-price acceptance and logs a warning when that price is checked. Current-price purchases remain accepted, and one-cent and other unconfigured amounts remain rejected.
+
+Preserve this timestamp on later deployments so redeploying does not restart the grace period. For the next price change, update the shared current/previous amounts and set a new release timestamp. Keep the product reference ID stable.
+
+Clock-injected pricing tests cover different release timestamps, within-window acceptance, exact/after-expiry rejection, missing/invalid configuration and warnings, current-price acceptance, one-cent rejection, and capture/webhook/IPN fulfillment.
 
 ## Changed files
 

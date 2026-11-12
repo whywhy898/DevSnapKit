@@ -12,9 +12,10 @@ const require = createRequire(import.meta.url), ts = require('typescript');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const secret = 'pricing-test-only-secret-at-least-32-characters';
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
-const priceChange = Date.parse('2026-11-11T11:46:42Z');
-const acceptedUntil = '2026-11-12T11:46:42Z';
-const expiry = Date.parse(acceptedUntil);
+const changedAt = '2030-04-05T12:00:00Z';
+const priceChange = Date.parse(changedAt);
+const expiry = priceChange + 24 * 60 * 60 * 1000;
+const priceEnv = { PRICE_CHANGED_AT: changedAt };
 function loader(pricingOverride = {}, now = Date.now) {
   class ClockDate extends Date { static now() { return now(); } }
   const cache = new Map();
@@ -59,8 +60,7 @@ function order(amount = loader()('shared/pricing.ts').proPricing.amount) {
 test('one config defines the early-bird offer, 24-hour grace period and stable product identity', () => {
   const { proPricing } = loader()('shared/pricing.ts');
   assert.equal(proPricing.amount, '9.90'); assert.equal(proPricing.currency, 'USD');
-  assert.deepEqual(proPricing.previousPrice, { amount: '1.00', acceptedUntil });
-  assert.equal(Date.parse(proPricing.previousPrice.acceptedUntil) - priceChange, 24 * 60 * 60 * 1000);
+  assert.deepEqual(proPricing.previousPrice, { amount: '1.00', graceHours: 24 });
   assert.equal('acceptedAmounts' in proPricing, false);
   assert.equal(proPricing.displayPrice, '$9.9'); assert.equal('compareAtPrice' in proPricing, false);
   assert.equal(proPricing.productName, 'DevSnapKit Pro');
@@ -68,14 +68,33 @@ test('one config defines the early-bird offer, 24-hour grace period and stable p
   assert.equal(proPricing.referenceId, 'DSK_PRO_LIFETIME');
 });
 
-test('the configured previous price expires at the switch deadline while the current price stays valid', () => {
-  for (const now of [priceChange, expiry - 1, expiry, expiry + 1]) {
-    const { validatePurchase } = loader({}, () => now)('functions/lib/paypal.ts');
-    assert.doesNotThrow(() => validatePurchase(order()));
-    if (now < expiry) assert.doesNotThrow(() => validatePurchase(order('1.00')));
-    else assert.throws(() => validatePurchase(order('1.00')), error => error.status === 422);
+test('the previous price expires 24 hours after the deployment timestamp', () => {
+  for (const timestamp of [changedAt, '2032-08-09T01:02:03.456Z', '2032-08-09T01:02:03+00:00']) {
+    const start = Date.parse(timestamp), end = start + 24 * 60 * 60 * 1000;
+    for (const now of [start, end - 1, end, end + 1]) {
+      const { validatePurchase } = loader({}, () => now)('functions/lib/paypal.ts');
+      const env = { PRICE_CHANGED_AT: timestamp };
+      assert.doesNotThrow(() => validatePurchase(order('9.90'), env));
+      assert.throws(() => validatePurchase(order('0.01'), env), error => error.status === 422);
+      if (now < end) assert.doesNotThrow(() => validatePurchase(order('1.00'), env));
+      else assert.throws(() => validatePurchase(order('1.00'), env), error => error.status === 422);
+    }
   }
 });
+
+for (const timestamp of [undefined, '', 'invalid', '0', '2030-04-05', '2030-04-05T12:00:00',
+  '2030-04-05T12:00:00+01:00', '2030-02-30T12:00:00Z']) {
+  test(`missing/invalid PRICE_CHANGED_AT ${JSON.stringify(timestamp)} fails closed and warns`, t => {
+    const warnings = [];
+    t.mock.method(console, 'warn', message => warnings.push(message));
+    const { validatePurchase } = loader({}, () => priceChange)('functions/lib/paypal.ts');
+    const env = { PRICE_CHANGED_AT: timestamp };
+    assert.throws(() => validatePurchase(order('1.00'), env), error => error.status === 422);
+    assert.ok(warnings.some(message => /PRICE_CHANGED_AT/.test(message)));
+    assert.doesNotThrow(() => validatePurchase(order('9.90'), env));
+    assert.throws(() => validatePurchase(order('0.01'), env), error => error.status === 422);
+  });
+}
 
 test('public copy and structured offers advertise the configured price without retired Pro prices', () => {
   const { proPricing } = loader()('shared/pricing.ts');
@@ -155,11 +174,11 @@ test('admin defaults use config while recorded historical amounts are preserved'
 
 for (const [configured, purchased, captured] of [['1.00', '7.50', '7.50'], ['7.50', '1.00', '01.0']]) {
   test(`fulfillment accepts previous ${purchased} before expiry after config becomes ${configured} and keeps license activation`, async t => {
-    const load = loader({ amount: configured, previousPrice: { amount: purchased, acceptedUntil } }, () => expiry - 1);
+    const load = loader({ amount: configured, previousPrice: { amount: purchased, graceHours: 24 } }, () => expiry - 1);
     const { DB, sql } = database(t);
     const purchase = order(purchased); purchase.purchase_units[0].payments.captures[0].amount.value = captured;
-    assert.equal(load('functions/lib/paypal.ts').validatePurchase(purchase), purchase.purchase_units[0]);
-    const result = await load('functions/lib/paypal.ts').fulfillOrder({ DB, DSK_SERVER_SECRET: secret }, purchase);
+    assert.equal(load('functions/lib/paypal.ts').validatePurchase(purchase, priceEnv), purchase.purchase_units[0]);
+    const result = await load('functions/lib/paypal.ts').fulfillOrder({ ...priceEnv, DB, DSK_SERVER_SECRET: secret }, purchase);
     assert.equal(result.amount, captured); assert.equal(sql.prepare('SELECT COUNT(*) n FROM orders').get().n, 1);
     const response = await load('functions/api/verify-license.ts').onRequestPost({ env: { DSK_SERVER_SECRET: secret },
       request: new Request('https://qa.invalid', { method: 'POST', body: JSON.stringify({ licenseKey: result.licenseKey }) }) });
@@ -167,27 +186,29 @@ for (const [configured, purchased, captured] of [['1.00', '7.50', '7.50'], ['7.5
   });
 }
 
-for (const [name, now, deadline] of [
-  ['at expiry', expiry, acceptedUntil],
-  ['after expiry', expiry + 1, acceptedUntil],
-  ['with an invalid expiry', priceChange, 'invalid'],
+for (const [name, now, timestamp] of [
+  ['at expiry', expiry, changedAt],
+  ['after expiry', expiry + 1, changedAt],
+  ['with a missing timestamp', priceChange, undefined],
+  ['with an invalid timestamp', priceChange, 'invalid'],
 ]) {
   test(`previous price is rejected ${name} without persisting a license`, async t => {
-    const load = loader({ amount: '7.50', previousPrice: { amount: '1.00', acceptedUntil: deadline } }, () => now);
+    const load = loader({ amount: '7.50' }, () => now);
     const { DB, sql } = database(t); const purchase = order('1.00');
+    const env = { DB, DSK_SERVER_SECRET: secret, PRICE_CHANGED_AT: timestamp };
     const { validatePurchase, fulfillOrder } = load('functions/lib/paypal.ts');
-    assert.throws(() => validatePurchase(purchase), error => error.status === 422);
-    await assert.rejects(() => fulfillOrder({ DB, DSK_SERVER_SECRET: secret }, purchase), error => error.status === 422);
+    assert.throws(() => validatePurchase(purchase, env), error => error.status === 422);
+    await assert.rejects(() => fulfillOrder(env, purchase), error => error.status === 422);
     assert.equal(sql.prepare('SELECT COUNT(*) n FROM orders').get().n, 0);
   });
 }
 
 test('current price remains accepted after the previous price expires', async t => {
-  const load = loader({ amount: '7.50', previousPrice: { amount: '1.00', acceptedUntil } }, () => expiry + 1);
+  const load = loader({ amount: '7.50' }, () => expiry + 1);
   const { DB } = database(t); const purchase = order('7.50');
   const { validatePurchase, fulfillOrder } = load('functions/lib/paypal.ts');
-  assert.equal(validatePurchase(purchase), purchase.purchase_units[0]);
-  assert.equal((await fulfillOrder({ DB, DSK_SERVER_SECRET: secret }, purchase)).amount, '7.50');
+  assert.equal(validatePurchase(purchase, priceEnv), purchase.purchase_units[0]);
+  assert.equal((await fulfillOrder({ ...priceEnv, DB, DSK_SERVER_SECRET: secret }, purchase)).amount, '7.50');
 });
 
 for (const [name, mutate] of [
@@ -219,21 +240,25 @@ for (const [name, mutate] of [
 
 test('purchase validation compares current amounts in cents and rejects unaccepted positive prices', () => {
   const { validatePurchase } = loader()('functions/lib/paypal.ts');
-  for (const amount of ['9.9', '9.90', '09.90']) assert.doesNotThrow(() => validatePurchase(order(amount)));
-  for (const amount of ['0.01', '7.50']) assert.throws(() => validatePurchase(order(amount)), error => error.status === 422);
+  for (const amount of ['9.9', '9.90', '09.90']) assert.doesNotThrow(() => validatePurchase(order(amount), {}));
+  for (const amount of ['0.01', '7.50']) assert.throws(() => validatePurchase(order(amount), {}), error => error.status === 422);
 });
 
-for (const endpoint of ['paypal-webhook', 'paypal-ipn']) {
-  for (const [name, configured, previousPrice, now, purchased, captured, expected] of [
-    ['previous price before expiry', '7.50', { amount: '1.00', acceptedUntil }, expiry - 1, '1.00', '01.0', 200],
-    ['previous price at expiry', '7.50', { amount: '1.00', acceptedUntil }, expiry, '1.00', '1.00', 422],
-    ['previous price after expiry', '7.50', { amount: '1.00', acceptedUntil }, expiry + 1, '1.00', '1.00', 422],
-    ['current price after expiry', '7.50', { amount: '1.00', acceptedUntil }, expiry + 1, '7.50', '7.50', 200],
-    ['one-cent order with matching capture', '1.00', undefined, priceChange, '0.01', '0.01', 422],
-    ['mismatched capture at another accepted price', '7.50', { amount: '1.00', acceptedUntil }, expiry - 1, '7.50', '1.00', 422],
+for (const endpoint of ['paypal-capture-order', 'paypal-webhook', 'paypal-ipn']) {
+  for (const [name, now, timestamp, purchased, captured, expected] of [
+    ['previous price before expiry', expiry - 1, changedAt, '1.00', '01.0', 200],
+    ['previous price at expiry', expiry, changedAt, '1.00', '1.00', 422],
+    ['previous price after expiry', expiry + 1, changedAt, '1.00', '1.00', 422],
+    ['previous price with missing timestamp', priceChange, undefined, '1.00', '1.00', 422],
+    ['previous price with invalid timestamp', priceChange, 'invalid', '1.00', '1.00', 422],
+    ...[changedAt, undefined, 'invalid'].flatMap(timestamp => [
+      [`current price with timestamp ${timestamp}`, expiry + 1, timestamp, '9.90', '9.90', 200],
+      [`one-cent order with timestamp ${timestamp}`, priceChange, timestamp, '0.01', '0.01', 422],
+    ]),
+    ['mismatched capture at another accepted price', expiry - 1, changedAt, '9.90', '1.00', 422],
   ]) {
     test(`${endpoint} validates ${name} before making a license claimable`, async t => {
-      const load = loader({ amount: configured, previousPrice }, () => now); const { DB, sql } = database(t);
+      const load = loader({}, () => now); const { DB, sql } = database(t);
       const purchase = order(purchased), unit = purchase.purchase_units[0], capture = unit.payments.captures[0];
       capture.amount.value = captured;
       const kv = new Map(); const original = globalThis.fetch;
@@ -249,10 +274,10 @@ for (const endpoint of ['paypal-webhook', 'paypal-ipn']) {
         throw new Error(`Unexpected provider request: ${url}`);
       };
       t.after(() => { globalThis.fetch = original; });
-      const env = { DB, DSK_SERVER_SECRET: secret, PAYPAL_CLIENT_ID: 'test', PAYPAL_CLIENT_SECRET: 'test',
+      const env = { DB, DSK_SERVER_SECRET: secret, PRICE_CHANGED_AT: timestamp, PAYPAL_CLIENT_ID: 'test', PAYPAL_CLIENT_SECRET: 'test',
         PAYPAL_WEBHOOK_ID: 'test-webhook', DSK_ORDERS: { async put(key, value) { kv.set(key, value); },
           async get(key) { return kv.get(key) || null; } } };
-      const body = endpoint === 'paypal-ipn'
+      const body = endpoint === 'paypal-capture-order' ? JSON.stringify({ orderId: purchase.id }) : endpoint === 'paypal-ipn'
         ? new URLSearchParams({ payment_status: 'Completed', txn_id: capture.id, mc_gross: captured, mc_currency: 'USD' }).toString()
         : JSON.stringify({ id: 'EVENT-TEST', event_type: 'PAYMENT.CAPTURE.COMPLETED', resource: {
           id: capture.id, supplementary_data: { related_ids: { order_id: purchase.id } },
