@@ -12,8 +12,8 @@ const require = createRequire(import.meta.url), ts = require('typescript');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const secret = 'pricing-test-only-secret-at-least-32-characters';
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
-const priceChange = Date.parse('2026-11-11T00:00:00.000Z');
-const acceptedUntil = '2026-11-12T00:00:00.000Z';
+const priceChange = Date.parse('2026-11-11T11:46:42Z');
+const acceptedUntil = '2026-11-12T11:46:42Z';
 const expiry = Date.parse(acceptedUntil);
 function loader(pricingOverride = {}, now = Date.now) {
   class ClockDate extends Date { static now() { return now(); } }
@@ -47,7 +47,7 @@ function database(t) {
     };
   } } };
 }
-function order(amount = '1.00') {
+function order(amount = loader()('shared/pricing.ts').proPricing.amount) {
   return { id: 'ORDER1234567890123', intent: 'CAPTURE', status: 'COMPLETED',
     purchase_units: [{ reference_id: 'DSK_PRO_LIFETIME', description: 'DevSnapKit Pro Lifetime Pass',
       amount: { currency_code: 'USD', value: amount }, payee: { merchant_id: 'OUR-MERCHANT' },
@@ -56,15 +56,45 @@ function order(amount = '1.00') {
   };
 }
 
-test('one config defines the unchanged offer and stable product identity', () => {
+test('one config defines the early-bird offer, 24-hour grace period and stable product identity', () => {
   const { proPricing } = loader()('shared/pricing.ts');
-  assert.equal(proPricing.amount, '1.00'); assert.equal(proPricing.currency, 'USD');
-  assert.equal(proPricing.previousPrice, undefined);
+  assert.equal(proPricing.amount, '9.90'); assert.equal(proPricing.currency, 'USD');
+  assert.deepEqual(proPricing.previousPrice, { amount: '1.00', acceptedUntil });
+  assert.equal(Date.parse(proPricing.previousPrice.acceptedUntil) - priceChange, 24 * 60 * 60 * 1000);
   assert.equal('acceptedAmounts' in proPricing, false);
-  assert.equal(proPricing.displayPrice, '$1'); assert.equal(proPricing.compareAtPrice, '$29');
+  assert.equal(proPricing.displayPrice, '$9.9'); assert.equal('compareAtPrice' in proPricing, false);
   assert.equal(proPricing.productName, 'DevSnapKit Pro');
   assert.equal(proPricing.description, 'DevSnapKit Pro Lifetime Pass');
   assert.equal(proPricing.referenceId, 'DSK_PRO_LIFETIME');
+});
+
+test('the configured previous price expires at the switch deadline while the current price stays valid', () => {
+  for (const now of [priceChange, expiry - 1, expiry, expiry + 1]) {
+    const { validatePurchase } = loader({}, () => now)('functions/lib/paypal.ts');
+    assert.doesNotThrow(() => validatePurchase(order()));
+    if (now < expiry) assert.doesNotThrow(() => validatePurchase(order('1.00')));
+    else assert.throws(() => validatePurchase(order('1.00')), error => error.status === 422);
+  }
+});
+
+test('public copy and structured offers advertise the configured price without retired Pro prices', () => {
+  const { proPricing } = loader()('shared/pricing.ts');
+  const files = ['index.html'];
+  function scan(dir) {
+    for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
+      const file = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) scan(file);
+      else if (/\.(?:tsx?|jsx?|json|html|md|mjs)$/.test(file)) files.push(file);
+    }
+  }
+  for (const dir of ['public', 'src', 'functions', 'scripts']) scan(dir);
+  for (const file of files) assert.doesNotMatch(read(file), /\$(?:1(?:\.00)?|29)(?![\d.])/, file);
+  const html = read('index.html');
+  const schema = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+  const paidOffer = schema.offers.find(offer => offer.price !== '0');
+  assert.equal(paidOffer.price, proPricing.amount);
+  assert.equal(paidOffer.priceCurrency, proPricing.currency);
+  assert.ok(html.includes(proPricing.displayPrice));
 });
 
 test('src and functions contain no duplicate Pro price literals or identifiers', () => {
@@ -189,7 +219,7 @@ for (const [name, mutate] of [
 
 test('purchase validation compares current amounts in cents and rejects unaccepted positive prices', () => {
   const { validatePurchase } = loader()('functions/lib/paypal.ts');
-  for (const amount of ['1', '1.0', '01.00']) assert.doesNotThrow(() => validatePurchase(order(amount)));
+  for (const amount of ['9.9', '9.90', '09.90']) assert.doesNotThrow(() => validatePurchase(order(amount)));
   for (const amount of ['0.01', '7.50']) assert.throws(() => validatePurchase(order(amount)), error => error.status === 422);
 });
 
@@ -240,12 +270,14 @@ for (const endpoint of ['paypal-webhook', 'paypal-ipn']) {
   }
 }
 
-test('comparison price keeps the exact existing price spans and disappears when unset', () => {
+test('Pro prices show a readable early-bird label and never show a strikethrough or deadline', () => {
   const load = loader(); const { ProPrice } = load('src/ProPrice.tsx');
-  assert.equal(renderToStaticMarkup(createElement(ProPrice)),
-    '<span class="text-3xl sm:text-4xl font-black text-white">$1</span><span class="text-sm text-slate-500 line-through">$29</span>');
-  for (const compareAtPrice of ['', undefined]) {
-    const markup = renderToStaticMarkup(createElement(ProPrice, { pricing: { displayPrice: '$1', compareAtPrice } }));
-    assert.equal(markup, '<span class="text-3xl sm:text-4xl font-black text-white">$1</span>');
-  }
+  const markup = renderToStaticMarkup(createElement(ProPrice));
+  assert.ok(markup.includes(load('shared/pricing.ts').proPricing.displayPrice));
+  assert.match(markup, /text-slate-300[^>]*>Early bird<\/span>/);
+  assert.doesNotMatch(markup, /line-through|<s[ >]|<del[ >]|deadline|2026-/i);
+  const configured = renderToStaticMarkup(createElement(ProPrice, { pricing: { displayPrice: '$7.50' } }));
+  assert.ok(configured.includes('$7.50'));
+  const app = read('src/App.tsx');
+  assert.match(app, /className="pro-early-bird">Early bird<\/span>/);
 });

@@ -86,5 +86,5 @@ test('Brand exposes only free Logo and static QR controls, with file recovery', 
   assert.match(html, /aria-label="Logo file"/);
   assert.match(html, /aria-label="QR website URL"/);
   assert.match(html, /Try another image\./);
-  assert.doesNotMatch(html, /PRO|Pro suite|Dynamic QR|\$1|Text Brand Badge|Unlock/);
+  assert.doesNotMatch(html, /PRO|Pro suite|Dynamic QR|\$\d|Text Brand Badge|Unlock/);
 });

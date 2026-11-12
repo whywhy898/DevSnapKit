@@ -22,6 +22,7 @@ function load(relative) {
   return module.exports;
 }
 const claim = load('functions/api/claim-license.ts');
+const { proPricing } = load('shared/pricing.ts');
 const verify = load('functions/api/verify-license.ts');
 const admin = load('functions/api/admin/auth.ts');
 const stats = load('functions/api/admin/stats.ts');
@@ -105,8 +106,8 @@ test('capture issues a key accepted by configured verifier without real payment'
     ? new Response(JSON.stringify({ access_token: 'qa-token' }))
     : new Response(JSON.stringify({ id: 'ORDER1234567890123', intent: 'CAPTURE', status: 'COMPLETED',
       payer: { email_address: 'buyer@example.com' }, purchase_units: [{ reference_id: 'DSK_PRO_LIFETIME',
-        payee: { merchant_id: 'TEST-MERCHANT' }, amount: { value: '1.00', currency_code: 'USD' },
-        payments: { captures: [{ id: 'CAPTURE-QA', status: 'COMPLETED', amount: { value: '1.00', currency_code: 'USD' } }] } }] }));
+        payee: { merchant_id: 'TEST-MERCHANT' }, amount: { value: proPricing.amount, currency_code: proPricing.currency },
+        payments: { captures: [{ id: 'CAPTURE-QA', status: 'COMPLETED', amount: { value: proPricing.amount, currency_code: proPricing.currency } }] } }] }));
   try {
     const res = await post(capture.onRequestPost, { orderId: 'ORDER1234567890123' }, { ...env, DB, PAYPAL_CLIENT_ID: 'qa-client', PAYPAL_CLIENT_SECRET: 'qa-secret', PAYPAL_MODE: 'sandbox' });
     assert.equal(res.status, 200); const data = await res.json();

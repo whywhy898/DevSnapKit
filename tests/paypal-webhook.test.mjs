@@ -10,6 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const { proPricing } = loader()('shared/pricing.ts');
 function loader() {
   const cache = new Map();
   function load(relative) {
@@ -37,9 +38,9 @@ const headers = {
 function canonical(status = 'COMPLETED') {
   return {
     id: orderId, status, intent: 'CAPTURE', payer: { email_address: 'buyer@example.test' },
-    purchase_units: [{ reference_id: 'DSK_PRO_LIFETIME', amount: { value: '1.00', currency_code: 'USD' },
+    purchase_units: [{ reference_id: 'DSK_PRO_LIFETIME', amount: { value: proPricing.amount, currency_code: proPricing.currency },
       payee: { merchant_id: 'OUR-MERCHANT' }, payments: { captures: [{ id: captureId, status: 'COMPLETED',
-        final_capture: true, amount: { value: '1.00', currency_code: 'USD' }, payee: { merchant_id: 'OUR-MERCHANT' } }] } }],
+        final_capture: true, amount: { value: proPricing.amount, currency_code: proPricing.currency }, payee: { merchant_id: 'OUR-MERCHANT' } }] } }],
   };
 }
 function event(type = 'PAYMENT.CAPTURE.COMPLETED') {
@@ -222,7 +223,7 @@ test('creation uses server credentials and the unchanged one-dollar CAPTURE purc
   assert.equal(r.status, 200); assert.equal((await r.json()).id, orderId);
   const request = s.calls.find(x => x.url.endsWith('/v2/checkout/orders'));
   const body = JSON.parse(request.body); assert.equal(body.intent, 'CAPTURE');
-  assert.deepEqual(body.purchase_units[0].amount, { value: '1.00', currency_code: 'USD' });
+  assert.deepEqual(body.purchase_units[0].amount, { value: proPricing.amount, currency_code: proPricing.currency });
   assert.equal(body.purchase_units[0].reference_id, 'DSK_PRO_LIFETIME');
   assert.ok(request.headers['PayPal-Request-Id']); assert.equal(s.count(), 0);
 });

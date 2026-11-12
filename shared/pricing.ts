@@ -13,16 +13,15 @@ export interface ProPricing {
   productName: string;
   description: string;
   referenceId: string;
-  compareAtPrice?: string;
 }
 
 /** Current offer. Keep referenceId stable so past/in-flight purchases remain identifiable. */
 export const proPricing: ProPricing = {
   currency: 'USD',
-  amount: '1.00',
-  displayPrice: '$1',
+  amount: '9.90',
+  previousPrice: { amount: '1.00', acceptedUntil: '2026-11-12T11:46:42Z' },
+  displayPrice: '$9.9',
   productName: 'DevSnapKit Pro',
   description: 'DevSnapKit Pro Lifetime Pass',
   referenceId: 'DSK_PRO_LIFETIME',
-  compareAtPrice: '$29',
 };

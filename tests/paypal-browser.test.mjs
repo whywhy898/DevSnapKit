@@ -5,10 +5,13 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launchBrowser, clickButton } from './helpers/browser.mjs';
+import { createTypeScriptLoader } from './helpers/load-typescript.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const { proPricing } = createTypeScriptLoader(root)('shared/pricing.ts');
 const evidence = process.env.PAYPAL_EVIDENCE_DIR;
 const key = 'DSK-AAAA-BBBB-CCCC', order = 'ORDER1234567890123';
+const discardNotice = '[data-pro-modal] [role="status"]';
 
 async function serveBuild(t) {
   const server = http.createServer(async (req, res) => {
@@ -71,6 +74,15 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
       const welcome = await page.$('button');
       if (welcome) await page.keyboard.press('Escape');
       await page.click('.pro-upgrade-button');
+      assert.equal(await page.$eval('.pro-price', node => node.textContent), proPricing.displayPrice);
+      assert.equal(await page.$eval('.pro-early-bird', node => node.textContent), 'Early bird');
+      const pricing = await page.$eval('[data-pro-modal]', node => ({
+        text: node.textContent,
+        strikethroughs: [...node.querySelectorAll('*')].filter(child => getComputedStyle(child).textDecorationLine.includes('line-through')).length,
+      }));
+      assert.ok(pricing.text.includes(proPricing.displayPrice));
+      assert.ok(pricing.text.includes('Early bird'));
+      assert.equal(pricing.strikethroughs, 0);
       await clickButton(page, 'Test PayPal checkout');
     }
     if (name === 'approval-open') {
@@ -104,7 +116,7 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
 test('pending checkout can be safely discarded or recovered through the browser UI', async t => {
   const base = await serveBuild(t);
   const browser = await launchBrowser(); t.after(() => browser.close());
-  for (const name of ['unpaid', 'paid', 'network', 'server', 'processing']) {
+  for (const name of ['unpaid', 'unpaid-timeout', 'paid', 'network', 'server', 'processing']) {
     const page = await browser.newPage();
     await page.setViewport({ width: name === 'unpaid' ? 390 : 1440, height: 1050, deviceScaleFactor: 1 });
     const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -121,8 +133,8 @@ test('pending checkout can be safely discarded or recovered through the browser 
         container.appendChild(button);
       } }) };
     }, order);
-    let captureCount = 0, createCount = 0, releaseCheck;
-    let outcome = name;
+    let captureCount = 0, createCount = 0, releaseCheck, releaseCreate;
+    let outcome = name === 'unpaid-timeout' ? 'unpaid' : name;
     const requests = [];
     await page.setRequestInterception(true);
     page.on('request', async request => {
@@ -131,7 +143,11 @@ test('pending checkout can be safely discarded or recovered through the browser 
       if (url.hostname === 'www.paypal.com') { await request.respond({ contentType: 'text/javascript', body: '' }); return; }
       if (url.pathname === '/api/paypal-config') { await json({ clientId: 'test-client', mode: 'sandbox' }); return; }
       if (url.pathname === '/api/claim-license') { await json({ success: false }, 403); return; }
-      if (url.pathname === '/api/paypal-create-order') { createCount++; await json({ id: 'SECONDORDER1234567' }); return; }
+      if (url.pathname === '/api/paypal-create-order') {
+        createCount++;
+        await new Promise(resolve => { releaseCreate = resolve; });
+        await json({ id: 'SECONDORDER1234567' }); return;
+      }
       if (url.pathname === '/api/paypal-capture-order') {
         captureCount++; const body = JSON.parse(request.postData()); requests.push(body);
         if (body.orderId === 'SECONDORDER1234567') { await json({ success: true, licenseKey: key }); return; }
@@ -149,11 +165,13 @@ test('pending checkout can be safely discarded or recovered through the browser 
     await page.goto(base, { waitUntil: 'networkidle0' });
     await page.click('.pro-upgrade-button');
     await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Discard and pay again'), { timeout: 3000 });
+    assert.equal(await page.$(discardNotice), null, 'no notice before a successful discard');
     assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Test PayPal checkout' && b.getClientRects().length)), false);
     if (name === 'unpaid') {
       await clickButton(page, 'Recover payment');
       await page.waitForFunction(() => document.querySelector('[role="alert"]')?.textContent.includes('discard it and pay again'));
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), order);
+      assert.equal(await page.$(discardNotice), null, 'recovering an unpaid order does not discard it');
     }
     await clickButton(page, 'Discard and pay again');
     const waitForHeldCheck = async () => {
@@ -161,12 +179,14 @@ test('pending checkout can be safely discarded or recovered through the browser 
       assert.equal(typeof releaseCheck, 'function');
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), order);
       assert.equal(createCount, 0);
+      assert.equal(await page.$(discardNotice), null, 'no notice while the status check is pending');
       assert.equal(await page.evaluate(() => ['Recover payment', 'Discard and pay again'].every(text => [...document.querySelectorAll('button')].find(b => b.textContent === text)?.disabled)), true);
       const release = releaseCheck; releaseCheck = undefined; release();
     };
     await waitForHeldCheck();
     if (['network', 'server', 'processing'].includes(name)) {
       await page.waitForFunction(() => document.querySelector('[role="alert"]')?.textContent.includes('retry'));
+      assert.equal(await page.$(discardNotice), null, 'failed or inconclusive checks never show the notice');
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), order);
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_license_key')), null);
       assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Test PayPal checkout' && b.getClientRects().length)), false);
@@ -177,11 +197,31 @@ test('pending checkout can be safely discarded or recovered through the browser 
     if (name === 'paid') {
       await page.waitForFunction(key => [...document.querySelectorAll('input')].some(input => input.value === key), {}, key);
       assert.equal(createCount, 0, 'a paid order never starts a second checkout');
+      assert.equal(await page.$(discardNotice), null, 'a paid order never shows the discard notice');
     } else {
       await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Test PayPal checkout' && b.getClientRects().length));
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), null);
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pro_unlocked')), null);
+      await page.waitForSelector(discardNotice, { visible: true, timeout: 1500 });
+      assert.equal(await page.$eval(discardNotice, node => node.textContent), 'Previous payment discarded. You can pay again now.');
+      assert.equal(await page.$eval(discardNotice, node => node.getAttribute('aria-live')), 'polite');
+      assert.equal(await page.$eval(discardNotice, node => {
+        const button = [...document.querySelectorAll('button')].find(b => b.textContent === 'Test PayPal checkout');
+        return !!(node.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)
+          && node.getBoundingClientRect().bottom <= button.getBoundingClientRect().top;
+      }), true, 'the notice appears above the payment buttons');
+      if (name === 'unpaid-timeout') {
+        await new Promise(resolve => setTimeout(resolve, 4000));
+        assert.notEqual(await page.$(discardNotice), null, 'notice remains readable for about five seconds');
+        await page.waitForFunction(selector => !document.querySelector(selector), { timeout: 2500 }, discardNotice);
+      }
       await clickButton(page, 'Test PayPal checkout');
+      await page.waitForFunction(selector => !document.querySelector(selector), { timeout: 1000 }, discardNotice);
+      for (let i = 0; i < 100 && !releaseCreate; i++) await new Promise(resolve => setTimeout(resolve, 20));
+      assert.equal(typeof releaseCreate, 'function');
+      assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), null,
+        'the notice hides when checkout starts, before the new order response');
+      releaseCreate();
       await page.waitForFunction(key => localStorage.getItem('devsnapkit_license_key') === key, {}, key);
       assert.equal(createCount, 1);
     }

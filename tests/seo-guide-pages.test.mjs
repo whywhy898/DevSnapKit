@@ -2,10 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { createTypeScriptLoader } from './helpers/load-typescript.mjs';
+import { fileURLToPath } from 'node:url';
 
 const { parse } = createRequire(import.meta.url)('postcss');
 
 const root = new URL('../', import.meta.url);
+const { proPricing } = createTypeScriptLoader(fileURLToPath(root))('shared/pricing.ts');
 const publicRoot = new URL('public/', root);
 const read = path => readFileSync(new URL(path, publicRoot), 'utf8');
 const guides = JSON.parse(readFileSync(new URL('tests/fixtures/seo-guides.json', root), 'utf8'));
@@ -126,7 +129,7 @@ test('comparison pages carry a dated, sourced comparison table and the verified 
     assert.match(html, /<p class="table-note last-checked">[\s\S]*?href="https:\/\/[^"]+" rel="nofollow noopener"/, guide.slug);
     const text = strip(html);
     assert.match(text, /no watermark/i, guide.slug);
-    assert.match(text, /\$1/, guide.slug);
+    assert.ok(text.includes(proPricing.displayPrice), guide.slug);
     assert.match(text, /not uploaded|never uploaded|without uploading|never leave/i, guide.slug);
   }
   const pika = read('pika-style-alternative/index.html');

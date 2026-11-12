@@ -698,6 +698,7 @@ export default function App() {
   const [isCapturingPayment, setIsCapturingPayment] = useState<boolean>(false);
   const [isPayPalCheckoutActive, setIsPayPalCheckoutActive] = useState(false);
   const [paymentError, setPaymentError] = useState('');
+  const [showPaymentDiscardedNotice, setShowPaymentDiscardedNotice] = useState(false);
   const [pendingPayPalOrder, setPendingPayPalOrder] = useState(readPendingOrder);
   const [paymentRecoveryAttempt, setPaymentRecoveryAttempt] = useState(0);
   const [pendingPaymentAction, setPendingPaymentAction] = useState<'recover' | 'discard' | null>(null);
@@ -1178,11 +1179,18 @@ export default function App() {
     setPendingPayPalOrder('');
     setPendingPaymentAction(null);
     setPaymentError('');
+    setShowPaymentDiscardedNotice(false);
     setIsCapturingPayment(false);
     setIsPayPalCheckoutActive(false);
     setShowProModal(false);
     setShowSuccessModal(true);
   }, []);
+
+  useEffect(() => {
+    if (!showPaymentDiscardedNotice) return;
+    const timer = setTimeout(() => setShowPaymentDiscardedNotice(false), 5000);
+    return () => clearTimeout(timer);
+  }, [showPaymentDiscardedNotice]);
 
   useEffect(() => {
     if (!pendingPayPalOrder) return;
@@ -1196,6 +1204,7 @@ export default function App() {
           rememberPendingOrder('');
           setPendingPayPalOrder('');
           setPaymentError('');
+          setShowPaymentDiscardedNotice(true);
         } else {
           setPaymentError(result.status === 'unpaid'
             ? 'This order has not been paid. You can discard it and pay again.'
@@ -1255,6 +1264,7 @@ export default function App() {
             },
             createOrder: async () => {
               purchaseCompleted.current = false;
+              setShowPaymentDiscardedNotice(false);
               setIsPayPalCheckoutActive(true);
               setPaymentError('');
               trackEvent('checkout_click');
@@ -2044,7 +2054,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                   title={productCopy.tooltip}
                 >
                   <Sparkles size={15} />
-                  <span className="pro-upgrade-label">Upgrade to Pro</span><span className="pro-price">{proPricing.displayPrice}</span>
+                  <span className="pro-upgrade-label">Upgrade to Pro</span><span className="pro-early-bird">Early bird</span><span className="pro-price">{proPricing.displayPrice}</span>
                 </button>
 
                 {/* Hairline Divider inside combo */}
@@ -4314,6 +4324,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
 
                   {/* PayPal Smart Payment Buttons Container */}
                   <div className="w-full min-h-[44px] space-y-1.5">
+                    {showPaymentDiscardedNotice && <p role="status" aria-live="polite" className="text-xs leading-relaxed text-emerald-200">Previous payment discarded. You can pay again now.</p>}
                     <div ref={paypalContainerRef} className={pendingPayPalOrder ? 'hidden' : 'w-full'} />
                     {isCapturingPayment && (
                       <div className="text-center py-2 text-xs font-semibold text-cyan-400 animate-pulse bg-cyan-950/40 border border-cyan-800/40 rounded-lg flex items-center justify-center gap-1.5">
