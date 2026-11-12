@@ -699,6 +699,7 @@ export default function App() {
   const [isPayPalCheckoutActive, setIsPayPalCheckoutActive] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [showPaymentDiscardedNotice, setShowPaymentDiscardedNotice] = useState(false);
+  const paymentNoticeSession = useRef(0);
   const [pendingPayPalOrder, setPendingPayPalOrder] = useState(readPendingOrder);
   const [paymentRecoveryAttempt, setPaymentRecoveryAttempt] = useState(0);
   const [pendingPaymentAction, setPendingPaymentAction] = useState<'recover' | 'discard' | null>(null);
@@ -1187,15 +1188,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!showPaymentDiscardedNotice) return;
-    const timer = setTimeout(() => setShowPaymentDiscardedNotice(false), 5000);
-    return () => clearTimeout(timer);
-  }, [showPaymentDiscardedNotice]);
+    // Keep the confirmation until another checkout starts or this modal closes.
+    if (!showProModal) {
+      paymentNoticeSession.current += 1;
+      setShowPaymentDiscardedNotice(false);
+    }
+  }, [showProModal]);
 
   useEffect(() => {
     if (!pendingPayPalOrder) return;
     const controller = new AbortController();
     if (pendingPaymentAction) {
+      const noticeSession = paymentNoticeSession.current;
       void checkPendingPayPalOrder(pendingPayPalOrder, controller.signal).then(result => {
         if (controller.signal.aborted || purchaseCompleted.current) return;
         if (result.status === 'paid') {
@@ -1204,7 +1208,8 @@ export default function App() {
           rememberPendingOrder('');
           setPendingPayPalOrder('');
           setPaymentError('');
-          setShowPaymentDiscardedNotice(true);
+          // A check started before closing must not add a notice to a later modal.
+          setShowPaymentDiscardedNotice(noticeSession === paymentNoticeSession.current);
         } else {
           setPaymentError(result.status === 'unpaid'
             ? 'This order has not been paid. You can discard it and pay again.'

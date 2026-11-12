@@ -116,25 +116,29 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
 test('pending checkout can be safely discarded or recovered through the browser UI', async t => {
   const base = await serveBuild(t);
   const browser = await launchBrowser(); t.after(() => browser.close());
-  for (const name of ['unpaid', 'unpaid-timeout', 'paid', 'network', 'server', 'processing']) {
+  for (const name of ['unpaid', 'unpaid-persistent', 'unpaid-close-button', 'unpaid-close-escape', 'unpaid-close-pending', 'unpaid-reopen-pending', 'paid', 'network', 'server', 'processing']) {
     const page = await browser.newPage();
     await page.setViewport({ width: name === 'unpaid' ? 390 : 1440, height: 1050, deviceScaleFactor: 1 });
     const errors = []; page.on('pageerror', error => errors.push(error.message));
-    await page.evaluateOnNewDocument(order => {
+    await page.evaluateOnNewDocument((order, name) => {
       localStorage.setItem('devsnapkit_welcome_dismissed', 'true');
       localStorage.setItem('devsnapkit_welcome_seen', '1');
       localStorage.setItem('devsnapkit_pending_paypal_order', order);
       window.paypal = { Buttons: config => ({ render(container) {
+        window.cancelPayPalCheckout = () => config.onCancel();
+        window.failPayPalCheckout = () => config.onError();
         const button = document.createElement('button'); button.textContent = 'Test PayPal checkout';
         button.onclick = async () => {
           try { await config.onApprove({ orderID: await config.createOrder() }); }
           catch (error) { config.onError(error); }
         };
-        container.appendChild(button);
+        // Model a slow SDK render after discard, as can happen on preview.
+        if (name === 'unpaid-persistent') setTimeout(() => container.appendChild(button), 6000);
+        else container.appendChild(button);
       } }) };
-    }, order);
+    }, order, name);
     let captureCount = 0, createCount = 0, releaseCheck, releaseCreate;
-    let outcome = name === 'unpaid-timeout' ? 'unpaid' : name;
+    let outcome = name.startsWith('unpaid') ? 'unpaid' : name;
     const requests = [];
     await page.setRequestInterception(true);
     page.on('request', async request => {
@@ -181,6 +185,10 @@ test('pending checkout can be safely discarded or recovered through the browser 
       assert.equal(createCount, 0);
       assert.equal(await page.$(discardNotice), null, 'no notice while the status check is pending');
       assert.equal(await page.evaluate(() => ['Recover payment', 'Discard and pay again'].every(text => [...document.querySelectorAll('button')].find(b => b.textContent === text)?.disabled)), true);
+      if (['unpaid-close-pending', 'unpaid-reopen-pending'].includes(name)) {
+        await page.keyboard.press('Escape');
+        if (name === 'unpaid-reopen-pending') await page.click('.pro-upgrade-button');
+      }
       const release = releaseCheck; releaseCheck = undefined; release();
     };
     await waitForHeldCheck();
@@ -199,21 +207,41 @@ test('pending checkout can be safely discarded or recovered through the browser 
       assert.equal(createCount, 0, 'a paid order never starts a second checkout');
       assert.equal(await page.$(discardNotice), null, 'a paid order never shows the discard notice');
     } else {
+      if (['unpaid-close-pending', 'unpaid-reopen-pending'].includes(name)) {
+        await page.waitForFunction(() => localStorage.getItem('devsnapkit_pending_paypal_order') === null);
+        if (name === 'unpaid-close-pending') await page.click('.pro-upgrade-button');
+        await page.waitForSelector('[data-pro-modal]');
+        assert.equal(await page.$(discardNotice), null, 'a check started before closing cannot leave a stale notice in a reopened modal');
+      }
+      if (name === 'unpaid-persistent') await page.waitForSelector(discardNotice, { visible: true, timeout: 1500 });
       await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Test PayPal checkout' && b.getClientRects().length));
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), null);
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pro_unlocked')), null);
-      await page.waitForSelector(discardNotice, { visible: true, timeout: 1500 });
-      assert.equal(await page.$eval(discardNotice, node => node.textContent), 'Previous payment discarded. You can pay again now.');
-      assert.equal(await page.$eval(discardNotice, node => node.getAttribute('aria-live')), 'polite');
-      assert.equal(await page.$eval(discardNotice, node => {
-        const button = [...document.querySelectorAll('button')].find(b => b.textContent === 'Test PayPal checkout');
-        return !!(node.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)
-          && node.getBoundingClientRect().bottom <= button.getBoundingClientRect().top;
-      }), true, 'the notice appears above the payment buttons');
-      if (name === 'unpaid-timeout') {
+      if (!['unpaid-close-pending', 'unpaid-reopen-pending'].includes(name)) {
+        await page.waitForSelector(discardNotice, { visible: true, timeout: 1500 });
+        assert.equal(await page.$eval(discardNotice, node => node.textContent), 'Previous payment discarded. You can pay again now.');
+        assert.equal(await page.$eval(discardNotice, node => node.getAttribute('aria-live')), 'polite');
+        assert.equal(await page.$eval(discardNotice, node => {
+          const button = [...document.querySelectorAll('button')].find(b => b.textContent === 'Test PayPal checkout');
+          return !!(node.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)
+            && node.getBoundingClientRect().bottom <= button.getBoundingClientRect().top;
+        }), true, 'the notice appears above the payment buttons');
+      }
+      if (name === 'unpaid-persistent') {
         await new Promise(resolve => setTimeout(resolve, 4000));
-        assert.notEqual(await page.$(discardNotice), null, 'notice remains readable for about five seconds');
-        await page.waitForFunction(selector => !document.querySelector(selector), { timeout: 2500 }, discardNotice);
+        await page.waitForSelector(discardNotice, { visible: true, timeout: 1000 });
+        assert.equal(await page.$eval(discardNotice, node => node.textContent), 'Previous payment discarded. You can pay again now.',
+          'notice survives a slow SDK render and remains visible after ten seconds');
+        await page.evaluate(() => { window.cancelPayPalCheckout(); window.failPayPalCheckout(); });
+        await page.waitForSelector(discardNotice, { visible: true, timeout: 1000 });
+      }
+      if (['unpaid-close-button', 'unpaid-close-escape'].includes(name)) {
+        if (name === 'unpaid-close-button') await clickButton(page, 'Close upgrade dialog');
+        else await page.keyboard.press('Escape');
+        await page.waitForFunction(() => !document.querySelector('[data-pro-modal]'));
+        await page.click('.pro-upgrade-button');
+        await page.waitForSelector('[data-pro-modal]');
+        assert.equal(await page.$(discardNotice), null, 'closing and reopening the modal never restores a stale discard notice');
       }
       await clickButton(page, 'Test PayPal checkout');
       await page.waitForFunction(selector => !document.querySelector(selector), { timeout: 1000 }, discardNotice);
