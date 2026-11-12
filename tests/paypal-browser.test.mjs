@@ -185,6 +185,10 @@ test('pending checkout can be safely discarded or recovered through the browser 
       assert.equal(createCount, 0);
       assert.equal(await page.$(discardNotice), null, 'no notice while the status check is pending');
       assert.equal(await page.evaluate(() => ['Recover payment', 'Discard and pay again'].every(text => [...document.querySelectorAll('button')].find(b => b.textContent === text)?.disabled)), true);
+      assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Discard and pay again')?.getAttribute('aria-busy')), 'true');
+      const beforeDoubleClick = captureCount;
+      await clickButton(page, 'Discard and pay again');
+      assert.equal(captureCount, beforeDoubleClick, 'a second click while checking must not send another request');
       if (['unpaid-close-pending', 'unpaid-reopen-pending'].includes(name)) {
         await page.keyboard.press('Escape');
         if (name === 'unpaid-reopen-pending') await page.click('.pro-upgrade-button');
@@ -194,6 +198,7 @@ test('pending checkout can be safely discarded or recovered through the browser 
     await waitForHeldCheck();
     if (['network', 'server', 'processing'].includes(name)) {
       await page.waitForFunction(() => document.querySelector('[role="alert"]')?.textContent.includes('retry'));
+      await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Discard and pay again' && !b.disabled && b.getAttribute('aria-busy') === 'false'));
       assert.equal(await page.$(discardNotice), null, 'failed or inconclusive checks never show the notice');
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), order);
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_license_key')), null);

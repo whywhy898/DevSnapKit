@@ -672,6 +672,7 @@ export default function App() {
   const [sidebarTab, setSidebarTab] = useState<'style' | 'background' | 'text' | 'brand' | 'export'>(() => entryParams.get('tool') === 'text' ? 'text' : 'style');
   const [anglesOpen, setAnglesOpen] = useState(true);
   const [elementSection, setElementSection] = useState<'text' | 'buttons' | 'decor' | 'annotations'>('text');
+  const annotationsPanelRef = useRef<HTMLElement>(null);
   const [copied, setCopied] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [showProModal, setShowProModal] = useState<boolean>(false);
@@ -2179,6 +2180,16 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               onClick={() => { finishCompositionEdit(); setSelectedObject(null); setElementSection('text'); setSidebarTab('text'); textEditor.add(); }}
               className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1 text-xs disabled:opacity-40"
               title="Add text to the canvas"><Type className="w-4 h-4" /><span className="text-[11px] font-medium">Add text</span></button>
+            <button type="button" aria-label="Annotate" disabled={isExporting}
+              onClick={() => {
+                leaveBrandEdit(); finishCompositionEdit(); if (!textEditor.finish()) return;
+                textEditor.select(null);
+                flushSync(() => { setElementSection('annotations'); setSidebarTab('text'); });
+                annotationsPanelRef.current?.scrollIntoView({ block: 'nearest' });
+                annotationsPanelRef.current?.querySelector<HTMLButtonElement>('.annotation-add button')?.focus({ preventScroll: true });
+              }}
+              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1 text-xs disabled:opacity-40"
+              title="Open annotation tools"><ArrowUpRight className="w-4 h-4" aria-hidden="true" /><span className="text-[11px] font-medium">Annotate</span></button>
             <div className="h-3.5 w-px bg-white/10 mx-0.5" />
             {/* Undo Button (F1) */}
             <button
@@ -2709,7 +2720,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             }}
             onReplace={slot => (slot === 'main' ? fileInputRef : secondaryFileInputRef).current?.click()} onRestore={handleRestoreTemplateLayout}
             onRemoveDetail={() => { if (textEditor.finish() && compositionDocument) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } }); }} />}
-          {sidebarTab === 'text' && elementSection !== 'text' && <section className="elements-object-panel">
+          {sidebarTab === 'text' && elementSection !== 'text' && <section ref={annotationsPanelRef} className="elements-object-panel">
             {elementSection === 'annotations' && <><div className="elements-object-heading"><div><h3>Annotations</h3><p>Point out details with arrows, outlines and highlights.</p></div></div><AnnotationTools selectedKind={compositionDocument?.objects.filter(isAnnotation).find(node => node.id === selectedObject)?.annotation} onAdd={kind => {
                 leaveBrandEdit(); finishCompositionEdit(); if (exportLock.current || !textEditor.finish()) return;
                 const before = editorHistory.getLatestSnapshot();
@@ -4379,7 +4390,8 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                           setPaymentError('Checking your PayPal receipt...');
                           setPendingPaymentAction('recover');
                         }}>Recover payment</button>
-                        <button type="button" className="font-semibold text-cyan-300 underline disabled:opacity-50" disabled={!!pendingPaymentAction || isCapturingPayment || isPayPalCheckoutActive} onClick={() => {
+                        <button type="button" className="font-semibold text-cyan-300 underline disabled:opacity-50" disabled={!!pendingPaymentAction || isCapturingPayment || isPayPalCheckoutActive} aria-busy={pendingPaymentAction === 'discard'} onClick={() => {
+                          if (pendingPaymentAction || isCapturingPayment || isPayPalCheckoutActive) return;
                           setPaymentError('Checking your PayPal receipt...');
                           setPendingPaymentAction('discard');
                         }}>Discard and pay again</button>

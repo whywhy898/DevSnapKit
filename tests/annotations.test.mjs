@@ -28,6 +28,66 @@ test('annotations add immutably to the drawing order with free style presets', (
   assert.equal(Object.keys(api.ANNOTATION_WIDTHS).length, 3);
 });
 
+test('new annotations cascade from the previous annotation and wrap inside wide, tall and small canvases', () => {
+  for (const canvas of [size, { width: 200, height: 200 }, { width: 8000, height: 200 }, { width: 200, height: 8000 }]) {
+    let doc = createIndependentComposition(), wrapped = false;
+    for (let i = 0; i < 100; i++) {
+      const previous = doc.objects.at(-1)?.frame;
+      const next = api.addAnnotation(doc, ['arrow', 'rectangle', 'highlight'][i % 3], `a-${i}`, canvas);
+      const frame = next.objects.at(-1).frame;
+      for (const [axis, dimension, ratio] of [['centerX', 'width', 'widthRatio'], ['centerY', 'height', 'heightRatio']]) {
+        assert.ok(frame[axis] - frame[ratio] / 2 >= 0);
+        assert.ok(frame[axis] + frame[ratio] / 2 <= 1);
+        if (previous && frame[axis] > previous[axis]) assert.ok(Math.abs((frame[axis] - previous[axis]) * canvas[dimension] - 24) < 1e-8);
+        if (previous && frame[axis] < previous[axis]) wrapped = true;
+      }
+      if (previous) assert.notDeepEqual(plain(frame), plain(previous), 'successive annotations must not stack');
+      assert.equal(doc.objects.length, i, 'adding leaves the previous document unchanged');
+      assert.equal(validateComposition(next), next);
+      doc = next;
+    }
+    assert.equal(wrapped, true, 'placement wraps at a canvas edge');
+  }
+  let doc = api.addAnnotation(createIndependentComposition(), 'arrow', 'first', size);
+  doc = moveCompositionObject(doc, 'first', { centerX: .3, centerY: .3 }, size);
+  doc = api.addAnnotation(doc, 'rectangle', 'second', size);
+  assert.ok(Math.abs(doc.objects[1].frame.centerX - (.3 + 24 / size.width)) < 1e-8);
+  assert.ok(Math.abs(doc.objects[1].frame.centerY - (.3 + 24 / size.height)) < 1e-8);
+});
+
+test('default Box has a substantial contrasting outline and a useful size', () => {
+  const { AnnotationRenderer } = load('composition/AnnotationRenderer.tsx');
+  const node = api.addAnnotation(createIndependentComposition(), 'rectangle', 'box', size).objects[0];
+  assert.equal(node.fill, 'transparent'); assert.equal(node.opacity, 1);
+  assert.equal(node.strokeWidth, api.ANNOTATION_WIDTHS.thick);
+  assert.ok(node.frame.widthRatio * size.width >= 200 && node.frame.heightRatio * size.height >= 100);
+  const luminance = color => color.match(/[\da-f]{2}/gi).map(hex => parseInt(hex, 16) / 255)
+    .map(channel => channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4)
+    .reduce((sum, channel, index) => sum + channel * [.2126, .7152, .0722][index], 0);
+  for (const background of ['#ffffff', '#0b0f19']) {
+    const a = luminance(node.stroke), b = luminance(background);
+    assert.ok((Math.max(a, b) + .05) / (Math.min(a, b) + .05) >= 3, `visible against ${background}`);
+  }
+  const html = renderToStaticMarkup(createElement(AnnotationRenderer, { object: node, size }));
+  assert.match(html, /<rect/); assert.match(html, /stroke="#ef4444" stroke-width="8"/);
+});
+
+test('selected arrows show only endpoint handles while boxes and highlights keep their selection UI', () => {
+  const { CompositionOverlay } = load('composition/CompositionOverlay.tsx');
+  for (const kind of ['arrow', 'rectangle', 'highlight']) {
+    const doc = api.addAnnotation(createIndependentComposition(), kind, kind, size);
+    const html = renderToStaticMarkup(createElement(CompositionOverlay, { document: doc, selected: kind, size, onStart() {}, onMove() {}, onEnd() {} }));
+    if (kind === 'arrow') {
+      assert.equal((html.match(/<button/g) || []).length, 2);
+      assert.match(html, /Arrow start endpoint/); assert.match(html, /Arrow end endpoint/);
+      assert.doesNotMatch(html, /outline:|box-shadow:|Move selected object|Scale selected object/);
+    } else {
+      assert.match(html, /outline:2px solid/); assert.match(html, /box-shadow:/);
+      assert.match(html, /Move selected object/); assert.match(html, /Scale selected object/);
+    }
+  }
+});
+
 test('reset clears every annotation and one undo restores the complete pre-reset snapshot', () => {
   let doc = createIndependentComposition();
   for (const kind of ['arrow', 'rectangle', 'highlight']) {
@@ -117,7 +177,7 @@ test('invalid annotation geometry and styles are rejected before export', () => 
 
 test('cancelled gestures preserve redo and a new annotation edit replaces the redo branch', () => {
   const initial = api.addAnnotation(createIndependentComposition(), 'rectangle', 'a', size);
-  const edited = api.styleAnnotation(initial, 'a', { width: 'thick' });
+  const edited = api.styleAnnotation(initial, 'a', { width: 'thin' });
   const history = new EditorHistory(initial); history.flush(edited);
   assert.deepEqual(plain(history.undo(edited)), plain(initial));
   history.beginTransaction(initial);

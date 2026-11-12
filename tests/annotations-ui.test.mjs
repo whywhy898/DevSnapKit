@@ -1,9 +1,65 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { launchBrowser, clickButton } from './helpers/browser.mjs';
 
 const origin = process.env.TEST_UI_URL;
+
+test('Annotate opens and focuses the tools; cascaded annotations and endpoint-only arrows work in both themes', { skip: !origin, timeout: 60000 }, async () => {
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage(); await page.setViewport({ width: 1440, height: 1100 });
+    await page.evaluateOnNewDocument(() => localStorage.setItem('devsnapkit_welcome_seen', '1'));
+    await page.goto(new URL('/?editor=1', origin).href, { waitUntil: 'networkidle0' });
+    await page.waitForSelector('#studio-canvas');
+    await page.evaluate(() => window.__mockupBaseline.apply({ aspectRatioId: 'custom', customCanvasSize: { width: 800, height: 600 }, bgType: 'solid', solidColor: '#ffffff', hideMockup: true, vfxGlow: false }));
+    const toolbar = await page.$eval('[data-canvas-toolbar]', node => {
+      const buttons = [...node.querySelectorAll('button')];
+      const index = buttons.findIndex(button => button.getAttribute('aria-label') === 'Add text');
+      const annotate = buttons[index + 1];
+      return { label: annotate?.textContent.trim(), icon: !!annotate?.querySelector('svg') };
+    });
+    assert.deepEqual(toolbar, { label: 'Annotate', icon: true });
+    await clickButton(page, 'Annotate');
+    await page.waitForFunction(() => document.activeElement?.closest('[aria-label="Annotation tools"]'));
+    assert.equal(await page.$eval('[data-element-section="annotations"]', node => node.getAttribute('aria-pressed')), 'true');
+    assert.equal(await page.$eval('[aria-label="Annotation tools"]', node => {
+      const box = node.getBoundingClientRect(); return box.top >= 0 && box.bottom <= innerHeight;
+    }), true);
+    for (const label of ['Box', 'Highlight', 'Arrow']) await clickButton(page, label);
+    const frames = await page.evaluate(() => window.__mockupBaseline.snapshot.compositionDocument.objects.map(node => node.frame));
+    assert.equal(new Set(frames.map(frame => `${frame.centerX},${frame.centerY}`)).size, 3);
+    for (const theme of ['light', 'dark']) {
+      const toggle = await page.$(`[aria-label="Switch to ${theme === 'light' ? 'Light' : 'Dark'} theme"]`);
+      if (toggle) await toggle.click();
+      await page.evaluate(color => window.__mockupBaseline.apply({ solidColor: color }), theme === 'light' ? '#ffffff' : '#0b0f19');
+      await clickButton(page, 'Annotate');
+      await page.waitForSelector('[aria-label="Arrow start endpoint"]');
+      const selection = await page.$eval('[aria-label="Arrow start endpoint"]', node => {
+        const frame = node.parentElement, style = getComputedStyle(frame);
+        return { handles: frame.querySelectorAll('button').length, outline: style.outlineStyle, shadow: style.boxShadow };
+      });
+      assert.deepEqual(selection, { handles: 2, outline: 'none', shadow: 'none' });
+      const box = await page.$eval('[data-annotation="rectangle"] rect', node => ({ stroke: node.getAttribute('stroke'), width: Number(node.getAttribute('stroke-width')) }));
+      assert.deepEqual(box, { stroke: '#ef4444', width: 8 });
+      if (process.env.ANNOTATIONS_EVIDENCE_DIR) {
+        await fs.mkdir(process.env.ANNOTATIONS_EVIDENCE_DIR, { recursive: true });
+        await page.evaluate(async () => {
+          const { stableArtworkLayout } = await import('/src/export/prepareArtworkExport.ts');
+          await stableArtworkLayout(document.querySelector('#studio-canvas'));
+          await Promise.all(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => {})));
+          await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+        });
+        await page.screenshot({ path: path.join(process.env.ANNOTATIONS_EVIDENCE_DIR, `${theme}.png`), fullPage: true });
+      }
+    }
+    await page.select('[aria-label="Current annotation"]', await page.$eval('[data-composition-object]:has([data-annotation="rectangle"])', node => node.dataset.compositionObject));
+    await page.waitForSelector('[aria-label="Scale selected object"]');
+    assert.equal(await page.$eval('[aria-label="Scale selected object"]', node => getComputedStyle(node.parentElement).outlineStyle), 'solid');
+  } finally { await browser.close(); }
+});
 test('adding the first annotation preserves the Duo upload placeholder and media geometry', { skip: !origin, timeout: 30000 }, async () => {
   const browser = await launchBrowser();
   try {
@@ -128,7 +184,7 @@ test('annotation tools, gesture history, typing guard and native scaled exports 
       for (const layoutMode of ['single', 'duo']) {
         let doc = { ...createIndependentComposition(), mediaLayout: 'legacy', detailVisible: layoutMode === 'duo' };
         for (const kind of ['rectangle', 'arrow', 'highlight']) doc = addAnnotation(doc, kind, kind, { width: 800, height: 600 });
-        doc.objects = doc.objects.map((node, index) => ({ ...node, frame: { ...node.frame, centerY: [.2, .5, .8][index] } }));
+        doc.objects = doc.objects.map((node, index) => ({ ...node, frame: { ...node.frame, centerX: .5, centerY: [.2, .5, .8][index] } }));
         const props = { ...window.__mockupBaseline.artwork(), compositionDocument: doc, layoutMode, imageSrc: image, secondarySrc: image, hideMockup: true, bgType: 'solid', solidColor: '#ffffff', vfxGlow: false, vfxNoise: false, shadowLevel: 'none', customBrandWatermark: '', textDocument: { version: 1, layers: [] } };
         const targets = [[800, 600, 800, 600], [800, 600, 1600, 1200], [1096, 822, 1096, 822]].map(([width, height, outputWidth, outputHeight]) => ({ width, height, outputWidth, outputHeight, format: 'png' }));
         const session = await prepareMockupExport(props, targets, document.body);

@@ -13,10 +13,16 @@ export function isAnnotation(node: GraphicObject | undefined): node is Annotatio
 
 export function addAnnotation(doc: CompositionDocument, kind: AnnotationKind, id: string, size: Size): CompositionDocument {
   if (doc.order.includes(id) || [...doc.objects, ...doc.decorations].some(node => node.id === id)) throw new Error('Duplicate annotation identity');
+  const previous = doc.objects.filter(isAnnotation).at(-1);
+  const cascade = (center: number, ratio: number, extent: number) => {
+    const next = center + 24 / extent;
+    return next + ratio / 2 <= 1 ? Math.max(ratio / 2, next) : ratio / 2;
+  };
   const node: AnnotationObject = { id, kind: 'shape', annotation: kind, name: kind === 'arrow' ? 'Arrow' : kind === 'rectangle' ? 'Rectangle' : 'Highlight',
     shape: kind === 'arrow' ? 'line' : 'rect', fill: kind === 'highlight' ? ANNOTATION_COLORS[1] : 'transparent',
-    stroke: kind === 'highlight' ? 'none' : ANNOTATION_COLORS[0], strokeWidth: ANNOTATION_WIDTHS.medium, opacity: kind === 'highlight' ? .35 : 1,
-    referenceWidth: size.width, frame: { centerX: .5, centerY: .5, widthRatio: .3, heightRatio: .18, rotation: 0 },
+    stroke: kind === 'highlight' ? 'none' : ANNOTATION_COLORS[0], strokeWidth: kind === 'rectangle' ? ANNOTATION_WIDTHS.thick : ANNOTATION_WIDTHS.medium, opacity: kind === 'highlight' ? .35 : 1,
+    referenceWidth: size.width, frame: { centerX: previous ? cascade(previous.frame.centerX, .3, size.width) : .5,
+      centerY: previous ? cascade(previous.frame.centerY, .18, size.height) : .5, widthRatio: .3, heightRatio: .18, rotation: 0 },
     ...(kind === 'arrow' ? { start: { x: 0, y: 1 }, end: { x: 1, y: 0 } } : {}) };
   return { ...doc, objects: [...doc.objects, node], order: [...doc.order, id] };
 }
