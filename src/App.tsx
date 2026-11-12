@@ -2552,7 +2552,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               <span>Reset</span>
             </button>
           </div>
-          <p data-reset-preserves-text className="text-[11px] text-white/50">Reset changes mockup styling. Your canvas text is preserved.</p>
+          <p data-reset-preserves-text className="text-[11px] text-white/50">Resets mockup styling and clears annotations (Undo restores them). Your canvas text is preserved.</p>
           <ElementPicker document={compositionDocument} texts={textDocument} context={templateContext} selected={selectedCompositionObject} onSelect={selectObject} onChange={changeComposition} />
 
 
