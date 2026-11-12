@@ -18,7 +18,7 @@ export function freezeArtworkProps(props: MockupArtworkProps): MockupArtworkProp
   return { ...props, compositionDocument: props.compositionDocument ? structuredClone(validateComposition(props.compositionDocument, props.textDocument.layers.map(layer => layer.id))) : null,
     templateContext: props.templateContext ? structuredClone(props.templateContext) : null, textDocument: { ...props.textDocument, layers: props.textDocument.layers.map(layer => validateText(structuredClone(layer))) }, canvasLogicalSize: { ...props.canvasLogicalSize },
     gradient: { ...props.gradient }, zoomStyle: { ...props.zoomStyle }, canvasRef: null, emptySlot: null, editingTextId: null,
-    onReplace: noop, onReplaceSecondary: noop, onObjectPointerDown: undefined, handleNaturalSceneSize: noop, preview: false };
+    onReplace: noop, onReplaceSecondary: noop, onObjectPointerDown: undefined, onObjectPointerMove: undefined, onObjectPointerEnd: undefined, handleNaturalSceneSize: noop, preview: false };
 }
 
 export function exportTargetLabel(target: MockupExportTarget) {

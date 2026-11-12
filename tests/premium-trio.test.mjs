@@ -60,6 +60,6 @@ test('the three additions preserve the complete original catalog and published t
  const originals=['editorial-honey','paper-launch-duo','calm-split','app-pair','night-signal-duo','pocket-flow-duo','studio-bridge','editorial-story','feature-spotlight','code-preview','metric-focus','before-after'];
  assert.deepEqual(plain(catalog.slice(0,12).map(x=>x.id)),originals);
  assert.ok(catalog.slice(0,4).every(x=>x.tier==='free'));assert.ok(catalog.slice(4,12).every(x=>x.tier==='pro'));
- assert.equal(catalog.length,16);
+ assert.equal(catalog.length,19);
  for(const [id,width,height] of configs){const c=catalog.find(x=>x.id===id);assert.ok(c,id);assert.equal(c.width,width);assert.equal(c.height,height);}
 });

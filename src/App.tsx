@@ -15,6 +15,8 @@ import type { CompositionDocument } from './composition/types';
 import { createIndependentComposition, compositionFrame, moveCompositionObject, secondaryRequired, boxOutsideCanvas, reserveCompositionTextMargin } from './composition/document';
 import { SelectionControls } from './inspector/SelectionControls';
 import { ObjectControls } from './composition/ObjectControls';
+import { AnnotationControls, AnnotationTools } from './composition/AnnotationControls';
+import { addAnnotation, annotationEndpoints, clearAnnotations, deleteAnnotation, isAnnotation, moveAnnotationEndpoint, type AnnotationGesture } from './composition/annotations';
 import { ElementPicker } from './inspector/ElementPicker';
 import { inspectorTabFor } from './inspector/model';
 import { BrandControls } from './inspector/BrandControls';
@@ -513,7 +515,7 @@ export default function App() {
   const [secondaryMediaOrigin, setSecondaryMediaOrigin] = useState<PrimaryMediaOrigin>({ kind: 'unknown' });
   const [selectedObject, setSelectedObject] = useState<string | null>(null);
   const compositionEdit = useRef<{ base: EditorSnapshot; document: CompositionDocument } | null>(null);
-  const compositionGesture = useRef<{ id: string; x: number; y: number; scale: number; resize: boolean; base: EditorSnapshot; document: CompositionDocument; latest: CompositionDocument } | null>(null);
+  const compositionGesture = useRef<{ id: string; x: number; y: number; scale: number; resize: AnnotationGesture; base: EditorSnapshot; document: CompositionDocument; latest: CompositionDocument } | null>(null);
   const [primaryMediaOrigin, setPrimaryMediaOrigin] = useState<PrimaryMediaOrigin>({ kind: 'builtin', sampleId: initialPreset.id });
   const applyingTemplate = useRef(false);
   const [preparingTemplate, setPreparingTemplate] = useState(false);
@@ -669,7 +671,7 @@ export default function App() {
   // Interactive UI States
   const [sidebarTab, setSidebarTab] = useState<'style' | 'background' | 'text' | 'brand' | 'export'>(() => entryParams.get('tool') === 'text' ? 'text' : 'style');
   const [anglesOpen, setAnglesOpen] = useState(true);
-  const [elementSection, setElementSection] = useState<'text' | 'buttons' | 'decor'>('text');
+  const [elementSection, setElementSection] = useState<'text' | 'buttons' | 'decor' | 'annotations'>('text');
   const [copied, setCopied] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [showProModal, setShowProModal] = useState<boolean>(false);
@@ -730,6 +732,7 @@ export default function App() {
     if (bgType !== 'image') artworkTasks.current!.clear('background');
   }, [bgType]);
   const currentSnapshot: EditorSnapshot = useMemo(() => ({
+    exportScale, exportFormat,
     templateContext, primaryMediaOrigin, compositionDocument, secondaryMediaOrigin,
     textDocument,
     gradientId: gradient.id,
@@ -783,6 +786,7 @@ export default function App() {
     imageOffsetX,
     imageOffsetY,
   }), [
+    exportScale, exportFormat,
     templateContext, primaryMediaOrigin, compositionDocument, secondaryMediaOrigin,
     textDocument, gradient.id, selectedPreset, imageSrc, imageName, windowTheme, windowTitle,
     padding, roundedCorners, shadowLevel, shadowOpacity, activeCuratedLayout,
@@ -796,6 +800,8 @@ export default function App() {
   ]);
 
   const handleRestoreSnapshot = useCallback((snap: EditorSnapshot) => {
+    setExportScale(snap.exportScale ?? 2);
+    setExportFormat(snap.exportFormat ?? 'png');
     if (autoCanvasHold.current) autoCanvasHold.current.padding = snap.padding;
     logoRequestSerial.current++;
     logoUploadRequested.current = Boolean(snap.logoDataUrl);
@@ -937,6 +943,7 @@ export default function App() {
     else {
       const node = [...(compositionDocument?.objects || []), ...(compositionDocument?.decorations || [])].find(item => item.id === id);
       if (node?.kind === 'button') setElementSection('buttons');
+      else if (isAnnotation(node)) setElementSection('annotations');
       else if (node?.kind === 'shape' && node.shape !== 'mark') setElementSection('decor');
       textEditor.select(null); setSelectedObject(id === 'secondary' && compositionDocument?.mediaLayout === 'legacy' ? 'main' : id);
     }
@@ -991,8 +998,8 @@ export default function App() {
     if (patch.customBrandWatermark !== undefined) setCustomBrandWatermark(patch.customBrandWatermark);
     if (ownTransaction) finishBrandEdit();
   };
-  const startCompositionGesture = (id: string, event: React.PointerEvent<HTMLElement>, resize = false) => {
-    if (event.button !== 0 || !compositionDocument || exportLock.current || !textEditor.finish()) return;
+  const startCompositionGesture = (id: string, event: React.PointerEvent<HTMLElement>, resize: AnnotationGesture = false) => {
+    if (event.button !== 0 || compositionGesture.current || !compositionDocument || exportLock.current || !textEditor.finish()) return;
     event.preventDefault(); event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId);
     selectObject(id); const base = editorHistory.getLatestSnapshot(); beginTransaction(base);
     let document = base.compositionDocument || compositionDocument;
@@ -1006,6 +1013,18 @@ export default function App() {
   const moveCompositionGesture = (event: React.PointerEvent<HTMLElement>) => {
     const gesture = compositionGesture.current; if (!gesture) return;
     const frame = compositionFrame(gesture.document, gesture.id), dx = (event.clientX - gesture.x) / gesture.scale, dy = (event.clientY - gesture.y) / gesture.scale;
+    const node = gesture.document.objects.find(node => node.id === gesture.id);
+    if (isAnnotation(node) && (gesture.resize === 'start' || gesture.resize === 'end')) {
+      const endpoint = annotationEndpoints(node, canvasLogicalSize)[gesture.resize];
+      gesture.latest = moveAnnotationEndpoint(gesture.document, gesture.id, gesture.resize, { x: endpoint.x + dx, y: endpoint.y + dy }, canvasLogicalSize);
+      setCompositionDocument(gesture.latest); return;
+    }
+    if (isAnnotation(node) && gesture.resize) {
+      const widthRatio = Math.max(12 / canvasLogicalSize.width, Math.min(1 - frame.centerX + frame.widthRatio / 2, frame.widthRatio + dx / canvasLogicalSize.width));
+      const heightRatio = Math.max(12 / canvasLogicalSize.height, Math.min(1 - frame.centerY + frame.heightRatio / 2, frame.heightRatio + dy / canvasLogicalSize.height));
+      gesture.latest = moveCompositionObject(gesture.document, gesture.id, { widthRatio, heightRatio, centerX: frame.centerX + (widthRatio - frame.widthRatio) / 2, centerY: frame.centerY + (heightRatio - frame.heightRatio) / 2 }, canvasLogicalSize);
+      setCompositionDocument(gesture.latest); return;
+    }
     const ratio = Math.max(.1, Math.min(3, 1 + dx / (frame.widthRatio * canvasLogicalSize.width)));
     const patch = gesture.resize ? { widthRatio: frame.widthRatio * ratio, heightRatio: frame.heightRatio * ratio }
       : { centerX: frame.centerX + dx / canvasLogicalSize.width, centerY: frame.centerY + dy / canvasLogicalSize.height };
@@ -1774,47 +1793,26 @@ export default function App() {
 
   // Handle Reset to Default Studio Styling
   const handleReset = () => {
+    if (exportLock.current) return;
+    leaveBrandEdit(); finishCompositionEdit();
+    let valid = false; flushSync(() => { valid = textEditor.finish(); });
+    if (!valid || editorHistory.isInTransaction()) return;
     autoCanvasHold.current = null;
-    if (compositionDocument?.templateId && isCuratedTemplateAvailable(compositionDocument.templateId)) {
-      let valid = false; flushSync(() => { valid = textEditor.finish(); });
-      if (valid && !editorHistory.isInTransaction()) editorHistory.applyCommand(resetCuratedStyles(editorHistory.getLatestSnapshot())); return;
-    }
-    setTemplateContext(null);
-    for (const key of ['main', 'secondary', 'background', 'logo', 'qr']) artworkTasks.current!.clear(key);
-    setPadding(88);
-    setAspectRatio(ASPECT_RATIOS[0]);
-    setCustomCanvasSize({ width: 1500, height: 900 });
-    setDimensionError('');
-    setRoundedCorners(14);
-    setShadowLevel('dramatic');
-    setShadowOpacity(75);
-    setWindowTheme('none');
-    setCornerStyle('default');
-    setLayoutPreset('flat');
-    setActiveCuratedLayout('center-hero');
-    setBgType('gradient');
-    setIsCustomGradient(false);
-    setSolidColor('#0b0f19');
-    setGradient(GRADIENTS[0]);
-    setVfxNoise(false);
-    setVfxGlow(true);
-    setVfxGlowColor('#6366f1');
-    setVfxGlowOpacity(30);
-    setExportScale(2);
-    setExportFormat('png');
-    if (!compositionDocument) { setSecondarySrc(null); setSecondaryName(''); setLayoutMode('single'); setDuoLayout('side'); }
-    // New states sync (Rule 7 §1)
-    setHideMockup(false);
-    setBgImageSrc(null);
-    setBgImageBlur(0);
-    setBgImageOpacity(100);
-    setBgImageFit('cover');
-    setMockupZoom(100);
-    setMockupOffsetX(0);
-    setMockupOffsetY(0);
-    setImageZoom(100);
-    setImageOffsetX(0);
-    setImageOffsetY(0);
+    const before = editorHistory.getLatestSnapshot();
+    const curated = before.compositionDocument?.templateId && isCuratedTemplateAvailable(before.compositionDocument.templateId);
+    const next: EditorSnapshot = curated ? resetCuratedStyles(before) : { ...before,
+      exportScale: 2, exportFormat: 'png', templateContext: null, padding: 88, aspectRatioId: ASPECT_RATIOS[0].id, customCanvasSize: { width: 1500, height: 900 },
+      roundedCorners: 14, shadowLevel: 'dramatic', shadowOpacity: 75, windowTheme: 'none', cornerStyle: 'default', layoutPreset: 'flat',
+      activeCuratedLayout: 'center-hero', bgType: 'gradient', isCustomGradient: false, solidColor: '#0b0f19', gradientId: GRADIENTS[0].id,
+      vfxNoise: false, vfxGlow: true, vfxGlowColor: '#6366f1', vfxGlowOpacity: 30,
+      ...(!before.compositionDocument ? { secondarySrc: null, secondaryName: '', layoutMode: 'single' as const, duoLayout: 'side' as const } : {}),
+      hideMockup: false, bgImageSrc: null, bgImageBlur: 0, bgImageOpacity: 100, bgImageFit: 'cover',
+      mockupZoom: 100, mockupOffsetX: 0, mockupOffsetY: 0, imageZoom: 100, imageOffsetX: 0, imageOffsetY: 0,
+    };
+    // Record all reset changes together, including annotations, before React renders.
+    if (next.compositionDocument) next.compositionDocument = clearAnnotations(next.compositionDocument);
+    editorHistory.applyCommand(next);
+    if (!curated) setDimensionError('');
   };
 
   // Keyboard Shortcuts Listener (F2)
@@ -1883,9 +1881,18 @@ export default function App() {
         }
         if (e.key === 'Delete' || e.key === 'Backspace') {
           if (textEditor.activeId) { e.preventDefault(); textEditor.remove(); return; }
+          const gesture = compositionGesture.current;
+          if (gesture && isAnnotation(gesture.latest.objects.find(node => node.id === gesture.id))) {
+            e.preventDefault(); compositionGesture.current = null;
+            const document = deleteAnnotation(gesture.latest, gesture.id);
+            setCompositionDocument(document); setSelectedObject(null);
+            commitTransaction({ ...gesture.base, compositionDocument: document });
+            releaseExportPointers(); return;
+          }
           if (compositionDocument) {
             e.preventDefault();
             if (selectedObject === 'secondary') editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } });
+            else if (selectedObject && isAnnotation(compositionDocument.objects.find(node => node.id === selectedObject))) changeComposition(deleteAnnotation(compositionDocument, selectedObject));
             else if (selectedObject && compositionDocument.objects.some(node => node.id === selectedObject && !(node.kind === 'shape' && node.shape === 'mark'))) changeComposition({ ...compositionDocument, objects: compositionDocument.objects.filter(node => node.id !== selectedObject), order: compositionDocument.order.filter(id => id !== selectedObject) });
             return;
           }
@@ -2375,7 +2382,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             {textLayout.recovery && <button type="button" data-text-size-recovery className="rounded bg-indigo-600 text-white px-3 py-2" onClick={textLayout.recovery.restore}>{textLayout.recovery.label}</button>}
           </div>}
           <CanvasStage width={canvasLogicalSize.width} height={canvasLogicalSize.height} freezePreviewWhileEditing={!!textEditor.editingId || textEditor.gesturing} onDeselect={() => textEditor.select(null)}>
-          <MockupArtwork {...artworkProps()} editingTextId={textEditor.editingId} onObjectPointerDown={id => selectObject(id)} />
+          <MockupArtwork {...artworkProps()} editingTextId={textEditor.editingId} onObjectPointerDown={(id, event) => { if (isAnnotation(compositionDocument?.objects.find(node => node.id === id))) startCompositionGesture(id, event); else selectObject(id); }} onObjectPointerMove={moveCompositionGesture} onObjectPointerEnd={finishCompositionGesture} />
           {compositionDocument && <CompositionOverlay document={compositionDocument} selected={selectedObject} size={canvasLogicalSize} onStart={startCompositionGesture} onMove={moveCompositionGesture} onEnd={finishCompositionGesture} />}
           <CanvasTextOverlay compositionHitTargets={!!compositionDocument} document={compositionDocument ? { ...textDocument, layers: textDocument.layers.filter(layer => !compositionDocument.hiddenIds.includes(layer.id)) } : textDocument} size={canvasLogicalSize} activeId={textEditor.activeId} editingId={textEditor.editingId}
             onArtworkHit={id => { if (!textEditor.finish()) return; selectObject(id); if (id === 'main' || id === 'secondary') (id === 'main' ? fileInputRef : secondaryFileInputRef).current?.click(); }}
@@ -2588,7 +2595,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               <span>Reset</span>
             </button>
           </div>
-          <p data-reset-preserves-text className="text-[11px] text-white/50">Reset changes mockup styling. Your canvas text is preserved.</p>
+          <p data-reset-preserves-text className="text-[11px] text-white/50">Resets mockup styling and clears annotations (Undo restores them). Your canvas text is preserved.</p>
           <ElementPicker document={compositionDocument} texts={textDocument} context={templateContext} selected={selectedCompositionObject} onSelect={selectObject} onChange={changeComposition} />
 
 
@@ -2650,7 +2657,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
           {sidebarTab === 'text' && <div className="elements-panel" data-elements-sections>
             <div className="elements-panel-heading"><div><h3>Elements</h3><p>Customize the details of your visual.</p></div><Layers size={19} aria-hidden="true" /></div>
             <div className="elements-tabs" role="group" aria-label="Element type">
-              {([['text', 'Text'], ['buttons', 'Buttons'], ['decor', 'Decor']] as const).map(([section, label]) => <button type="button" key={section} data-element-section={section} aria-pressed={elementSection === section} onClick={() => { finishCompositionEdit(); if (!textEditor.finish()) return; if (section === 'text') setSelectedObject(null); else textEditor.select(null); setElementSection(section); }}>{label}</button>)}
+              {([['text', 'Text'], ['buttons', 'Buttons'], ['decor', 'Decor'], ['annotations', 'Annotations']] as const).map(([section, label]) => <button type="button" key={section} data-element-section={section} aria-pressed={elementSection === section} onClick={() => { finishCompositionEdit(); if (!textEditor.finish()) return; if (section === 'text') setSelectedObject(null); else textEditor.select(null); setElementSection(section); }}>{label}</button>)}
             </div>
           </div>}
           {sidebarTab === 'style' && <SelectionControls context={templateContext} tab={sidebarTab} layoutMode={layoutMode} imageSrc={imageSrc} secondarySrc={secondarySrc} imageName={imageName} secondaryName={secondaryName} angleControls={<>              {/* 3D Perspective & Angles Selector (Shown in Inspector only on smaller screens where dedicated side rail is hidden) */}
@@ -2703,13 +2710,20 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             onReplace={slot => (slot === 'main' ? fileInputRef : secondaryFileInputRef).current?.click()} onRestore={handleRestoreTemplateLayout}
             onRemoveDetail={() => { if (textEditor.finish() && compositionDocument) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } }); }} />}
           {sidebarTab === 'text' && elementSection !== 'text' && <section className="elements-object-panel">
+            {elementSection === 'annotations' && <><div className="elements-object-heading"><div><h3>Annotations</h3><p>Point out details with arrows, outlines and highlights.</p></div></div><AnnotationTools selectedKind={compositionDocument?.objects.filter(isAnnotation).find(node => node.id === selectedObject)?.annotation} onAdd={kind => {
+                leaveBrandEdit(); finishCompositionEdit(); if (exportLock.current || !textEditor.finish()) return;
+                const before = editorHistory.getLatestSnapshot();
+                const document = before.compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: before.layoutMode === 'duo' };
+                const id = crypto.randomUUID();
+                if (editorHistory.applyCommand({ ...before, compositionDocument: addAnnotation(document, kind, id, canvasLogicalSize) })) { textEditor.select(null); setSelectedObject(id); }
+              }} /></>}
             {elementSection === 'decor' && <div className="elements-object-heading"><div><h3>Decorations</h3><p>Customize decorative elements from your template.</p></div></div>}
               {elementSection === 'buttons' && <button type="button" className="elements-add" onClick={() => { finishCompositionEdit(); if (!textEditor.finish()) return; const document = compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: layoutMode === 'duo' }; const id = crypto.randomUUID(); changeComposition({ ...document, objects: [...document.objects, { id, name: 'Button', kind: 'button', frame: { centerX: .5, centerY: .8, widthRatio: .25, heightRatio: .07, rotation: 0 }, text: 'Get started', fill: '#272617', color: '#ffffff', fontSize: 20, radius: 8, padding: 16, autoWidth: false, arrow: true }], order: [...document.order, id] }); textEditor.select(null); setSelectedObject(id); }}><Plus size={16} aria-hidden="true" /> Add button</button>}
             {(() => {
-              const items = [...(compositionDocument?.objects || []), ...(compositionDocument?.decorations || [])].filter(node => elementSection === 'buttons' ? node.kind === 'button' : node.kind === 'shape' && node.shape !== 'mark');
+              const items = [...(compositionDocument?.objects || []), ...(compositionDocument?.decorations || [])].filter(node => elementSection === 'annotations' ? isAnnotation(node) : elementSection === 'buttons' ? node.kind === 'button' : node.kind === 'shape' && node.shape !== 'mark' && !isAnnotation(node));
               const current = items.find(node => node.id === selectedObject);
-              return <><label className="elements-select-label">Selected {elementSection === 'buttons' ? 'button' : 'decoration'}<select aria-label={elementSection === 'buttons' ? 'Current button' : 'Current decoration'} value={current?.id || ''} onChange={event => { if (event.target.value) selectObject(event.target.value); else setSelectedObject(null); }}><option value="">Choose an element</option>{items.map(node => <option value={node.id} key={node.id}>{node.name}</option>)}</select></label>
-                {current ? <ObjectControls document={compositionDocument} selected={current.id} size={canvasLogicalSize} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit} /> : <p className="elements-empty">{items.length ? 'Select an element above or on the canvas to edit it.' : elementSection === 'buttons' ? 'Add a button to start customizing it.' : 'Apply a template with decorations to edit them here.'}</p>}
+              return <><label className="elements-select-label">Selected {elementSection === 'annotations' ? 'annotation' : elementSection === 'buttons' ? 'button' : 'decoration'}<select aria-label={elementSection === 'annotations' ? 'Current annotation' : elementSection === 'buttons' ? 'Current button' : 'Current decoration'} value={current?.id || ''} onChange={event => { if (event.target.value) selectObject(event.target.value); else setSelectedObject(null); }}><option value="">Choose an element</option>{items.map(node => <option value={node.id} key={node.id}>{node.name}</option>)}</select></label>
+                {current && isAnnotation(current) && compositionDocument ? <AnnotationControls document={compositionDocument} selected={current.id} onChange={changeComposition} onFinish={finishCompositionEdit} /> : current ? <ObjectControls document={compositionDocument} selected={current.id} size={canvasLogicalSize} onChange={changeComposition} onStart={beginCompositionEdit} onFinish={finishCompositionEdit} /> : <p className="elements-empty">{items.length ? 'Select an element above or on the canvas to edit it.' : elementSection === 'annotations' ? 'Add an annotation to mark a detail.' : elementSection === 'buttons' ? 'Add a button to start customizing it.' : 'Apply a template with decorations to edit them here.'}</p>}
               </>;
             })()}
           </section>}

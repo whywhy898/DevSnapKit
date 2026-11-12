@@ -10,15 +10,20 @@ import { MediaHoverOverlay } from '../MockupUnit';
 import { canUse } from '../../shared/productCapabilities';
 import { compositionFrame } from './document';
 import { MediaShell } from './MediaShell';
+import { isAnnotation } from './annotations';
+import { AnnotationRenderer } from './AnnotationRenderer';
 const noop = () => {};
 export const frameStyle = (frame: ObjectFrame): CSSProperties => ({ position: 'absolute', left: `${frame.centerX * 100}%`, top: `${frame.centerY * 100}%`,
   width: `${frame.widthRatio * 100}%`, height: `${frame.heightRatio * 100}%`, transform: `translate(-50%, -50%) rotate(${frame.rotation}deg)`, transformOrigin: 'center' });
-type Props = Pick<MockupArtworkProps, 'imageSrc' | 'imageName' | 'secondarySrc' | 'secondaryName' | 'windowTheme' | 'windowTitle' | 'shadowLevel' | 'shadowOpacity' | 'cornerStyle' | 'roundedCorners' | 'hideMockup' | 'layoutPreset' | 'textDocument' | 'preview' | 'editingTextId'> & {
+type Props = Pick<MockupArtworkProps, 'imageSrc' | 'imageName' | 'secondarySrc' | 'secondaryName' | 'windowTheme' | 'windowTitle' | 'shadowLevel' | 'shadowOpacity' | 'cornerStyle' | 'roundedCorners' | 'hideMockup' | 'layoutPreset' | 'textDocument' | 'preview' | 'editingTextId' | 'templateContext'> & {
+  emptySlot?: MockupArtworkProps['emptySlot'];
   logoDataUrl?: string | null; logoOpacity?: number; isProUnlocked?: boolean;
   document: CompositionDocument; size: { width: number; height: number };
   onReplace?: () => void; onReplaceSecondary?: () => void;
   legacy?: Pick<MockupArtworkProps, 'effectivePaddingX' | 'effectivePaddingY' | 'layoutMode' | 'duoLayout' | 'mockupZoom' | 'mockupOffsetX' | 'mockupOffsetY' | 'isPhoneTheme' | 'zoomStyle' | 'handleNaturalSceneSize'>;
   onObjectPointerDown?: (id: string, event: PointerEvent<HTMLDivElement>) => void;
+  onObjectPointerMove?: (event: PointerEvent<HTMLDivElement>) => void;
+  onObjectPointerEnd?: (event: PointerEvent<HTMLDivElement>) => void;
 };
 
 /** All composition artwork is independent of selection UI and uses canonical slot sources. */
@@ -37,19 +42,20 @@ export function CompositionRenderer(props: Props) {
         return src ? <PresentedMedia key={id} props={props} slot={id} src={src} zIndex={index + 1} /> : null;
       }
       if (text) return <div key={id} data-composition-text={id} style={{ position: 'absolute', inset: 0, zIndex: index + 1, pointerEvents: 'none' }}><CanvasTextLayerRenderer document={{ version: 1, layers: [text] }} size={size} editingId={preview ? editingTextId : null} /></div>;
-      if (graphic) return graphic.hidden ? null : <div key={id} data-composition-object={id} style={{ ...frameStyle(graphic.frame), ...(graphic.kind === 'button' && graphic.autoWidth ? { width: 'max-content' } : {}), zIndex: index + 1, opacity: graphic.opacity ?? 1 }} onPointerDown={event => props.onObjectPointerDown?.(id, event)}>
-        {graphic.kind === 'button' ? <ButtonRenderer object={graphic} contentScale={graphic.referenceSize && graphic.referenceSize.width > 0 && graphic.referenceSize.height > 0 ? Math.min(1, graphic.frame.widthRatio * size.width / graphic.referenceSize.width, graphic.frame.heightRatio * size.height / graphic.referenceSize.height) : undefined} /> : graphic.shape === 'mark' && canUse('brand_logo', Boolean(props.isProUnlocked)) && props.logoDataUrl
+      if (graphic) return graphic.hidden ? null : <div key={id} data-composition-object={id} style={{ ...frameStyle(graphic.frame), ...(graphic.kind === 'button' && graphic.autoWidth ? { width: 'max-content' } : {}), ...(isAnnotation(graphic) && preview ? { cursor: 'move', touchAction: 'none', userSelect: 'none' } : {}), zIndex: index + 1, opacity: graphic.opacity ?? 1 }} onPointerDown={event => props.onObjectPointerDown?.(id, event)}
+        onPointerMove={isAnnotation(graphic) ? props.onObjectPointerMove : undefined} onPointerUp={isAnnotation(graphic) ? props.onObjectPointerEnd : undefined} onPointerCancel={isAnnotation(graphic) ? props.onObjectPointerEnd : undefined} onLostPointerCapture={isAnnotation(graphic) ? props.onObjectPointerEnd : undefined}>
+        {isAnnotation(graphic) ? <AnnotationRenderer object={graphic} size={size} /> : graphic.kind === 'button' ? <ButtonRenderer object={graphic} contentScale={graphic.referenceSize && graphic.referenceSize.width > 0 && graphic.referenceSize.height > 0 ? Math.min(1, graphic.frame.widthRatio * size.width / graphic.referenceSize.width, graphic.frame.heightRatio * size.height / graphic.referenceSize.height) : undefined} /> : graphic.shape === 'mark' && canUse('brand_logo', Boolean(props.isProUnlocked)) && props.logoDataUrl
           ? <img src={props.logoDataUrl} alt="Brand Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: props.logoOpacity ?? 1, pointerEvents: 'none' }} /> : <DecorationRenderer object={graphic} />}
       </div>;
       if (id === 'main') return <div key={id} data-composition-object="main" style={{ ...(doc.mediaLayout === 'legacy' ? { position: 'absolute' as const, inset: 0 } : frameStyle(main)), zIndex: index + 1 }} onPointerDown={event => props.onObjectPointerDown?.(id, event)}>
-        <FittedScene width={doc.mediaLayout === 'legacy' ? size.width : main.widthRatio * size.width} height={doc.mediaLayout === 'legacy' ? size.height : main.heightRatio * size.height}
+        <FittedScene mediaRegion={doc.mediaLayout === 'legacy' ? props.templateContext?.mediaRegion : undefined} width={doc.mediaLayout === 'legacy' ? size.width : main.widthRatio * size.width} height={doc.mediaLayout === 'legacy' ? size.height : main.heightRatio * size.height}
           paddingX={doc.mediaLayout === 'legacy' ? props.legacy?.effectivePaddingX ?? 0 : 0} paddingY={doc.mediaLayout === 'legacy' ? props.legacy?.effectivePaddingY ?? 0 : 0}
           basisWidth={doc.mediaLayout === 'legacy' && props.legacy?.isPhoneTheme && props.legacy.layoutMode === 'single' ? 375 : 1024}
           zoom={doc.mediaLayout === 'legacy' ? props.legacy?.mockupZoom ?? 100 : 100} offsetX={doc.mediaLayout === 'legacy' ? props.legacy?.mockupOffsetX ?? 0 : 0} offsetY={doc.mediaLayout === 'legacy' ? props.legacy?.mockupOffsetY ?? 0 : 0}
           projection={props.layoutPreset} onNaturalSize={doc.mediaLayout === 'legacy' ? props.legacy?.handleNaturalSceneSize ?? noop : noop} measurementKey={key}>
-          <DeviceComposition mode={doc.mediaLayout === 'legacy' ? props.legacy?.layoutMode ?? 'single' : 'single'} duoLayout={props.legacy?.duoLayout ?? 'side'} secondarySrc={doc.mediaLayout === 'legacy' ? props.secondarySrc : null} secondaryName={props.secondaryName} onReplaceSecondary={props.onReplaceSecondary ?? noop} emptySlot={null}
+          <DeviceComposition mode={doc.mediaLayout === 'legacy' ? props.legacy?.layoutMode ?? 'single' : 'single'} duoLayout={props.legacy?.duoLayout ?? 'side'} secondarySrc={doc.mediaLayout === 'legacy' ? props.secondarySrc : null} secondaryName={props.secondaryName} onReplaceSecondary={props.onReplaceSecondary ?? noop} emptySlot={preview ? props.emptySlot : null}
             theme={props.windowTheme} imageSrc={props.imageSrc} imageName={props.imageName} interactive={Boolean(preview && !editingTextId)} deferHoverOverlay
-            onReplace={props.onReplace} mediaFit={doc.mediaLayout === 'independent' ? 'contain' : undefined} zoomStyle={doc.mediaLayout === 'legacy' ? props.legacy?.zoomStyle : undefined} windowTitle={props.windowTitle} shadowLevel={props.shadowLevel} shadowOpacity={props.shadowOpacity}
+            onReplace={props.onReplace} mediaFit={doc.mediaLayout === 'independent' || props.templateContext ? 'contain' : undefined} zoomStyle={doc.mediaLayout === 'legacy' ? props.legacy?.zoomStyle : undefined} windowTitle={props.windowTitle} shadowLevel={props.shadowLevel} shadowOpacity={props.shadowOpacity}
             cornerStyle={props.cornerStyle} roundedCorners={props.roundedCorners} hideFrame={props.hideMockup} />
         </FittedScene>
       </div>;

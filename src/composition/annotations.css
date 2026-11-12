@@ -1,0 +1,15 @@
+.annotation-add, .annotation-options { display:flex; flex-wrap:wrap; gap:8px; }
+.annotation-add .elements-add { width:auto; flex:1 1 90px; background:var(--editor-surface); color:var(--editor-text); border-color:var(--editor-border); }
+.annotation-add .elements-add:hover { background:var(--editor-soft); }
+.annotation-add .elements-add[aria-pressed="true"] { background:#6555ed; color:#fff; border-color:#8375ff; box-shadow:0 0 0 2px #9588ff55; }
+.annotation-add .elements-add[aria-pressed="true"]:hover { background:#5745dc; }
+.annotation-add .elements-add svg { flex-shrink:0; }
+.annotation-controls { display:flex; flex-direction:column; gap:16px; padding:15px; border:1px solid var(--editor-border); border-radius:12px; background:var(--editor-soft); color:var(--editor-text); }
+.annotation-controls h3 { font-size:14px; font-weight:700; }
+.annotation-controls legend { margin-bottom:8px; font-size:12px; font-weight:650; }
+.annotation-controls p { font-size:12px; line-height:1.5; color:var(--editor-muted); }
+.annotation-options button, .annotation-delete { display:flex; align-items:center; justify-content:center; gap:6px; padding:8px; min-height:38px; border:1px solid var(--editor-border); border-radius:7px; background:var(--editor-surface); color:var(--editor-text); font-size:12px; cursor:pointer; }
+.annotation-options button[aria-pressed="true"] { border-color:#b9b1ff; outline:2px solid #b9b1ff; outline-offset:1px; }
+.annotation-swatch { width:16px; height:16px; border:1px solid #94a3b8; border-radius:50%; }
+.annotation-delete { border-color:#fb7185; }
+.annotation-controls button:focus-visible { outline:2px solid #c7d2fe; outline-offset:3px; }

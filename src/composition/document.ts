@@ -1,4 +1,5 @@
 import type { CompositionDocument, ObjectFrame } from './types';
+import { isAnnotation, validateAnnotation } from './annotations';
 import { materializeMediaPlacements, resolveMediaPlacements } from '../templates/collection/mediaLayout';
 type Size = { width: number; height: number };
 
@@ -119,6 +120,7 @@ export function validateComposition(doc: CompositionDocument, textIds: readonly 
     if (!frame || !(['centerX', 'centerY', 'widthRatio', 'heightRatio', 'rotation'] as const).every(key => Number.isFinite(frame[key])) || frame.widthRatio <= 0 || frame.heightRatio <= 0 || Math.abs(frame.rotation) > 180) throw new Error('Invalid placement geometry');
   }
   for (const node of nodes) {
+    if (isAnnotation(node)) validateAnnotation(node);
     if (node.kind === 'button') {
       if (typeof node.text !== 'string' || Array.from(node.text).length > 1000 || !Number.isFinite(node.fontSize) || node.fontSize <= 0 || !Number.isFinite(node.padding) || node.padding < 0 || !Number.isFinite(node.radius) || node.radius < 0 || typeof node.autoWidth !== 'boolean' || typeof node.arrow !== 'boolean') throw new Error('Invalid button style or text');
     } else if (node.kind !== 'shape' || !['rect', 'ellipse', 'line', 'halo', 'grid', 'mark'].includes(node.shape)) throw new Error('Unsupported graphic object');
