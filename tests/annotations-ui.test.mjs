@@ -19,7 +19,7 @@ test('adding the first annotation preserves the Duo upload placeholder and media
       return { placeholder: root.querySelector('[data-scene-slot="2"]')?.textContent.trim(), box: [rect.x - canvas.x, rect.y - canvas.y, rect.width, rect.height].map(value => value / scale) };
     });
     const before = await geometry(); assert.ok(before.placeholder);
-    await clickButton(page, 'Text'); await clickButton(page, 'Annotations'); await clickButton(page, 'Add rectangle');
+    await clickButton(page, 'Text'); await clickButton(page, 'Annotations'); await clickButton(page, 'Box');
     const after = await geometry(); assert.equal(after.placeholder, before.placeholder);
     for (let i = 0; i < 4; i++) assert.ok(Math.abs(after.box[i] - before.box[i]) < .2, 'annotation preserves screenshot placement');
   } finally { await browser.close(); }
@@ -35,7 +35,7 @@ test('annotation tools, gesture history, typing guard and native scaled exports 
     await page.waitForSelector('#studio-canvas');
     await page.evaluate(() => window.__mockupBaseline.apply({ aspectRatioId: 'custom', customCanvasSize: { width: 800, height: 600 } }));
     await page.waitForFunction(() => document.querySelector('#studio-canvas').offsetWidth === 800);
-    await clickButton(page, 'Text'); await clickButton(page, 'Annotations'); await clickButton(page, 'Add arrow');
+    await clickButton(page, 'Text'); await clickButton(page, 'Annotations'); await clickButton(page, 'Arrow');
     const snapshot = async () => {
       await page.waitForFunction(() => !window.__mockupBaseline.history.inTransaction);
       return page.evaluate(async () => {
@@ -76,7 +76,7 @@ test('annotation tools, gesture history, typing guard and native scaled exports 
     await page.evaluate(() => document.querySelector('#annotation-typing-test').remove());
     await page.keyboard.press('Delete'); assert.equal((await snapshot()).objects.length, 0);
     await undo(); assert.equal((await snapshot()).objects.length, 1); await redo();
-    await clickButton(page, 'Add rectangle'); const rectangle = await snapshot();
+    await clickButton(page, 'Box'); const rectangle = await snapshot();
     const cancelHandle = await page.$('[aria-label="Scale selected object"]'), cancelBox = await cancelHandle.boundingBox();
     await page.mouse.move(cancelBox.x + cancelBox.width / 2, cancelBox.y + cancelBox.height / 2); await page.mouse.down();
     await page.mouse.move(cancelBox.x + 40, cancelBox.y + 40, { steps: 5 }); await page.keyboard.press('Escape'); await page.mouse.up();
@@ -84,7 +84,7 @@ test('annotation tools, gesture history, typing guard and native scaled exports 
     await drag('[aria-label="Scale selected object"]', 50, 25);
     const resized = await snapshot(); assert.notDeepEqual(resized.objects[0].frame, rectangle.objects[0].frame);
     await undo(); assert.deepEqual(await snapshot(), rectangle); await redo();
-    await clickButton(page, 'Add highlight');
+    await clickButton(page, 'Highlight');
     assert.equal((await snapshot()).objects.at(-1).opacity, .35);
     const highlight = await snapshot();
     await drag('[data-annotation="highlight"]', -35, 20);
@@ -109,7 +109,7 @@ test('annotation tools, gesture history, typing guard and native scaled exports 
     }
     await page.keyboard.press('Backspace'); assert.equal((await snapshot()).objects.length, 1);
     await undo(); assert.equal((await snapshot()).objects.length, 2); await redo();
-    await clickButton(page, 'Add arrow');
+    await clickButton(page, 'Arrow');
     const beforeDeleteDrag = await snapshot(), draggedId = beforeDeleteDrag.objects.at(-1).id;
     const deleteHandle = await page.$('[aria-label="Arrow end endpoint"]'), deleteBox = await deleteHandle.boundingBox();
     await page.mouse.move(deleteBox.x + deleteBox.width / 2, deleteBox.y + deleteBox.height / 2); await page.mouse.down();

@@ -1,5 +1,9 @@
 .annotation-add, .annotation-options { display:flex; flex-wrap:wrap; gap:8px; }
-.annotation-add .elements-add { width:auto; flex:1 1 90px; }
+.annotation-add .elements-add { width:auto; flex:1 1 90px; background:var(--editor-surface); color:var(--editor-text); border-color:var(--editor-border); }
+.annotation-add .elements-add:hover { background:var(--editor-soft); }
+.annotation-add .elements-add[aria-pressed="true"] { background:#6555ed; color:#fff; border-color:#8375ff; box-shadow:0 0 0 2px #9588ff55; }
+.annotation-add .elements-add[aria-pressed="true"]:hover { background:#5745dc; }
+.annotation-add .elements-add svg { flex-shrink:0; }
 .annotation-controls { display:flex; flex-direction:column; gap:16px; padding:15px; border:1px solid var(--editor-border); border-radius:12px; background:var(--editor-soft); color:var(--editor-text); }
 .annotation-controls h3 { font-size:14px; font-weight:700; }
 .annotation-controls legend { margin-bottom:8px; font-size:12px; font-weight:650; }

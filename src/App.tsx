@@ -15,8 +15,8 @@ import type { CompositionDocument } from './composition/types';
 import { createIndependentComposition, compositionFrame, moveCompositionObject, secondaryRequired, boxOutsideCanvas, reserveCompositionTextMargin } from './composition/document';
 import { SelectionControls } from './inspector/SelectionControls';
 import { ObjectControls } from './composition/ObjectControls';
-import { AnnotationControls } from './composition/AnnotationControls';
-import { addAnnotation, annotationEndpoints, deleteAnnotation, isAnnotation, moveAnnotationEndpoint, type AnnotationGesture } from './composition/annotations';
+import { AnnotationControls, AnnotationTools } from './composition/AnnotationControls';
+import { addAnnotation, annotationEndpoints, clearAnnotations, deleteAnnotation, isAnnotation, moveAnnotationEndpoint, type AnnotationGesture } from './composition/annotations';
 import { ElementPicker } from './inspector/ElementPicker';
 import { inspectorTabFor } from './inspector/model';
 import { BrandControls } from './inspector/BrandControls';
@@ -726,6 +726,7 @@ export default function App() {
     if (bgType !== 'image') artworkTasks.current!.clear('background');
   }, [bgType]);
   const currentSnapshot: EditorSnapshot = useMemo(() => ({
+    exportScale, exportFormat,
     templateContext, primaryMediaOrigin, compositionDocument, secondaryMediaOrigin,
     textDocument,
     gradientId: gradient.id,
@@ -779,6 +780,7 @@ export default function App() {
     imageOffsetX,
     imageOffsetY,
   }), [
+    exportScale, exportFormat,
     templateContext, primaryMediaOrigin, compositionDocument, secondaryMediaOrigin,
     textDocument, gradient.id, selectedPreset, imageSrc, imageName, windowTheme, windowTitle,
     padding, roundedCorners, shadowLevel, shadowOpacity, activeCuratedLayout,
@@ -792,6 +794,8 @@ export default function App() {
   ]);
 
   const handleRestoreSnapshot = useCallback((snap: EditorSnapshot) => {
+    setExportScale(snap.exportScale ?? 2);
+    setExportFormat(snap.exportFormat ?? 'png');
     if (autoCanvasHold.current) autoCanvasHold.current.padding = snap.padding;
     logoRequestSerial.current++;
     logoUploadRequested.current = Boolean(snap.logoDataUrl);
@@ -1746,47 +1750,26 @@ export default function App() {
 
   // Handle Reset to Default Studio Styling
   const handleReset = () => {
+    if (exportLock.current) return;
+    leaveBrandEdit(); finishCompositionEdit();
+    let valid = false; flushSync(() => { valid = textEditor.finish(); });
+    if (!valid || editorHistory.isInTransaction()) return;
     autoCanvasHold.current = null;
-    if (compositionDocument?.templateId && isCuratedTemplateAvailable(compositionDocument.templateId)) {
-      let valid = false; flushSync(() => { valid = textEditor.finish(); });
-      if (valid && !editorHistory.isInTransaction()) editorHistory.applyCommand(resetCuratedStyles(editorHistory.getLatestSnapshot())); return;
-    }
-    setTemplateContext(null);
-    for (const key of ['main', 'secondary', 'background', 'logo', 'qr']) artworkTasks.current!.clear(key);
-    setPadding(88);
-    setAspectRatio(ASPECT_RATIOS[0]);
-    setCustomCanvasSize({ width: 1500, height: 900 });
-    setDimensionError('');
-    setRoundedCorners(14);
-    setShadowLevel('dramatic');
-    setShadowOpacity(75);
-    setWindowTheme('none');
-    setCornerStyle('default');
-    setLayoutPreset('flat');
-    setActiveCuratedLayout('center-hero');
-    setBgType('gradient');
-    setIsCustomGradient(false);
-    setSolidColor('#0b0f19');
-    setGradient(GRADIENTS[0]);
-    setVfxNoise(false);
-    setVfxGlow(true);
-    setVfxGlowColor('#6366f1');
-    setVfxGlowOpacity(30);
-    setExportScale(2);
-    setExportFormat('png');
-    if (!compositionDocument) { setSecondarySrc(null); setSecondaryName(''); setLayoutMode('single'); setDuoLayout('side'); }
-    // New states sync (Rule 7 §1)
-    setHideMockup(false);
-    setBgImageSrc(null);
-    setBgImageBlur(0);
-    setBgImageOpacity(100);
-    setBgImageFit('cover');
-    setMockupZoom(100);
-    setMockupOffsetX(0);
-    setMockupOffsetY(0);
-    setImageZoom(100);
-    setImageOffsetX(0);
-    setImageOffsetY(0);
+    const before = editorHistory.getLatestSnapshot();
+    const curated = before.compositionDocument?.templateId && isCuratedTemplateAvailable(before.compositionDocument.templateId);
+    const next: EditorSnapshot = curated ? resetCuratedStyles(before) : { ...before,
+      exportScale: 2, exportFormat: 'png', templateContext: null, padding: 88, aspectRatioId: ASPECT_RATIOS[0].id, customCanvasSize: { width: 1500, height: 900 },
+      roundedCorners: 14, shadowLevel: 'dramatic', shadowOpacity: 75, windowTheme: 'none', cornerStyle: 'default', layoutPreset: 'flat',
+      activeCuratedLayout: 'center-hero', bgType: 'gradient', isCustomGradient: false, solidColor: '#0b0f19', gradientId: GRADIENTS[0].id,
+      vfxNoise: false, vfxGlow: true, vfxGlowColor: '#6366f1', vfxGlowOpacity: 30,
+      ...(!before.compositionDocument ? { secondarySrc: null, secondaryName: '', layoutMode: 'single' as const, duoLayout: 'side' as const } : {}),
+      hideMockup: false, bgImageSrc: null, bgImageBlur: 0, bgImageOpacity: 100, bgImageFit: 'cover',
+      mockupZoom: 100, mockupOffsetX: 0, mockupOffsetY: 0, imageZoom: 100, imageOffsetX: 0, imageOffsetY: 0,
+    };
+    // Record all reset changes together, including annotations, before React renders.
+    if (next.compositionDocument) next.compositionDocument = clearAnnotations(next.compositionDocument);
+    editorHistory.applyCommand(next);
+    if (!curated) setDimensionError('');
   };
 
   // Keyboard Shortcuts Listener (F2)
@@ -2684,15 +2667,13 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
             onReplace={slot => (slot === 'main' ? fileInputRef : secondaryFileInputRef).current?.click()} onRestore={handleRestoreTemplateLayout}
             onRemoveDetail={() => { if (textEditor.finish() && compositionDocument) editorHistory.applyCommand({ ...editorHistory.getLatestSnapshot(), secondarySrc: null, secondaryName: '', secondaryMediaOrigin: { kind: 'unknown' }, ...(compositionDocument.mediaLayout === 'legacy' ? { layoutMode: 'single' as const } : {}), compositionDocument: { ...compositionDocument, detailVisible: false } }); }} />}
           {sidebarTab === 'text' && elementSection !== 'text' && <section className="elements-object-panel">
-            {elementSection === 'annotations' && <><div className="elements-object-heading"><div><h3>Annotations</h3><p>Point out details with arrows, outlines and highlights.</p></div></div><div className="annotation-add">
-              {(['arrow', 'rectangle', 'highlight'] as const).map(kind => <button key={kind} type="button" className="elements-add" onClick={() => {
+            {elementSection === 'annotations' && <><div className="elements-object-heading"><div><h3>Annotations</h3><p>Point out details with arrows, outlines and highlights.</p></div></div><AnnotationTools selectedKind={compositionDocument?.objects.filter(isAnnotation).find(node => node.id === selectedObject)?.annotation} onAdd={kind => {
                 leaveBrandEdit(); finishCompositionEdit(); if (exportLock.current || !textEditor.finish()) return;
                 const before = editorHistory.getLatestSnapshot();
                 const document = before.compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: before.layoutMode === 'duo' };
                 const id = crypto.randomUUID();
                 if (editorHistory.applyCommand({ ...before, compositionDocument: addAnnotation(document, kind, id, canvasLogicalSize) })) { textEditor.select(null); setSelectedObject(id); }
-              }}>Add {kind}</button>)}
-            </div></>}
+              }} /></>}
             {elementSection === 'decor' && <div className="elements-object-heading"><div><h3>Decorations</h3><p>Customize decorative elements from your template.</p></div></div>}
               {elementSection === 'buttons' && <button type="button" className="elements-add" onClick={() => { finishCompositionEdit(); if (!textEditor.finish()) return; const document = compositionDocument || { ...createIndependentComposition(), mediaLayout: 'legacy' as const, detailVisible: layoutMode === 'duo' }; const id = crypto.randomUUID(); changeComposition({ ...document, objects: [...document.objects, { id, name: 'Button', kind: 'button', frame: { centerX: .5, centerY: .8, widthRatio: .25, heightRatio: .07, rotation: 0 }, text: 'Get started', fill: '#272617', color: '#ffffff', fontSize: 20, radius: 8, padding: 16, autoWidth: false, arrow: true }], order: [...document.order, id] }); textEditor.select(null); setSelectedObject(id); }}><Plus size={16} aria-hidden="true" /> Add button</button>}
             {(() => {

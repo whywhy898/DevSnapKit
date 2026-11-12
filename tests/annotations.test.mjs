@@ -28,6 +28,47 @@ test('annotations add immutably to the drawing order with free style presets', (
   assert.equal(Object.keys(api.ANNOTATION_WIDTHS).length, 3);
 });
 
+test('reset clears every annotation and one undo restores the complete pre-reset snapshot', () => {
+  let doc = createIndependentComposition();
+  for (const kind of ['arrow', 'rectangle', 'highlight']) {
+    doc = api.addAnnotation(doc, kind, kind, size);
+    doc = moveCompositionObject(doc, kind, { centerX: .2 + doc.objects.length * .15, heightRatio: .25 }, size);
+    doc = api.styleAnnotation(doc, kind, { color: '#3b82f6', width: 'thick' });
+  }
+  const decoration = { ...doc.objects[1], id: 'decorated-annotation' };
+  const ordinary = { id: 'ordinary', kind: 'shape', shape: 'rect', fill: '#ffffff', frame: { ...doc.objects[0].frame } };
+  doc = { ...doc, objects: [...doc.objects, ordinary], decorations: [decoration],
+    order: [...doc.order, ordinary.id, decoration.id], hiddenIds: ['rectangle', decoration.id, ordinary.id] };
+  const before = { compositionDocument: doc, padding: 123, solidColor: '#abcdef' };
+  const saved = plain(before), history = new EditorHistory(before);
+  const reset = { ...before, compositionDocument: api.clearAnnotations(doc), padding: 88, solidColor: '#0b0f19' };
+  history.flush(reset);
+  assert.equal(history.count, 2, 'the entire reset is one history entry');
+  assert.deepEqual(plain(reset.compositionDocument.objects), [ordinary]);
+  assert.deepEqual(plain(reset.compositionDocument.decorations), []);
+  assert.deepEqual(plain(reset.compositionDocument.order), doc.order.filter(id => !['arrow', 'rectangle', 'highlight', decoration.id].includes(id)));
+  assert.deepEqual(plain(reset.compositionDocument.hiddenIds), [ordinary.id]);
+  assert.deepEqual(plain(before), saved, 'reset never mutates the snapshot stored for Undo');
+  assert.deepEqual(plain(history.undo(reset)), saved);
+  assert.deepEqual(plain(history.redo()), plain(reset));
+});
+
+test('annotation tools render exact short labels, lucide icons and the selected kind', () => {
+  const { AnnotationTools } = load('composition/AnnotationControls.tsx');
+  for (const selectedKind of ['arrow', 'rectangle', 'highlight']) {
+    const html = renderToStaticMarkup(createElement(AnnotationTools, { selectedKind, onAdd() {} }));
+    const buttons = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)];
+    assert.deepEqual(buttons.map(([, , content]) => content.replace(/<svg[\s\S]*?<\/svg>/g, '').replace(/<[^>]*>/g, '')), ['Arrow', 'Box', 'Highlight']);
+    assert.equal(buttons.filter(([, attrs]) => attrs.includes('aria-pressed="true"')).length, 1);
+    for (const [, attrs, content] of buttons) {
+      assert.match(content, /<svg[^>]*aria-hidden="true"/);
+      assert.match(content, /lucide/);
+      assert.match(attrs, /class="elements-add"/);
+    }
+    assert.match(buttons[['arrow', 'rectangle', 'highlight'].indexOf(selectedKind)][1], /aria-pressed="true"/);
+  }
+});
+
 test('endpoint drag crosses either axis and preserves the opposite endpoint, including horizontal and vertical arrows', () => {
   let doc = api.addAnnotation(createIndependentComposition(), 'arrow', 'a', size);
   const before = api.annotationEndpoints(doc.objects[0], size);

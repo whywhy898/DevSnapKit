@@ -54,6 +54,14 @@ export function deleteAnnotation(doc: CompositionDocument, id: string): Composit
   return { ...doc, objects: doc.objects.filter(node => node.id !== id || !isAnnotation(node)), order: doc.order.filter(key => key !== id), hiddenIds: doc.hiddenIds.filter(key => key !== id) };
 }
 
+/** Clear annotation content and references without disturbing other artwork. */
+export function clearAnnotations(doc: CompositionDocument): CompositionDocument {
+  const ids = new Set([...doc.objects, ...doc.decorations].filter(isAnnotation).map(node => node.id));
+  if (!ids.size) return doc;
+  return { ...doc, objects: doc.objects.filter(node => !ids.has(node.id)), decorations: doc.decorations.filter(node => !ids.has(node.id)),
+    order: doc.order.filter(id => !ids.has(id)), hiddenIds: doc.hiddenIds.filter(id => !ids.has(id)) };
+}
+
 /** Local SVG coordinates scale with logical canvas width; output pixel ratio scales the whole artwork again. */
 export function annotationGeometry(node: AnnotationObject, size: Size) {
   const width = node.frame.widthRatio * size.width, height = node.frame.heightRatio * size.height;

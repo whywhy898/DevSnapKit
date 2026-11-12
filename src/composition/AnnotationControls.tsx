@@ -1,6 +1,14 @@
 import type { CompositionDocument } from './types';
+import { ArrowUpRight, Square, Highlighter } from 'lucide-react';
 import './annotations.css';
-import { ANNOTATION_COLORS, ANNOTATION_WIDTHS, isAnnotation, styleAnnotation, deleteAnnotation } from './annotations';
+import { ANNOTATION_COLORS, ANNOTATION_WIDTHS, isAnnotation, styleAnnotation, deleteAnnotation, type AnnotationKind } from './annotations';
+
+export function AnnotationTools({ selectedKind, onAdd }: { selectedKind?: AnnotationKind; onAdd: (kind: AnnotationKind) => void }) {
+  return <div className="annotation-add" role="group" aria-label="Annotation tools">
+    {([{ kind: 'arrow', label: 'Arrow', Icon: ArrowUpRight }, { kind: 'rectangle', label: 'Box', Icon: Square }, { kind: 'highlight', label: 'Highlight', Icon: Highlighter }] as const).map(({ kind, label, Icon }) =>
+      <button key={kind} type="button" className="elements-add" aria-pressed={selectedKind === kind} onClick={() => onAdd(kind)}><Icon size={16} aria-hidden="true" /><span>{label}</span></button>)}
+  </div>;
+}
 
 export function AnnotationControls({ document: doc, selected, onChange, onFinish }: {
   document: CompositionDocument; selected: string; onChange: (doc: CompositionDocument) => void; onFinish: () => void;

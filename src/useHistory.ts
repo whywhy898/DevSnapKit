@@ -8,6 +8,8 @@ import type { PrimaryMediaOrigin, TemplateContext } from './templates/types';
 import type { CompositionDocument } from './composition/types';
 
 export interface EditorSnapshot {
+  exportScale?: number;
+  exportFormat?: 'png' | 'webp' | 'jpeg';
   compositionDocument?: CompositionDocument | null;
   secondaryMediaOrigin?: PrimaryMediaOrigin;
   templateContext?: TemplateContext | null;
