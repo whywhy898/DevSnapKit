@@ -16,6 +16,7 @@ const browser = await launchBrowser(args);
 const results = { origin, cases: [], errors: [], startedAt: new Date().toISOString() };
 try {
   const page = await browser.newPage();
+  page.on('dialog', dialog => dialog.accept());
   await page.setViewport({ width: 1440, height: 1100, deviceScaleFactor: 1 });
   page.setDefaultNavigationTimeout(60000);
   page.on('pageerror', error => results.errors.push(error.message));
@@ -64,8 +65,8 @@ try {
   results.cases.push({ case: 'tool=text opens panel without adding content', passed: true });
 
   const entries = [
-    ['og-image-generator', '?editor=1&aspect=og'],
-    ['product-hunt-image-maker', '?editor=1&mode=duo&aspect=og'],
+    ['og-image-generator', '?editor=1&aspect=og&scene=og'],
+    ['product-hunt-image-maker', '?editor=1&mode=duo&aspect=og&scene=producthunt'],
     ['add-text-to-image', '?editor=1&tool=text'],
   ];
   for (const width of [1440, 390]) {
@@ -81,11 +82,9 @@ try {
         await page.waitForSelector('[data-canvas-text-controls]', { visible: true });
         assert.equal((await page.$$('[data-canvas-text]')).length, 0);
       } else {
-        await waitSize(1200, 630);
+        await waitSize(...(slug === 'product-hunt-image-maker' ? [1270, 760] : [1200, 630]));
         if (slug === 'product-hunt-image-maker') {
-          assert.equal(await selected('Dual shots (2 images)'), true);
-          await clickButton(page, 'Frame');
-          await page.waitForSelector('button[aria-label="Replace Image 2"]', { visible: true });
+          await page.waitForFunction(() => document.querySelectorAll('#studio-canvas [data-canvas-text]').length > 0);
         }
       }
       await page.screenshot({ path: path.join(output, `${slug}-${width}-entry.png`), fullPage: true });

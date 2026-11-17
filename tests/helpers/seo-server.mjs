@@ -12,12 +12,17 @@ export async function startSeoServer(getStats, requestedOrigin, allowPro = () =>
   const server = http.createServer(async (request, response) => {
     try {
       const pathname = new URL(request.url, 'http://localhost').pathname;
-      if (pathname === '/api/telemetry/event' && request.method === 'POST') {
+      if (['/api/event', '/api/telemetry/event'].includes(pathname) && request.method === 'POST') {
         const chunks = [];
         for await (const chunk of request) chunks.push(chunk);
         events.push(JSON.parse(Buffer.concat(chunks).toString('utf8')));
         response.writeHead(200, { 'Content-Type': 'application/json' });
         response.end('{"ok":true}');
+        return;
+      }
+      if (pathname === '/api/feedback' && request.method === 'GET') {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end('{"enabled":false}');
         return;
       }
       if (pathname === '/api/admin/stats') {
@@ -62,5 +67,8 @@ export async function startSeoServer(getStats, requestedOrigin, allowPro = () =>
   const wanted = requestedOrigin ? new URL(requestedOrigin) : null;
   if (wanted && !['127.0.0.1', 'localhost'].includes(wanted.hostname)) throw Error('SEO fixture server requires a loopback origin');
   await new Promise(resolve => server.listen(wanted ? Number(wanted.port || 80) : 0, '127.0.0.1', resolve));
-  return { events, origin: `http://127.0.0.1:${server.address().port}`, close: () => new Promise(resolve => server.close(resolve)) };
+  return { events, origin: `http://127.0.0.1:${server.address().port}`, close: () => new Promise(resolve => {
+    server.close(resolve);
+    server.closeAllConnections();
+  }) };
 }

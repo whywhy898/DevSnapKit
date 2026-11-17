@@ -53,3 +53,20 @@ test('simulation affects both endpoints on preview and dev, never production', a
 test('runtime reload cannot emit a duplicate automatic visit', async () => {
   const b = browser(); vm.runInNewContext(source, { window: b.window, URL, Blob, Math, Date }); assert.equal((await b.events()).length, 1);
 });
+
+test('visit is limited to one per document even if another caller requests it; a real reload counts again', async () => {
+  const b = browser({ path: '/?utm_source=landing&utm_campaign=one' });
+  b.window.DevSnapKitAnalytics.track('visit');
+  b.window.location = new URL('https://devsnapkit.com/?editor=1&utm_source=changed');
+  for (const name of ['visit', 'page_view', 'seo_editor_open', 'visit', 'export_image', 'export_image']) b.window.DevSnapKitAnalytics.track(name);
+  assert.deepEqual((await b.events()).map(e => e.event), ['visit', 'editor_open', 'export', 'export']);
+  const reloaded = browser({ path: '/?editor=1&utm_source=changed', storage: b.storage });
+  reloaded.window.DevSnapKitAnalytics.track('visit');
+  reloaded.window.DevSnapKitAnalytics.track('page_view');
+  assert.deepEqual((await reloaded.events()).map(e => e.event), ['visit', 'editor_open']);
+  for (const e of [...await b.events(), ...await reloaded.events()]) {
+    assert.equal(e.sessionId, (await b.events())[0].sessionId);
+    assert.equal(e.utm_source, 'landing');
+    assert.equal(e.utm_campaign, 'one');
+  }
+});

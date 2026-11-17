@@ -16,6 +16,8 @@
     else state[field] = state[field].replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 120);
   }
   try { window.sessionStorage.setItem(key, JSON.stringify(state)); } catch {}
+  // Document lifetime, not sessionStorage: a real reload must count again.
+  let visited = false;
   let editorOpened = false;
   function context() {
     return Object.fromEntries(['sessionId', ...fields].map(field => [field, state[field]]).concat([['path', window.location.pathname.slice(0, 512)]]));
@@ -29,6 +31,7 @@
     try {
       const event = ({ page_view: 'editor_open', seo_editor_open: 'editor_open', export_image: 'export', copy_image: 'export', poster_export_success: 'export' })[name] || name;
       if (!['visit', 'editor_open', 'export'].includes(event)) return;
+      if (event === 'visit') { if (visited) return; visited = true; }
       if (event === 'editor_open') { if (editorOpened) return; editorOpened = true; }
       const body = JSON.stringify({ ...context(), event });
       const url = endpoint('/api/event');

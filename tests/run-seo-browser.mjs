@@ -62,14 +62,21 @@ try {
         const dimensions = await page.evaluate(() => ({ viewport: innerWidth, body: document.body.scrollWidth, html: document.documentElement.scrollWidth }));
         assert.ok(dimensions.body <= width && dimensions.html <= width, `${slug} ${width} ${theme}: horizontal overflow ${JSON.stringify(dimensions)}`);
         for (const image of await page.$$('img')) {
+          // The floating CTA deliberately stays hidden on mobile until near
+          // the page end. Its hidden lazy thumbnail need not load yet.
+          if (!await image.evaluate(node => node.getClientRects().length > 0)) continue;
+          results.checkingImage = await image.evaluate(node => ({ src: node.src, complete: node.complete, naturalWidth: node.naturalWidth, loading: node.loading }));
           if (!await image.evaluate(node => node.complete && node.naturalWidth > 0)) {
             await image.evaluate(node => node.scrollIntoView({ block: 'center', behavior: 'instant' }));
             await page.waitForFunction(node => node.complete && node.naturalWidth > 0, { timeout: 15000 }, image);
           }
         }
-        const images = await page.$$eval('img', nodes => nodes.map(node => ({ src: node.getAttribute('src'), loaded: node.complete && node.naturalWidth > 0 })));
+        const images = await page.$$eval('img', nodes => nodes.filter(node => node.getClientRects().length > 0).map(node => ({ src: node.getAttribute('src'), loaded: node.complete && node.naturalWidth > 0 })));
         assert.ok(images.every(image => image.loaded), `${slug}: images loaded`);
-        const heroRatio = await page.$eval('.finished-shot img', node => ({ rendered: node.offsetWidth / node.offsetHeight, intrinsic: node.naturalWidth / node.naturalHeight }));
+        const heroRatio = await page.$eval(slug === 'add-text-to-image' ? '[data-demo-player]' : '.finished-shot img', node => ({
+          rendered: node.offsetWidth / node.offsetHeight,
+          intrinsic: (node.naturalWidth || node.videoWidth || Number(node.getAttribute('width'))) / (node.naturalHeight || node.videoHeight || Number(node.getAttribute('height'))),
+        }));
         // The legacy hero has a decorative rotation; new cases preserve the image's ratio.
         if (slug !== 'screenshot-beautifier') assert.ok(Math.abs(heroRatio.rendered - heroRatio.intrinsic) < 0.1, `${slug}: undistorted hero`);
         await page.$eval('#reveal', node => node.scrollIntoView({ block: 'center', behavior: 'instant' }));
@@ -115,7 +122,7 @@ try {
   await page.goto(`${origin}/og-image-generator/`, { waitUntil: 'networkidle0' });
   await page.click('.hero-copy a.button');
   await page.waitForSelector('#studio-canvas');
-  assert.equal(new URL(page.url()).search, '?editor=1&aspect=og');
+  assert.equal(new URL(page.url()).search, '?editor=1&aspect=og&scene=og');
   assert.deepEqual(await page.$eval('#studio-canvas', node => ({ width: node.offsetWidth, height: node.offsetHeight })), { width: 1200, height: 630 });
   const tools = await page.$$eval('nav[aria-label="Screenshot tools"] a', nodes => nodes.map(node => new URL(node.href).pathname));
   for (const slug of slugs) assert.ok(tools.includes(`/${slug}/`), `editor footer: ${slug}`);

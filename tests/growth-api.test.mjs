@@ -138,3 +138,61 @@ test('production admin statistics exclude sandbox, preview and unclassified lega
     request: new Request('https://devsnapkit.com/api/admin/stats', { headers: { Authorization: 'Bearer ' + token } }) });
   assert.equal((await empty.json()).overview.totalOrders, 0);
 });
+
+test('actual authenticated stats handler defaults the D1 growth funnel to production and allows only explicit preview/dev', async t => {
+  const sql = new DatabaseSync(':memory:'); t.after(() => sql.close());
+  sql.exec(fs.readFileSync(path.join(root, 'd1/schema.sql'), 'utf8'));
+  let reads = 0;
+  const DB = { prepare(query) { reads++; let args = []; return {
+    bind(...values) { args = values; return this; },
+    async first() { return sql.prepare(query).get(...args); },
+    async all() { return { results: sql.prepare(query).all(...args) }; },
+  }; } };
+  const insert = sql.prepare('INSERT INTO events (event_type, session_id, path, metadata, created_at) VALUES (?, ?, ?, ?, ?)');
+  const counts = {
+    production: { visit: 2, editor_open: 1, export: 1, payment: 1 },
+    preview: { visit: 3, editor_open: 2, export: 2, payment: 2 },
+    dev: { visit: 4, editor_open: 3, export: 3, payment: 3 },
+  };
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  for (const [env, events] of Object.entries(counts)) for (const [event, count] of Object.entries(events)) {
+    for (let i = 0; i < count; i++) insert.run(event, 's_fixture_' + env, '/', JSON.stringify({ env, utm_source: 'shared-campaign' }), now);
+    insert.run(event, 's_' + env + '_unique', '/', JSON.stringify({ env, utm_source: env + '-only' }), now);
+  }
+  for (const metadata of ['{}', 'not-json', JSON.stringify({ env: 'unknown' })]) insert.run('visit', 's_unclassified', '/', metadata, now);
+  insert.run('visit', 's_expired', '/', JSON.stringify({ env: 'production', utm_source: 'expired' }), '2000-01-01 00:00:00');
+  insert.run('upload_image', 's_legacy', '/', JSON.stringify({ env: 'production', utm_source: 'legacy-event' }), now);
+  const secret = 'test-only-admin-secret-at-least-32-characters';
+  const token = await load('functions/lib/security.ts').createAdminToken(secret);
+  const handler = load('functions/api/admin/stats.ts').onRequestGet;
+  const call = (query = '', bearer = token, env = { DB, ADMIN_SECRET: secret }) => handler({ env,
+    request: new Request(query.startsWith('http') ? query : 'https://devsnapkit.com/api/admin/stats' + query, { headers: bearer ? { Authorization: 'Bearer ' + bearer } : {} }) });
+  for (const query of ['', '?env=preview', '?env=dev']) {
+    for (const bearer of ['', 'forged-token']) assert.equal((await call(query, bearer)).status, 401);
+  }
+  assert.equal((await call('?env=preview', token, { DB })).status, 503);
+  assert.equal(reads, 0, 'authentication rejects before touching D1');
+  const evidence = [];
+  for (const [query, selected] of [
+    ['', 'production'], ['?env=production', 'production'], ['?env=preview', 'preview'], ['?env=dev', 'dev'],
+    ['?env=', 'production'], ['?env=all', 'production'], ['?env=Preview', 'production'],
+    ['?env=staging', 'production'], ['?env=preview%20', 'production'], ['?environment=preview', 'production'],
+    ['https://branch.pages.dev/api/admin/stats', 'production'], ['http://localhost:3001/api/admin/stats', 'production'],
+  ]) {
+    const response = await call(query);
+    assert.equal(response.status, 200, query);
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    const body = await response.json(), funnel = body.growthFunnel;
+    assert.equal(funnel.available, true, query);
+    assert.equal(funnel.env, selected, query);
+    assert.equal(funnel.windowDays, 30);
+    assert.equal(funnel.rows.length, 2);
+    assert.deepEqual(funnel.rows.find(r => r.utm_source === 'shared-campaign'), { utm_source: 'shared-campaign', ...counts[selected] });
+    assert.deepEqual(funnel.rows.find(r => r.utm_source === selected + '-only'), { utm_source: selected + '-only', visit: 1, editor_open: 1, export: 1, payment: 1 });
+    assert.equal(body.overview.totalPv, 4, 'all-time overview includes the old production visit and remains production for every funnel selection');
+    evidence.push({ request: query.startsWith('http') ? query : '/api/admin/stats' + query, status: response.status, growthFunnel: funnel });
+  }
+  const directory = path.join(root, 'scratch/growth-followup');
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(path.join(directory, 'admin-handler-responses.json'), JSON.stringify({ authentication: 'six unauthorized requests: 401; missing admin configuration: 503; zero D1 reads before authorization', fixtures: counts, responses: evidence }, null, 2));
+});
