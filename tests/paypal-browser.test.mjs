@@ -36,7 +36,7 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
   for (const [name, width] of [['creation-error', 1440], ['lost-callback', 390], ['reload-recovery', 1440], ['approval-open', 1440]]) {
     const page = await browser.newPage();
     await page.setViewport({ width, height: 1050, deviceScaleFactor: 1 });
-    let claimCount = 0, captureCount = 0;
+    let claimCount = 0, captureCount = 0, createCount = 0;
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.evaluateOnNewDocument((name, order) => {
       localStorage.setItem('devsnapkit_welcome_dismissed', 'true');
@@ -60,8 +60,11 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
       const json = (data, status = 200) => request.respond({ status, contentType: 'application/json', body: JSON.stringify(data) });
       if (url.hostname === 'www.paypal.com') { await request.respond({ contentType: 'text/javascript', body: '' }); return; }
       if (url.pathname === '/api/paypal-config') { await json({ clientId: 'test-client', mode: 'sandbox' }); return; }
-      if (url.pathname === '/api/paypal-create-order') { await json(name === 'creation-error' ? { error: 'Checkout unavailable' } : { id: order }, name === 'creation-error' ? 503 : 200); return; }
-      if (url.pathname === '/api/paypal-capture-order') { captureCount++; await json({ error: 'connection interrupted' }, 503); return; }
+      if (url.pathname === '/api/paypal-create-order') { createCount++; await json(name === 'creation-error' ? { error: 'Checkout unavailable' } : { id: order }, name === 'creation-error' ? 503 : 200); return; }
+      if (url.pathname === '/api/paypal-capture-order') {
+        captureCount++; assert.equal(JSON.parse(request.postData()).orderId, order);
+        await json({ error: 'connection interrupted' }, 503); return;
+      }
       if (url.pathname === '/api/claim-license') {
         if (name === 'approval-open') { await json({ success: false }, 403); return; }
         claimCount++; await json(name === 'creation-error' || claimCount < 2 ? { success: false } : { success: true, licenseKey: key }, claimCount < 2 ? 403 : 200); return;
@@ -90,10 +93,13 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
       assert.equal(await page.evaluate(() => ['Recover payment', 'Discard and pay again'].every(text => [...document.querySelectorAll('button')].find(b => b.textContent === text)?.disabled)), true,
         'an active PayPal approval window must finish before its order can be discarded');
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), order);
-      assert.equal(captureCount, 0);
+      assert.equal(createCount, 1, 'status recovery must not start a second checkout while approval is open');
+      assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_license_key')), null);
+      const checksBeforeApproval = captureCount;
       await page.evaluate(() => window.finishPayPalApproval());
       await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Discard and pay again' && !b.disabled));
-      assert.equal(captureCount, 1);
+      assert.ok(captureCount > checksBeforeApproval, 'approval attempts to capture the original order');
+      assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), order);
     } else if (name === 'creation-error') {
       await page.waitForSelector('[role="alert"]');
       assert.match(await page.$eval('[role="alert"]', n => n.textContent), /could not complete/);
@@ -102,7 +108,8 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
       await page.waitForFunction(key => [...document.querySelectorAll('input')].some(input => input.value === key), { timeout: 15000 }, key);
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_license_key')), key);
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), null);
-      assert.equal(captureCount, 0, 'the lost frontend callback does not cause another client capture');
+      assert.ok(captureCount >= 1, 'unsuccessful claims check the original order with PayPal');
+      assert.equal(createCount, name === 'reload-recovery' ? 0 : 1, 'recovery never creates a replacement order');
     }
     assert.deepEqual(errors, []);
     if (evidence) { await fs.mkdir(evidence, { recursive: true }); await page.screenshot({ path: path.join(evidence, name + '.png'), fullPage: true }); }
@@ -116,7 +123,7 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
 test('pending checkout can be safely discarded or recovered through the browser UI', async t => {
   const base = await serveBuild(t);
   const browser = await launchBrowser(); t.after(() => browser.close());
-  for (const name of ['unpaid', 'unpaid-persistent', 'unpaid-close-button', 'unpaid-close-escape', 'unpaid-close-pending', 'unpaid-reopen-pending', 'paid', 'network', 'server', 'processing']) {
+  for (const name of ['unpaid', 'unpaid-persistent', 'unpaid-close-button', 'unpaid-close-escape', 'unpaid-close-pending', 'unpaid-reopen-pending', 'paid', 'network', 'server', 'processing', 'forbidden', 'unprocessable', 'created', 'approved']) {
     const page = await browser.newPage();
     await page.setViewport({ width: name === 'unpaid' ? 390 : 1440, height: 1050, deviceScaleFactor: 1 });
     const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -137,7 +144,7 @@ test('pending checkout can be safely discarded or recovered through the browser 
         else container.appendChild(button);
       } }) };
     }, order, name);
-    let captureCount = 0, createCount = 0, releaseCheck, releaseCreate;
+    let createCount = 0, releaseCheck, releaseCreate, nextCheck;
     let outcome = name.startsWith('unpaid') ? 'unpaid' : name;
     const requests = [];
     await page.setRequestInterception(true);
@@ -153,15 +160,22 @@ test('pending checkout can be safely discarded or recovered through the browser 
         await json({ id: 'SECONDORDER1234567' }); return;
       }
       if (url.pathname === '/api/paypal-capture-order') {
-        captureCount++; const body = JSON.parse(request.postData()); requests.push(body);
+        const body = JSON.parse(request.postData()); requests.push(body);
         if (body.orderId === 'SECONDORDER1234567') { await json({ success: true, licenseKey: key }); return; }
-        // Hold discard checks so we can verify that nothing is cleared early.
-        if (captureCount > (name === 'unpaid' ? 1 : 0)) await new Promise(resolve => { releaseCheck = resolve; });
+        const action = nextCheck; nextCheck = undefined;
+        // Background claim followups remain inconclusive; hold the explicit
+        // discard request to verify the UI before provider verification finishes.
+        if (!action) { await json({ success: false, pending: true }, 202); return; }
+        if (action === 'discard') await new Promise(resolve => { releaseCheck = resolve; });
         if (outcome === 'network') { await request.abort('failed'); return; }
         if (outcome === 'paid') { await json({ success: true, status: 'COMPLETED', licenseKey: key }); return; }
         if (outcome === 'server') { await json({ success: false }, 503); return; }
         if (outcome === 'processing') { await json({ success: false, pending: true }, 202); return; }
-        await json({ success: false, unpaid: true, pending: false, status: 'CREATED' }, 202); return;
+        if (outcome === 'forbidden' || outcome === 'unprocessable') { await json({ success: false }, outcome === 'forbidden' ? 403 : 422); return; }
+        if (outcome === 'created' || outcome === 'approved') {
+          await json({ success: false, terminalUnpaid: false, unpaid: false, pending: true, status: outcome.toUpperCase() }, 202); return;
+        }
+        await json({ success: false, terminalUnpaid: true, unpaid: true, pending: false, status: 'VOIDED' }, 202); return;
       }
       if (url.pathname.startsWith('/api/')) { await json({ valid: false }); return; }
       await request.continue();
@@ -172,11 +186,13 @@ test('pending checkout can be safely discarded or recovered through the browser 
     assert.equal(await page.$(discardNotice), null, 'no notice before a successful discard');
     assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Test PayPal checkout' && b.getClientRects().length)), false);
     if (name === 'unpaid') {
+      nextCheck = 'recover';
       await clickButton(page, 'Recover payment');
       await page.waitForFunction(() => document.querySelector('[role="alert"]')?.textContent.includes('discard it and pay again'));
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), order);
       assert.equal(await page.$(discardNotice), null, 'recovering an unpaid order does not discard it');
     }
+    nextCheck = 'discard';
     await clickButton(page, 'Discard and pay again');
     const waitForHeldCheck = async () => {
       for (let i = 0; i < 100 && !releaseCheck; i++) await new Promise(resolve => setTimeout(resolve, 20));
@@ -192,13 +208,14 @@ test('pending checkout can be safely discarded or recovered through the browser 
       const release = releaseCheck; releaseCheck = undefined; release();
     };
     await waitForHeldCheck();
-    if (['network', 'server', 'processing'].includes(name)) {
+    if (['network', 'server', 'processing', 'forbidden', 'unprocessable', 'created', 'approved'].includes(name)) {
       await page.waitForFunction(() => document.querySelector('[role="alert"]')?.textContent.includes('retry'));
       assert.equal(await page.$(discardNotice), null, 'failed or inconclusive checks never show the notice');
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), order);
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_license_key')), null);
       assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Test PayPal checkout' && b.getClientRects().length)), false);
       outcome = 'unpaid';
+      nextCheck = 'discard';
       await clickButton(page, 'Discard and pay again');
       await waitForHeldCheck();
     }
@@ -260,4 +277,63 @@ test('pending checkout can be safely discarded or recovered through the browser 
     assert.deepEqual(errors, []);
     await page.close();
   }
+});
+
+test('a closed checkout tab recovers its stored order from the bare homepage in the same browser context', async t => {
+  const base = await serveBuild(t);
+  const browser = await launchBrowser(); t.after(() => browser.close());
+  let providerCompleted = false, createCount = 0, statusChecks = 0, claims = 0;
+  const errors = [], checkedOrders = [];
+  async function openTab(url = base) {
+    const page = await browser.newPage();
+    page.on('pageerror', error => errors.push(error.message));
+    await page.evaluateOnNewDocument(() => {
+      localStorage.setItem('devsnapkit_welcome_seen', '1');
+      localStorage.setItem('devsnapkit_welcome_dismissed', 'true');
+      window.paypal = { Buttons: config => ({ render(container) {
+        const button = document.createElement('button'); button.textContent = 'Test PayPal checkout';
+        // PayPal's approval tab is lost before onApprove reaches the editor.
+        button.onclick = () => config.createOrder(); container.appendChild(button);
+      } }) };
+    });
+    await page.setRequestInterception(true);
+    page.on('request', async request => {
+      const url = new URL(request.url());
+      const json = (data, status = 200) => request.respond({ status, contentType: 'application/json', body: JSON.stringify(data) });
+      if (url.hostname === 'www.paypal.com') { await request.respond({ contentType: 'text/javascript', body: '' }); return; }
+      if (url.pathname === '/api/paypal-config') { await json({ clientId: 'test-client', mode: 'sandbox' }); return; }
+      if (url.pathname === '/api/paypal-create-order') { createCount++; await json({ id: order }); return; }
+      if (url.pathname === '/api/claim-license') { claims++; await json({ success: false }, 403); return; }
+      if (url.pathname === '/api/paypal-capture-order') {
+        statusChecks++; checkedOrders.push(JSON.parse(request.postData()).orderId);
+        await json(providerCompleted ? { success: true, status: 'COMPLETED', licenseKey: key }
+          : { success: false, status: 'APPROVED', terminalUnpaid: false, unpaid: false, pending: true }, providerCompleted ? 200 : 202); return;
+      }
+      if (url.pathname.startsWith('/api/')) { await json({ valid: false }); return; }
+      await request.continue();
+    });
+    await page.goto(url, { waitUntil: 'networkidle0' });
+    return page;
+  }
+  const original = await openTab();
+  await original.click('.pro-upgrade-button');
+  await clickButton(original, 'Test PayPal checkout');
+  await original.waitForFunction(order => localStorage.getItem('devsnapkit_pending_paypal_order') === order, {}, order);
+  assert.equal(await original.evaluate(() => localStorage.getItem('devsnapkit_license_key')), null);
+  assert.equal(createCount, 1);
+  await original.close();
+  assert.equal(original.isClosed(), true);
+  providerCompleted = true;
+  const checksBeforeReopening = statusChecks;
+  const reopened = await openTab(new URL('/', base).href);
+  assert.equal(new URL(reopened.url()).search, '', 'recovery must not require an editor query parameter');
+  await reopened.waitForFunction(key => [...document.querySelectorAll('input')].some(input => input.value === key), { timeout: 15000 }, key);
+  assert.equal(createCount, 1, 'reopening must recover the stored order without creating another checkout');
+  assert.ok(claims >= 1); assert.ok(statusChecks > checksBeforeReopening);
+  assert.ok(checkedOrders.every(id => id === order));
+  assert.equal(await reopened.evaluate(() => localStorage.getItem('devsnapkit_license_key')), key);
+  assert.equal(await reopened.evaluate(() => localStorage.getItem('devsnapkit_pro_unlocked')), 'true');
+  assert.equal(await reopened.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), null);
+  assert.deepEqual(errors, []);
+  await reopened.close();
 });

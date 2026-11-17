@@ -1,8 +1,9 @@
 import { ConfigurationError, generateSignedKey, requireSecret } from './security';
 import { sendOrderNotification, type NotifyEnv } from '../api/notify';
 import { proPricing } from '../../shared/pricing';
+import { paymentEnvironment, recordPayment, type GrowthEnv } from './growth';
 
-export interface PayPalEnv extends NotifyEnv {
+export interface PayPalEnv extends NotifyEnv, GrowthEnv {
   PAYPAL_CLIENT_ID?: string;
   PAYPAL_CLIENT_SECRET?: string;
   PAYPAL_MODE?: string;
@@ -124,7 +125,7 @@ export async function completedOrder(env: PayPalEnv, session: Session, orderId: 
   return order;
 }
 
-export async function fulfillOrder(env: PayPalEnv, order: any, expectedCaptureId?: string) {
+export async function fulfillOrder(env: PayPalEnv, order: any, expectedCaptureId?: string, request?: Request) {
   requirePaymentStorage(env);
   const unit = validatePurchase(order, env);
   const captures = unit.payments?.captures;
@@ -141,6 +142,8 @@ export async function fulfillOrder(env: PayPalEnv, order: any, expectedCaptureId
   const record = { orderId: order.id, txnId: capture.id, payerEmail: order.payer?.email_address || '',
     amount: capture.amount.value, currency: proPricing.currency, status: 'COMPLETED', licenseKey,
     createdAt: capture.create_time || new Date().toISOString() };
+  const mode = (env.PAYPAL_MODE || 'live').trim().toLowerCase();
+  const paymentContext = { mode, env: request ? paymentEnvironment(request, mode) : 'unknown' };
   let inserted: any, stored: any;
   try {
     inserted = await env.DB.prepare(`INSERT INTO orders
@@ -150,7 +153,7 @@ export async function fulfillOrder(env: PayPalEnv, order: any, expectedCaptureId
         amount=excluded.amount, currency=excluded.currency, status=excluded.status,
         license_key=excluded.license_key, raw_payload=excluded.raw_payload
       WHERE orders.status='PENDING'`).bind(record.orderId, record.txnId, record.payerEmail,
-        record.amount, record.currency, record.licenseKey, record.createdAt, JSON.stringify(order).slice(0, 4000)).run();
+        record.amount, record.currency, record.licenseKey, record.createdAt, JSON.stringify({ ...order, devsnapkit_payment: paymentContext })).run();
     stored = await env.DB.prepare('SELECT txn_id, status, license_key FROM orders WHERE order_id = ?').bind(record.orderId).first();
   } catch {
     throw new PaymentError('Payment confirmation is being saved. Please retry or recover your key using the PayPal receipt.');
@@ -160,6 +163,9 @@ export async function fulfillOrder(env: PayPalEnv, order: any, expectedCaptureId
   }
   // D1's unique order ID selects one winner across webhook and browser requests.
   if (Number(inserted.meta?.changes) === 1) {
+    if (request) {
+      try { await recordPayment(env, request, record.orderId, mode); } catch { /* Never block a paid license. */ }
+    }
     try { await sendOrderNotification({ ...record, timestamp: record.createdAt }, env); }
     catch { console.warn('[Payment] Merchant notification failed; confirmed order is saved.'); }
   }

@@ -1,99 +1,41 @@
-// Shared by static SEO pages and the studio. No image data, cookies or URL queries.
+// Shared by static pages and the studio. No cookies, image data or fingerprinting.
 (function () {
   'use strict';
   if (window.DevSnapKitAnalytics) return;
-  const paths = ['/screenshot-beautifier/', '/og-image-generator/', '/product-hunt-image-maker/', '/add-text-to-image/'];
-  const key = 'dsk_attribution_v1';
-  const timeout = 30 * 60 * 1000;
-  const entryPath = path => paths.find(value => value === path || value.slice(0, -1) === path);
-  const hostname = value => {
-    try {
-      const url = new URL(value);
-      return /^https?:$/.test(url.protocol) ? url.hostname.slice(0, 253) : 'direct';
-    } catch { return 'direct'; }
-  };
-  const newSession = () => ({
-    sid: 's_' + (window.crypto?.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now().toString(36)),
-    entry: null,
-    referrer: hostname(document.referrer),
-    sequence: 0,
-    lastSeen: Date.now(),
-  });
-  let state = newSession();
-  let persistent = false;
+  const key = 'dsk_attribution_v2';
+  const fields = ['utm_source', 'utm_medium', 'utm_campaign', 'ref'];
+  let state = { sessionId: 's_' + (window.crypto?.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now().toString(36)) };
   try {
     const saved = JSON.parse(window.sessionStorage.getItem(key) || 'null');
-    if (saved && /^s_[a-zA-Z0-9_-]{8,60}$/.test(saved.sid) &&
-        (saved.entry === null || paths.includes(saved.entry)) &&
-        (saved.referrer === 'direct' || /^[a-z0-9.-]{1,253}$/i.test(saved.referrer)) &&
-        Number.isSafeInteger(saved.sequence) && saved.sequence >= 0 && saved.sequence < 999999999 &&
-        Number.isFinite(saved.lastSeen) && saved.lastSeen <= Date.now() && Date.now() - saved.lastSeen < timeout) {
-      state = saved;
-    }
+    if (saved && typeof saved.sessionId === 'string' && /^s_[a-zA-Z0-9_-]{8,60}$/.test(saved.sessionId)) state = saved;
   } catch {}
-  const currentEntry = entryPath(window.location.pathname);
-  if (!state.entry) {
-    if (currentEntry) state.entry = currentEntry;
-    else {
-      try {
-        const referrer = new URL(document.referrer);
-        if (referrer.origin === window.location.origin) state.entry = entryPath(referrer.pathname) || null;
-      } catch {}
-    }
+  const params = new URL(window.location.href).searchParams;
+  for (const field of fields) {
+    // First landing URL wins for the browser session, including direct traffic.
+    if (typeof state[field] !== 'string') state[field] = (params.get(field) || '').replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 120);
+    else state[field] = state[field].replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 120);
   }
-  const save = () => {
-    try { window.sessionStorage.setItem(key, JSON.stringify(state)); persistent = true; }
-    catch { persistent = false; }
-  };
-  save();
-
-  function track(event, metadata) {
+  try { window.sessionStorage.setItem(key, JSON.stringify(state)); } catch {}
+  let editorOpened = false;
+  function context() {
+    return Object.fromEntries(['sessionId', ...fields].map(field => [field, state[field]]).concat([['path', window.location.pathname.slice(0, 512)]]));
+  }
+  function endpoint(path) {
+    const host = window.location.hostname;
+    const production = host === 'devsnapkit.com' || host === 'www.devsnapkit.com';
+    return path + (!production && new URL(window.location.href).searchParams.get('simulate_api_fail') === '1' ? '?simulate_api_fail=1' : '');
+  }
+  function track(name) {
     try {
-      const expired = Date.now() - state.lastSeen >= timeout || state.sequence >= 999999999;
-      if (expired) {
-        state = newSession();
-        state.entry = currentEntry || null;
-      }
-      if (expired && currentEntry && event !== 'seo_landing_view') track('seo_landing_view');
-      state.lastSeen = Date.now();
-      state.sequence += 1;
-      save();
-      const meta = { ...metadata };
-      if (event === 'upload_image' || event === 'upload_logo') delete meta.name;
-      // Reserved fields always come from validated first-entry context.
-      delete meta.seo_entry;
-      delete meta.entry_referrer;
-      delete meta.attribution_storage;
-      meta.event_sequence = state.sequence;
-      if (state.entry) {
-        meta.seo_entry = state.entry;
-        meta.entry_referrer = state.referrer;
-      }
-      meta.attribution_storage = persistent ? 'session' : 'memory';
-      const ua = window.navigator.userAgent || '';
-      const device = /tablet|ipad|playbook|silk|android(?!.*mobi)/i.test(ua) || (window.innerWidth >= 768 && window.innerWidth <= 1024)
-        ? 'tablet' : /mobile|iphone|ipod|blackberry|opera mini|iemobile|wpdesktop/i.test(ua) || window.innerWidth < 768 ? 'mobile' : 'desktop';
-      const browser = /Firefox/.test(ua) ? 'Firefox' : /Edg/.test(ua) ? 'Edge' : /Chrome/.test(ua) ? 'Chrome' : /Safari/.test(ua) ? 'Safari' : 'Other';
-      const body = JSON.stringify({ event, sessionId: state.sid, path: window.location.pathname,
-        referrer: hostname(document.referrer), device, browser, metadata: meta, timestamp: new Date().toISOString() });
-      try {
-        if (window.navigator.sendBeacon?.('/api/telemetry/event', new Blob([body], { type: 'application/json' }))) return;
-      } catch {}
-      Promise.resolve(window.fetch('/api/telemetry/event', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true,
-      })).catch(() => {});
+      const event = ({ page_view: 'editor_open', seo_editor_open: 'editor_open', export_image: 'export', copy_image: 'export', poster_export_success: 'export' })[name] || name;
+      if (!['visit', 'editor_open', 'export'].includes(event)) return;
+      if (event === 'editor_open') { if (editorOpened) return; editorOpened = true; }
+      const body = JSON.stringify({ ...context(), event });
+      const url = endpoint('/api/event');
+      try { if (window.navigator.sendBeacon?.(url, new Blob([body], { type: 'application/json' }))) return; } catch {}
+      Promise.resolve(window.fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true, credentials: 'omit' })).catch(() => {});
     } catch { /* Analytics must never interrupt the product. */ }
   }
-  window.DevSnapKitAnalytics = { track };
-  if (currentEntry) {
-    track('seo_landing_view');
-    document.addEventListener('click', event => {
-      try {
-        const anchor = event.target?.closest?.('a[href]');
-        if (!anchor) return;
-        const url = new URL(anchor.href, window.location.origin);
-        if (url.origin === window.location.origin && url.pathname === '/' && url.searchParams.get('editor') === '1') track('seo_editor_open');
-      } catch {}
-    });
-  }
+  window.DevSnapKitAnalytics = { track, context, endpoint };
+  track('visit');
 }());

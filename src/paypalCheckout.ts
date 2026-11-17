@@ -47,8 +47,8 @@ export async function checkPendingPayPalOrder(orderId: string, signal: AbortSign
       && /^DSK-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/.test(data.licenseKey)) {
       return { status: 'paid', licenseKey: data.licenseKey };
     }
-    if (response.status === 403 || response.status === 422
-      || (response.ok && data?.success === false && data.unpaid === true && data.pending === false)) {
+    if (response.ok && data?.success === false && data.terminalUnpaid === true
+      && data.unpaid === true && data.pending === false && ['EXPIRED', 'VOIDED'].includes(data.status)) {
       return { status: 'unpaid' };
     }
   } catch { /* An unavailable check is never proof that the order is unpaid. */ }
@@ -68,6 +68,9 @@ export async function recoverPayPalLicense(orderId: string, signal: AbortSignal,
       if (!signal.aborted && response.ok && data.success === true
         && typeof data.licenseKey === 'string' && /^DSK-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/.test(data.licenseKey)) return data.licenseKey;
     } catch { if (signal.aborted) return null; }
+    const checked = await checkPendingPayPalOrder(orderId, signal, { fetch: request });
+    if (checked.status === 'paid') return checked.licenseKey;
+    if (checked.status === 'unpaid' || signal.aborted) return null;
     if (i + 1 < (options.attempts ?? 60)) await wait(3000, signal);
   }
   return null;

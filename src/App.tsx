@@ -45,6 +45,8 @@ import { readPendingOrder, rememberPendingOrder, savePurchasedLicense, recoverPa
 import { LegalModals, LegalModalType } from './LegalModals';
 import { Modal } from './Modal';
 import { trackEvent } from './telemetry';
+import { ExportFeedback } from './ExportFeedback';
+import { downloadStarted } from './downloadFeedback';
 import { 
   CornerStyle, CORNER_STYLES, CornerThumbnail,
   LayoutPreset, LAYOUT_PRESETS,
@@ -1299,7 +1301,7 @@ export default function App() {
               setIsPayPalCheckoutActive(true);
               setPaymentError('');
               trackEvent('checkout_click');
-              const res = await fetch('/api/paypal-create-order', { method: 'POST' });
+              const res = await fetch('/api/paypal-create-order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(window.DevSnapKitAnalytics?.context() || {}) });
               const data = await res.json();
               if (!data.id) throw new Error(data.error || 'Failed to initialize PayPal order');
               rememberPendingOrder(data.id);
@@ -1381,6 +1383,12 @@ export default function App() {
       }
     });
   };
+  useEffect(() => {
+    const file = window.DevSnapKitPendingImage;
+    if (!file) return;
+    delete window.DevSnapKitPendingImage;
+    loadMainImage(file);
+  }, []);
   const loadSecondaryImage = (file: File, fileName = file.name) => {
     if (exportLock.current) return;
     setTextError('');
@@ -1620,12 +1628,13 @@ export default function App() {
       const filename = `devsnap-${Date.now()}.${context.format}`;
       const blob = await exportSingleCanvasBlob(context, context.aspect, context.scale, context.format);
       if (blob) {
-        trackEvent('export_image', { format: context.format, scale: context.scale, aspect: context.aspect.id });
         const downloadUrl = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.download = filename;
         link.href = downloadUrl;
         link.click();
+        downloadStarted();
+        trackEvent('export_image', { format: context.format, scale: context.scale, aspect: context.aspect.id });
         setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
       } else {
         alert('Failed to generate image blob.');
@@ -1669,12 +1678,13 @@ export default function App() {
         const filename = `devsnap-${target.id}-${Date.now()}.${format}`;
         const blob = await session.rasterize(i);
         if (blob) {
-          trackEvent('export_image', { format, scale: context.scale, aspect: target.id, method: 'batch' });
           const downloadUrl = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.download = filename;
           link.href = downloadUrl;
           link.click();
+          downloadStarted();
+          trackEvent('export_image', { format, scale: context.scale, aspect: target.id, method: 'batch' });
           completed++;
           setTimeout(() => URL.revokeObjectURL(downloadUrl), 8000);
         }
@@ -4664,6 +4674,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
       )}
 
       {/* Legal & Support Modals */}
+      <ExportFeedback />
       <LegalModals
         activeModal={activeLegalModal}
         onClose={() => setActiveLegalModal(null)}

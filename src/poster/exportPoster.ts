@@ -48,4 +48,5 @@ export function downloadPoster(dataUrl: string, pixelRatio: 1 | 2) {
   const a = document.createElement('a');
   a.download = `devsnapkit-poster-${1600 * pixelRatio}x${1200 * pixelRatio}.png`;
   a.href = dataUrl; a.click();
+  try { window.dispatchEvent(new Event('dsk:download-started')); } catch {}
 }

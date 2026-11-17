@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { DatabaseSync } from 'node:sqlite';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -95,23 +97,28 @@ test('a real secondary-image upload also completes the upload stage', async () =
   } finally { f.db.close(); }
 });
 
-test('the real ingestion handler preserves journey metadata for the SQLite cohort report', async () => {
-  const handler = { exports: {} };
-  new Function('exports', ts.transpileModule(fs.readFileSync(new URL('../functions/api/telemetry/event.ts', import.meta.url), 'utf8'), {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
-  }).outputText)(handler.exports);
+test('the legacy ingestion route forwards the four-event contract into existing D1 storage', async () => {
+  const cache = new Map();
+  function load(file) {
+    if (cache.has(file)) return cache.get(file).exports;
+    const mod = { exports: {} }; cache.set(file, mod);
+    const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+    }).outputText;
+    new Function('require', 'module', 'exports', code)(name => load(path.resolve(path.dirname(file), name + '.ts')), mod, mod.exports);
+    return mod.exports;
+  }
+  const handler = load(fileURLToPath(new URL('../functions/api/telemetry/event.ts', import.meta.url)));
   const f = fixture();
   try {
-    let sequence = 0;
-    for (const event of ['seo_landing_view', 'seo_editor_open', 'upload_image', 'export_image']) {
-      const response = await handler.exports.onRequestPost({ request: new Request('https://devsnapkit.com/api/telemetry/event', {
-        method: 'POST', body: JSON.stringify({ event, sessionId: 's_ingest_12345678', path: '/', referrer: 'www.google.com',
-          metadata: { seo_entry: entry, entry_referrer: 'www.google.com', attribution_storage: 'session', format: 'png', event_sequence: ++sequence } }),
+    for (const event of ['visit', 'editor_open', 'export']) {
+      const response = await handler.onRequestPost({ request: new Request('https://devsnapkit.com/api/telemetry/event', {
+        method: 'POST', body: JSON.stringify({ event, sessionId: 's_ingest_12345678', path: entry, utm_source: 'newsletter' }),
       }), env: { DB: f.binding } });
-      assert.equal(response.status, 200);
+      assert.equal(response.status, 204);
     }
-    const row = (await read(f.binding)).rows.find(x => x.entry === entry);
-    assert.equal(row.landings, 1); assert.equal(row.exports, 1);
-    assert.equal(f.db.prepare('SELECT COUNT(*) AS count FROM events').get().count, 4);
+    const rows = f.db.prepare('SELECT event_type, metadata FROM events').all();
+    assert.deepEqual(rows.map(row => row.event_type), ['visit', 'editor_open', 'export']);
+    assert.ok(rows.every(row => JSON.parse(row.metadata).env === 'production' && JSON.parse(row.metadata).utm_source === 'newsletter'));
   } finally { f.db.close(); }
 });

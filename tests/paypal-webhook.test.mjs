@@ -58,7 +58,7 @@ function setup(t, options = {}) {
     return { bind(...values) { args = values; return this; },
       async first() { return sql.prepare(query).get(...args) || null; },
       async run() { if (options.dbFailure) throw new Error('database unavailable');
-        const result = sql.prepare(query).run(...args); writes += Number(result.changes);
+        const result = sql.prepare(query).run(...args); if (/INSERT INTO orders/.test(query)) writes += Number(result.changes);
         return { success: true, meta: { changes: Number(result.changes) } }; },
     };
   } };
@@ -74,10 +74,12 @@ function setup(t, options = {}) {
     if (url.endsWith('/v2/checkout/orders')) return Response.json({ id: orderId }, { status: 201 });
     if (url === 'https://notify.example.test/payment') return Response.json({ ok: true });
     if (url.endsWith('/capture')) {
+      if (options.captureHttp) return Response.json({ details: [{ issue: 'INSTRUMENT_DECLINED' }] }, { status: options.captureHttp });
       if (options.alreadyCaptured) return Response.json({ details: [{ issue: 'ORDER_ALREADY_CAPTURED' }] }, { status: 422 });
       return Response.json(options.capture || options.order || canonical());
     }
     if (url.endsWith('/v2/checkout/orders/' + orderId)) {
+      if (options.orderHttp) return Response.json({ message: 'unavailable' }, { status: options.orderHttp });
       const sequence = options.orderSequence;
       return Response.json(sequence ? sequence[Math.min(orderReads++, sequence.length - 1)] : options.order || canonical());
     }
@@ -105,6 +107,43 @@ test('signed completed event durably issues a claimable existing-format license'
   const claim = await s.load('functions/api/claim-license.ts').onRequestPost({ env: s.env,
     request: new Request('https://qa.invalid', { method: 'POST', body: JSON.stringify({ orderId }) }) });
   assert.equal((await claim.json()).licenseKey, row.license_key);
+});
+
+test('capture and webhook race record one preview payment with checkout attribution', async t => {
+  const s = setup(t);
+  s.sql.exec(fs.readFileSync(path.join(root, 'd1/migrations/0001_growth_feedback.sql'), 'utf8'));
+  s.sql.prepare('INSERT INTO checkout_attribution (order_id, attribution) VALUES (?, ?)').run(orderId,
+    JSON.stringify({ sessionId: 's_checkout_123456', path: '/', utm_source: 'newsletter' }));
+  s.env.PAYPAL_MODE = 'sandbox';
+  const replies = await Promise.all([s.capture(), s.webhook(), s.capture(), s.webhook()]);
+  assert.ok(replies.every(r => r.ok));
+  const events = s.sql.prepare("SELECT * FROM events WHERE event_type = 'payment'").all();
+  assert.equal(events.length, 1);
+  assert.equal(events[0].session_id, 's_checkout_123456');
+  assert.equal(JSON.parse(events[0].metadata).env, 'preview');
+  assert.equal(JSON.parse(events[0].metadata).utm_source, 'newsletter');
+  assert.equal(s.notifications(), 1);
+});
+
+test('payment analytics failure cannot change captured payment or issued license', async t => {
+  const s = setup(t);
+  s.env.EVENTS = { writeDataPoint() { throw Error('analytics unavailable'); } };
+  const response = await s.capture();
+  assert.equal(response.status, 200); assert.ok((await response.json()).licenseKey);
+  assert.equal(s.count(), 1);
+});
+
+for (const mode of ['sandbox', 'live']) test(mode + ' captures on production host are isolated and deduped in both stores', async t => {
+  const s = setup(t); s.env.PAYPAL_MODE = mode;
+  const points = []; s.env.EVENTS = { writeDataPoint: point => points.push(point) };
+  const capture = () => s.load('functions/api/paypal-capture-order.ts').onRequestPost({ env: s.env,
+    request: new Request('https://devsnapkit.com/api/paypal-capture-order', { method: 'POST', body: JSON.stringify({ orderId }) }) });
+  await Promise.all([capture(), capture(), s.webhook()]);
+  assert.equal(points.length, 1);
+  assert.equal(points[0].blobs[0], mode === 'sandbox' ? 'preview' : 'production');
+  const payload = JSON.parse(s.sql.prepare('SELECT raw_payload FROM orders').get().raw_payload);
+  assert.equal(payload.devsnapkit_payment.mode, mode);
+  assert.equal(payload.devsnapkit_payment.env, mode === 'sandbox' ? 'preview' : 'production');
 });
 test('verification sends the full event and all required PayPal transmission fields', async t => {
   const s = setup(t); await s.webhook();
@@ -188,15 +227,45 @@ test('pending provider capture returns processing without issuing a key', async 
   assert.equal(r.status, 202); assert.equal((await r.json()).pending, true); assert.equal(s.count(), 0);
 });
 
-for (const status of ['CREATED', 'SAVED', 'PAYER_ACTION_REQUIRED', 'VOIDED']) {
-  test('server recovery confirms an unpaid ' + status + ' order can be discarded', async t => {
+for (const status of ['EXPIRED', 'VOIDED']) {
+  test('server recovery confirms only a terminal ' + status + ' order can be discarded', async t => {
     const order = canonical(status); delete order.purchase_units[0].payments;
     const s = setup(t, { order }); const r = await s.capture();
     assert.equal(r.status, 202);
     const result = await r.json();
+    assert.equal(result.terminalUnpaid, true); assert.equal(result.status, status);
     assert.equal(result.unpaid, true); assert.equal(result.pending, false);
     assert.equal(s.count(), 0);
     assert.equal(s.calls.some(x => x.url.endsWith('/capture')), false);
+  });
+}
+
+for (const status of ['CREATED', 'SAVED', 'PAYER_ACTION_REQUIRED', 'APPROVED']) {
+  test('server recovery retains a nonterminal ' + status + ' order', async t => {
+    const order = canonical(status); delete order.purchase_units[0].payments;
+    const s = setup(t, { order }); const r = await s.capture(); const result = await r.json();
+    assert.equal(r.status, 202); assert.equal(result.status, status);
+    assert.equal(result.terminalUnpaid, false); assert.equal(result.unpaid, false); assert.equal(result.pending, true);
+    assert.equal(s.count(), 0);
+  });
+}
+
+for (const [name, options] of [
+  ...[403, 422, 503].map(status => ['order read HTTP ' + status, { orderHttp: status }]),
+  ...[403, 422, 503].map(status => ['capture HTTP ' + status, { order: canonical('APPROVED'), captureHttp: status }]),
+]) {
+  test('server recovery never marks terminal after ' + name, async t => {
+    const s = setup(t, options); const r = await s.capture(); const result = await r.json();
+    assert.ok(r.status >= 400); assert.notEqual(result.terminalUnpaid, true); assert.notEqual(result.unpaid, true);
+    assert.equal(s.count(), 0);
+  });
+}
+
+for (const status of ['EXPIRED', 'VOIDED']) {
+  test('server recovery retains a ' + status + ' order with pending capture evidence', async t => {
+    const order = canonical(status); order.purchase_units[0].payments.captures[0].status = 'PENDING';
+    const s = setup(t, { order }); const result = await (await s.capture()).json();
+    assert.equal(result.terminalUnpaid, false); assert.equal(result.pending, true); assert.equal(s.count(), 0);
   });
 }
 
@@ -218,8 +287,9 @@ test('public config refuses to display checkout without server credentials', asy
   const data = await (await handler({ env: s.env })).json();
   assert.deepEqual(data, { clientId: 'client-test', mode: 'live' });
 });
-test('creation uses server credentials and the unchanged one-dollar CAPTURE purchase', async t => {
-  const s = setup(t); const r = await s.load('functions/api/paypal-create-order.ts').onRequestPost({ env: s.env });
+test('creation uses server credentials and the configured CAPTURE purchase', async t => {
+  const s = setup(t); const r = await s.load('functions/api/paypal-create-order.ts').onRequestPost({ env: s.env,
+    request: new Request('https://qa.invalid/api/paypal-create-order', { method: 'POST' }) });
   assert.equal(r.status, 200); assert.equal((await r.json()).id, orderId);
   const request = s.calls.find(x => x.url.endsWith('/v2/checkout/orders'));
   const body = JSON.parse(request.body); assert.equal(body.intent, 'CAPTURE');

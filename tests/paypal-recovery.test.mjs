@@ -18,7 +18,8 @@ function load() {
 test('webhook-completed payment is recovered after pending claim responses', async () => {
   const { recoverPayPalLicense } = load(); let count = 0;
   const key = await recoverPayPalLicense('ORDER1234567890123', new AbortController().signal, {
-    fetch: async () => ++count < 3 ? Response.json({ success: false }, { status: 403 })
+    fetch: async url => url === '/api/paypal-capture-order' ? Response.json({ success: false, pending: true }, { status: 202 })
+      : ++count < 3 ? Response.json({ success: false }, { status: 403 })
       : Response.json({ success: true, licenseKey: 'DSK-AAAA-BBBB-CCCC' }),
     wait: async () => {}, attempts: 4,
   });
@@ -27,7 +28,7 @@ test('webhook-completed payment is recovered after pending claim responses', asy
 test('an unverified purchase cannot become unlocked after retries', async () => {
   const { recoverPayPalLicense } = load(); let count = 0;
   const key = await recoverPayPalLicense('ORDER1234567890123', new AbortController().signal, {
-    fetch: async () => { count++; return Response.json({ success: false }, { status: 403 }); },
+    fetch: async url => { if (url === '/api/claim-license') count++; return Response.json({ success: false }, { status: 403 }); },
     wait: async () => {}, attempts: 3,
   });
   assert.equal(key, null); assert.equal(count, 3);
@@ -78,9 +79,8 @@ test('checking a pending order recovers a completed purchase through server capt
 });
 
 for (const [name, status, body] of [
-  ['unapproved order', 202, { success: false, unpaid: true, pending: false, status: 'CREATED' }],
-  ['unverified order', 403, { success: false }],
-  ['nonmatching order', 422, { success: false }],
+  ['expired order', 202, { success: false, terminalUnpaid: true, unpaid: true, pending: false, status: 'EXPIRED' }],
+  ['voided order', 202, { success: false, terminalUnpaid: true, unpaid: true, pending: false, status: 'VOIDED' }],
 ]) {
   test('checking a pending order allows discarding a server-confirmed ' + name, async () => {
     const { checkPendingPayPalOrder } = load();
@@ -92,6 +92,12 @@ for (const [name, status, body] of [
 }
 
 for (const [name, response] of [
+  ['unapproved order', () => Response.json({ success: false, unpaid: true, pending: false, status: 'CREATED' }, { status: 202 })],
+  ['unverified order', () => Response.json({ success: false }, { status: 403 })],
+  ['nonmatching order', () => Response.json({ success: false }, { status: 422 })],
+  ['unverified terminal marker', () => Response.json({ success: false, terminalUnpaid: true, status: 'VOIDED' }, { status: 422 })],
+  ['contradictory terminal marker', () => Response.json({ success: false, terminalUnpaid: true, pending: true, status: 'VOIDED' }, { status: 202 })],
+  ['nonterminal marker', () => Response.json({ success: false, terminalUnpaid: true, unpaid: true, pending: false, status: 'APPROVED' }, { status: 202 })],
   ['network error', () => { throw new TypeError('Failed to fetch'); }],
   ['server failure', () => Response.json({ success: false, unpaid: true }, { status: 503 })],
   ['pending capture', () => Response.json({ success: false, pending: true }, { status: 202 })],
@@ -129,3 +135,55 @@ test('a status check aborted during the request cannot authorize discarding', as
     fetch: async () => { controller.abort(); return Response.json({ unpaid: true }, { status: 202 }); },
   }), { status: 'retry' });
 });
+
+for (const status of ['EXPIRED', 'VOIDED']) {
+  test('claim polling stops early after verified terminal ' + status, async () => {
+    const { recoverPayPalLicense } = load(); const calls = []; let waits = 0;
+    const key = await recoverPayPalLicense('ORDER1234567890123', new AbortController().signal, {
+      fetch: async url => { calls.push(url); return url === '/api/claim-license'
+        ? Response.json({ success: false }, { status: 403 })
+        : Response.json({ success: false, terminalUnpaid: true, unpaid: true, pending: false, status }, { status: 202 }); },
+      wait: async () => { waits++; },
+    });
+    assert.equal(key, null);
+    assert.deepEqual(calls, ['/api/claim-license', '/api/paypal-capture-order']);
+    assert.equal(waits, 0);
+  });
+}
+
+test('claim polling recovers a stored order after the payment tab closed before the webhook', async () => {
+  const { rememberPendingOrder, readPendingOrder, recoverPayPalLicense, savePurchasedLicense } = load();
+  const data = new Map(); const storage = { getItem: k => data.get(k) ?? null,
+    setItem: (k, v) => data.set(k, v), removeItem: k => data.delete(k) };
+  rememberPendingOrder('ORDER1234567890123', storage);
+  const calls = [];
+  const key = await recoverPayPalLicense(readPendingOrder(storage), new AbortController().signal, {
+    fetch: async (url, init) => { calls.push(url); assert.equal(JSON.parse(init.body).orderId, 'ORDER1234567890123');
+      return url === '/api/claim-license' ? Response.json({ success: false }, { status: 403 })
+        : Response.json({ success: true, status: 'COMPLETED', licenseKey: 'DSK-AAAA-BBBB-CCCC' }); },
+    wait: async () => { assert.fail('verified capture should recover immediately'); },
+  });
+  assert.equal(key, 'DSK-AAAA-BBBB-CCCC');
+  assert.deepEqual(calls, ['/api/claim-license', '/api/paypal-capture-order']);
+  savePurchasedLicense(key, storage); assert.equal(readPendingOrder(storage), '');
+});
+
+for (const [name, response] of [
+  ...['CREATED', 'SAVED', 'PAYER_ACTION_REQUIRED', 'APPROVED'].map(status => [status,
+    () => Response.json({ success: false, status, unpaid: true, pending: false }, { status: 202 })]),
+  ...[403, 422, 429, 503].map(status => ['HTTP ' + status, () => Response.json({ success: false }, { status })]),
+  ['network failure', () => { throw new TypeError('offline'); }],
+  ['invalid JSON', () => new Response('unavailable')],
+]) {
+  test('claim polling keeps the default retry cadence after ' + name, async () => {
+    const { recoverPayPalLicense } = load(); let claims = 0, checks = 0; const waits = [];
+    const signal = new AbortController().signal;
+    const key = await recoverPayPalLicense('ORDER1234567890123', signal, {
+      fetch: async url => { if (url === '/api/claim-license') { claims++; return Response.json({ success: false }, { status: 403 }); }
+        checks++; return response(); },
+      wait: async (ms, actualSignal) => { waits.push(ms); assert.equal(actualSignal, signal); },
+    });
+    assert.equal(key, null); assert.equal(claims, 60); assert.equal(checks, 60);
+    assert.deepEqual(waits, Array(59).fill(3000));
+  });
+}

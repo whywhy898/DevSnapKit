@@ -2,7 +2,16 @@
 // Returns aggregated metrics, traffic trends, and real-time orders for the Admin Dashboard
 import { requireSecret, verifyAdminToken } from '../../lib/security';
 import { readSeoFunnel } from '../../lib/seo-funnel';
+import { readGrowthFunnel } from '../../lib/growth';
 import { proPricing } from '../../../shared/pricing';
+
+// Legacy records lack a trustworthy mode/environment and cannot be counted as
+// production. Keep those records in storage for support and audited backfills.
+const productionOrders = `(SELECT * FROM orders WHERE
+  json_extract(CASE WHEN json_valid(raw_payload) THEN raw_payload ELSE '{}' END, '$.devsnapkit_payment.mode') = 'live'
+  AND json_extract(CASE WHEN json_valid(raw_payload) THEN raw_payload ELSE '{}' END, '$.devsnapkit_payment.env') = 'production')`;
+const productionEvents = `(SELECT * FROM events WHERE
+  json_extract(CASE WHEN json_valid(metadata) THEN metadata ELSE '{}' END, '$.env') = 'production')`;
 
 interface Env {
   ADMIN_SECRET?: string;
@@ -101,12 +110,12 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
         // Today metrics
         const todayStats = await env.DB.prepare(`
           SELECT 
-            COUNT(CASE WHEN event_type = 'page_view' THEN 1 END) as pv,
-            COUNT(DISTINCT CASE WHEN event_type = 'page_view' THEN session_id END) as uv,
+            COUNT(CASE WHEN event_type = 'visit' THEN 1 END) as pv,
+            COUNT(DISTINCT CASE WHEN event_type = 'visit' THEN session_id END) as uv,
             COUNT(CASE WHEN event_type IN ('upload_image', 'upload_logo') THEN 1 END) as uploads,
             COUNT(CASE WHEN event_type IN ('preset_change', 'theme_change', 'bg_type_change') THEN 1 END) as trials,
-            COUNT(CASE WHEN event_type IN ('export_image', 'copy_image') THEN 1 END) as exports
-          FROM events
+            COUNT(CASE WHEN event_type = 'export' THEN 1 END) as exports
+          FROM ${productionEvents}
           WHERE created_at >= date('now', 'start of day')
         `).first();
 
@@ -123,7 +132,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
           SELECT 
             COUNT(*) as count,
             COALESCE(SUM(CAST(amount AS REAL)), 0) as revenue
-          FROM orders
+          FROM ${productionOrders}
           WHERE status = 'COMPLETED' AND created_at >= date('now', 'start of day')
         `).first();
 
@@ -138,12 +147,12 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
         // non-page_view event arrived without its page_view row.
         const totalStats = await env.DB.prepare(`
           SELECT 
-            COUNT(CASE WHEN event_type = 'page_view' THEN 1 END) as total_pv,
-            COUNT(DISTINCT CASE WHEN event_type = 'page_view' THEN session_id END) as total_uv,
+            COUNT(CASE WHEN event_type = 'visit' THEN 1 END) as total_pv,
+            COUNT(DISTINCT CASE WHEN event_type = 'visit' THEN session_id END) as total_uv,
             COUNT(CASE WHEN event_type IN ('upload_image', 'upload_logo') THEN 1 END) as total_uploads,
             COUNT(CASE WHEN event_type IN ('preset_change', 'theme_change', 'bg_type_change') THEN 1 END) as total_trials,
-            COUNT(CASE WHEN event_type IN ('export_image', 'copy_image') THEN 1 END) as total_exports
-          FROM events
+            COUNT(CASE WHEN event_type = 'export' THEN 1 END) as total_exports
+          FROM ${productionEvents}
         `).first();
 
         if (totalStats) {
@@ -159,7 +168,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
           SELECT 
             COUNT(*) as count,
             COALESCE(SUM(CAST(amount AS REAL)), 0) as revenue
-          FROM orders
+          FROM ${productionOrders}
           WHERE status = 'COMPLETED'
         `).first();
 
@@ -176,12 +185,12 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
         const trendResults = await env.DB.prepare(`
           SELECT 
             strftime('%Y-%m-%d', created_at) as day,
-            COUNT(CASE WHEN event_type = 'page_view' THEN 1 END) as pv,
-            COUNT(DISTINCT CASE WHEN event_type = 'page_view' THEN session_id END) as uv,
+            COUNT(CASE WHEN event_type = 'visit' THEN 1 END) as pv,
+            COUNT(DISTINCT CASE WHEN event_type = 'visit' THEN session_id END) as uv,
             COUNT(CASE WHEN event_type IN ('upload_image', 'upload_logo') THEN 1 END) as uploads,
             COUNT(CASE WHEN event_type IN ('preset_change', 'theme_change', 'bg_type_change') THEN 1 END) as trials,
-            COUNT(CASE WHEN event_type IN ('export_image', 'copy_image') THEN 1 END) as exports
-          FROM events
+            COUNT(CASE WHEN event_type = 'export' THEN 1 END) as exports
+          FROM ${productionEvents}
           WHERE created_at >= date('now', '-14 days')
           GROUP BY day
           ORDER BY day ASC
@@ -192,7 +201,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
             strftime('%Y-%m-%d', created_at) as day,
             COUNT(*) as orders_count,
             COALESCE(SUM(CAST(amount AS REAL)), 0) as day_revenue
-          FROM orders
+          FROM ${productionOrders}
           WHERE status = 'COMPLETED' AND created_at >= date('now', '-14 days')
           GROUP BY day
         `).all();
@@ -219,7 +228,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
         // Top Countries
         const countryResults = await env.DB.prepare(`
           SELECT country, COUNT(*) as count
-          FROM events
+          FROM ${productionEvents}
           WHERE country IS NOT NULL AND country != 'XX' AND country != ''
           GROUP BY country
           ORDER BY count DESC
@@ -234,7 +243,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
         // Top Referrers
         const referrerResults = await env.DB.prepare(`
           SELECT referrer, COUNT(*) as count
-          FROM events
+          FROM ${productionEvents}
           WHERE referrer IS NOT NULL AND referrer != '' AND referrer != 'direct'
           GROUP BY referrer
           ORDER BY count DESC
@@ -249,7 +258,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
         // Recent 50 Orders
         const ordersRows = await env.DB.prepare(`
           SELECT order_id, txn_id, payer_email, amount, currency, status, license_key, created_at
-          FROM orders
+          FROM ${productionOrders}
           ORDER BY created_at DESC
           LIMIT 50
         `).all();
@@ -268,7 +277,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
         // Recent 20 Visits
         const visitsRows = await env.DB.prepare(`
           SELECT id, event_type, session_id, path, referrer, country, device_type, browser, created_at
-          FROM events
+          FROM ${productionEvents}
           ORDER BY id DESC
           LIMIT 20
         `).all();
@@ -279,31 +288,9 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
       }
     }
 
-    // --- 2. Fallback to KV if D1 not present or returned 0 orders ---
+    // Legacy KV counters have no verified environment or mode. Report only D1
+    // production records; retain the connectivity indicator for operators.
     const kv = env.DSK_KV || env.DSK_ORDERS;
-    if (kv && (!env.DB || recentOrders.length === 0)) {
-      if (storageEngine !== 'D1') storageEngine = 'KV';
-
-      try {
-        const rawRecent = await kv.get('orders_recent');
-        if (rawRecent) {
-          const list = JSON.parse(rawRecent);
-          recentOrders = list;
-          overview.totalOrders = list.length;
-          overview.totalRevenue = list.reduce((acc: number, item: any) => acc + (parseFloat(item.amount) || 0), 0);
-        }
-
-        const rawTodayStats = await kv.get(`stats:${todayStr}`);
-        if (rawTodayStats) {
-          const tStats = JSON.parse(rawTodayStats);
-          overview.todayPv = tStats.pv || 0;
-          overview.todayUv = tStats.uv || 0;
-          overview.todayExports = tStats.exports || 0;
-        }
-      } catch (kvErr: any) {
-        console.error('[Admin KV Query Error]', kvErr);
-      }
-    }
 
     // If no daily trends data yet (e.g. fresh install today), populate today's point
     if (dailyTrends.length === 0) {
@@ -336,6 +323,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
       topReferrers,
       recentVisits,
       seoFunnel: await readSeoFunnel(env.DB),
+      growthFunnel: await readGrowthFunnel(env.DB, ['preview', 'dev'].includes(new URL(request.url).searchParams.get('env') || '') ? new URL(request.url).searchParams.get('env')! : 'production'),
     }), {
       status: 200,
       headers: corsHeaders,

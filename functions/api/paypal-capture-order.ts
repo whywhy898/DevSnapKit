@@ -11,12 +11,12 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: P
     const order = await completedOrder(env, session, orderId, true, true);
     const captures = order?.purchase_units?.[0]?.payments?.captures;
     if (!order || order.status !== 'COMPLETED' || captures?.some((capture: any) => capture.status === 'PENDING')) {
-      const unpaid = ['CREATED', 'SAVED', 'PAYER_ACTION_REQUIRED', 'VOIDED'].includes(order?.status)
+      const terminalUnpaid = ['EXPIRED', 'VOIDED'].includes(order?.status)
         && !captures?.some((capture: any) => ['PENDING', 'COMPLETED'].includes(capture.status));
-      return paymentResponse({ success: false, unpaid, pending: !unpaid,
-        error: unpaid ? 'This order has not been paid.' : 'PayPal is still processing this payment. No key is issued until it completes.' }, 202);
+      return paymentResponse({ success: false, status: order?.status, terminalUnpaid, unpaid: terminalUnpaid, pending: !terminalUnpaid,
+        error: terminalUnpaid ? 'This order is expired or voided without a payment.' : 'PayPal is still processing this payment. No key is issued until it completes.' }, 202);
     }
-    const record = await fulfillOrder(env, order);
+    const record = await fulfillOrder(env, order, undefined, request);
     return paymentResponse({ success: true, status: 'COMPLETED', licenseKey: record.licenseKey,
       orderId: record.orderId, transactionId: record.txnId });
   } catch (error) { return paymentFailure(error); }

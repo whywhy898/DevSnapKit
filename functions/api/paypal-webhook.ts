@@ -33,7 +33,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: P
       if (!approved) throw new PaymentError('Completed capture is not yet available from PayPal.');
       return paymentResponse({ received: true, pending: true });
     }
-    await fulfillOrder(env, order, approved ? undefined : event.resource.id);
+    await fulfillOrder(env, order, approved ? undefined : event.resource.id, request);
     return paymentResponse({ received: true });
   } catch (error) { return paymentFailure(error); }
 };

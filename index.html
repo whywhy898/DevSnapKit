@@ -94,7 +94,7 @@
           if (legalPage === 'terms' || legalPage === 'privacy') { l.replace('/' + legalPage + '/'); return; }
           app = l.pathname.indexOf('/admin') === 0;
           new URLSearchParams(l.search).forEach(function(v, k) {
-            if (!/^(utm_[a-z0-9_]+|ref|via|source|gclid|gbraid|wbraid|fbclid|msclkid|yclid|twclid|li_fat_id|mc_cid|mc_eid|_ga|_gl)$/i.test(k)) app = true;
+            if (!/^(utm_[a-z0-9_]+|ref|via|source|gclid|gbraid|wbraid|fbclid|msclkid|yclid|twclid|li_fat_id|mc_cid|mc_eid|_ga|_gl|simulate_api_fail)$/i.test(k)) app = true;
           });
         } catch (e) {}
         var root = document.documentElement;
@@ -102,10 +102,6 @@
           root.classList.add('dsk-app');
           var css = document.getElementById('landing-css');
           if (css) css.parentNode.removeChild(css);
-          var font = document.createElement('link');
-          font.rel = 'stylesheet';
-          font.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap';
-          document.head.appendChild(font);
         } else {
           try { var t = localStorage.getItem('devsnapkit_landing_theme'); if (t === 'light' || t === 'dark') root.dataset.theme = t; } catch (e) {}
         }
@@ -139,10 +135,19 @@
             <h1 id="hero-title">Turn Screenshots into <span>Beautiful Product Mockups</span></h1>
             <p class="hero-description">Add device frames, backgrounds, two-image layouts and 3D angles to your screenshots. Create polished launch visuals, social cards and Open Graph images directly in your browser. Your images never leave your device.</p>
             <a class="button" href="/?editor=1">Create Your First Mockup <span aria-hidden="true">↗</span></a>
-            <p class="hero-description">Free to start, no account needed. Pro is a one-time $9.9 payment. <small>Early bird</small></p>
+            <p class="hero-description hero-promise">Free. No watermark. Images never uploaded.<br>No sign-up. Pro lifetime $9.9, paid once.</p>
           </div>
           <div class="hero-art">
-            <div class="hero-stage"><figure class="finished-shot"><img src="/welcome/welcome-bg.webp" width="1562" height="1108" alt="Product screenshots composed in laptop and phone device frames with DevSnapKit" fetchpriority="high"></figure></div>
+            <div class="hero-before-after" aria-label="Before and after styling the same screenshot">
+              <figure><figcaption><span>01</span> Plain screenshot</figcaption><div><img src="/seo/examples/github-original.webp" width="1280" height="800" alt="Before: an unstyled screenshot of the Vite GitHub repository"></div></figure>
+              <span class="hero-transform" aria-hidden="true">→</span>
+              <figure><figcaption><span>02</span> Ready to share</figcaption><div><img src="/seo/examples/github-styled.webp" width="1200" height="863" alt="After: the same screenshot with a browser frame, background and shadow" fetchpriority="high"></div></figure>
+            </div>
+            <div class="hero-drop" data-hero-drop>
+              <label for="hero-image"><strong>Drop your screenshot here</strong><span>or <u>pick an image</u> to start creating ↗</span><input id="hero-image" type="file" accept="image/*" aria-describedby="hero-image-help hero-image-error"></label>
+              <p id="hero-image-help">Up to 15 MB · Opens the free editor · Stays on your device</p>
+              <p id="hero-image-error" role="status"></p>
+            </div>
           </div>
         </section>
 
@@ -181,6 +186,7 @@
         <section class="details-section wrap" aria-labelledby="tools-title">
           <div class="details-intro"><p class="eyebrow">FOCUSED TOOLS</p><h2 id="tools-title">Start from the job you need done.</h2></div>
           <div class="detail-list tool-links">
+            <article><h3><a href="/screenshot-annotation-tool/">Screenshot annotation tool</a></h3><p>Add arrows, text, boxes and highlights to explain your screenshots.</p></article>
             <article><h3><a href="/screenshot-beautifier/">Screenshot beautifier</a></h3><p>Add backgrounds, padding, rounded corners, shadows and frames to any screenshot.</p></article>
             <article><h3><a href="/og-image-generator/">OG image generator</a></h3><p>Turn a screenshot and a headline into a 1200×630 Open Graph image for link previews.</p></article>
             <article><h3><a href="/product-hunt-image-maker/">Product Hunt image maker</a></h3><p>Compose gallery images for your launch from two product screenshots.</p></article>
@@ -207,6 +213,7 @@
       <a href="/screenshot-beautifier/">Explore the screenshot beautifier ↗</a>
     </nav>
     <script src="/seo/attribution.js"></script>
+    <script src="/seo/hero-entry.js" defer></script>
     <script>
       if (!document.documentElement.classList.contains('dsk-app')) {
         var landingScript = document.createElement('script');

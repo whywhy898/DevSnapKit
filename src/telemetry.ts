@@ -1,7 +1,12 @@
 // The shared runtime is loaded before the studio entry in index.html.
 declare global {
   interface Window {
-    DevSnapKitAnalytics?: { track(event: string, metadata?: Record<string, unknown>): void };
+    DevSnapKitAnalytics?: {
+      track(event: string, metadata?: Record<string, unknown>): void;
+      context(): Record<string, string>;
+      endpoint(path: string): string;
+    };
+    DevSnapKitPendingImage?: File;
   }
 }
 

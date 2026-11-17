@@ -143,6 +143,7 @@ test('order creation and copy read changed values from the shared config', async
   t.after(() => { globalThis.fetch = original; });
   const response = await load('functions/api/paypal-create-order.ts').onRequestPost({
     env: { DB, DSK_SERVER_SECRET: secret, PAYPAL_CLIENT_ID: 'test', PAYPAL_CLIENT_SECRET: 'test' },
+    request: new Request('https://qa.invalid/api/paypal-create-order', { method: 'POST' }),
   });
   assert.equal(response.status, 200);
   assert.deepEqual(body.purchase_units[0], { reference_id: 'DSK_PRO_LIFETIME', description: 'Configured pass',
@@ -162,6 +163,8 @@ test('admin defaults use config while recorded historical amounts are preserved'
     .run('MISSING', 'MISSING-TXN', '', '');
   sql.prepare("INSERT INTO orders (order_id, txn_id, amount, currency, status) VALUES (?, ?, ?, ?, 'COMPLETED')")
     .run('HISTORICAL', 'OLD-TXN', '2.00', 'USD');
+  // Only explicitly classified production payments belong in production stats.
+  sql.prepare('UPDATE orders SET raw_payload = ?').run(JSON.stringify({ devsnapkit_payment: { mode: 'live', env: 'production' } }));
   const { createAdminToken } = load('functions/lib/security.ts');
   const token = await createAdminToken(secret);
   const response = await load('functions/api/admin/stats.ts').onRequestGet({ env: { DB, ADMIN_SECRET: secret },

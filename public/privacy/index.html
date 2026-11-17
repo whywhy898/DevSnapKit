@@ -36,15 +36,19 @@
     <article class="legal-doc wrap" aria-labelledby="legal-title">
       <p class="eyebrow">LEGAL</p>
       <h1 id="legal-title">Privacy Policy</h1>
-      <p class="legal-date">Effective Date: September 29, 2026</p>
+      <p class="legal-date">Effective Date: November 17, 2026</p>
       <aside class="legal-callout"><p><strong>Zero-Upload Guarantee:</strong> All screenshot rendering, styling, image resizing, and OpenGraph card generation happens 100% locally in your web browser. No uploaded images or canvas outputs are ever transferred to or stored on our servers.</p></aside>
       <h2>1. Data We Do Not Collect</h2>
       <p>We do not collect, view, transmit, or retain your raw screenshots, mockup contents, source code snippets, or exported graphic files. Everything runs client-side using Web APIs (HTML5 Canvas &amp; Blob rendering).</p>
       <h2>2. Payment &amp; License Information</h2>
-      <p>Payments are securely processed by PayPal Inc. DevSnapKit never stores credit card details or financial credentials. When you purchase a Pro Lifetime Pass, we only verify the transaction reference to issue your cryptographic license key.</p>
+      <p>Payments are processed by PayPal Inc. DevSnapKit does not receive your card details or PayPal login credentials. To verify payment, issue and recover your license, we store order and capture references, payer email, amount, currency, payment status, license key, timestamps and PayPal order data in Cloudflare D1. We may retain campaign attribution with the order reference.</p>
       <h2>3. Local Storage</h2>
-      <p>We store your Pro license activation status and UI preferences in your browser's standard <code>localStorage</code>. You may clear this at any time through your browser settings.</p>
-      <h2>4. Contact Us</h2>
+      <p>We store your Pro license activation status and UI preferences in your browser's standard <code>localStorage</code>, including your license key and a pending PayPal order reference so a paid license can be recovered after closing a tab. You may clear this at any time through your browser settings. Clearing a pending order reference removes automatic recovery from that browser.</p>
+      <h2>4. Optional Email and Feedback</h2>
+      <p>When feedback collection is enabled, after export you may optionally share an email address and feedback text. We store these with a record identifier, submission time and hosting environment in Cloudflare D1 and use them only for product updates, including deciding which product improvements to announce. Collection stays disabled until storage and the support deletion workflow are configured. Providing either field is optional and never affects your download. You may request deletion at any time by emailing <a href="mailto:support@devsnapkit.com">support@devsnapkit.com</a>. Please include the email address or feedback text you submitted so we can locate it.</p>
+      <h2>5. Anonymous Usage Analytics</h2>
+      <p>We count visits, editor opens, exports and verified payments using Cloudflare Analytics Engine or D1. A random session identifier and landing campaign tags (utm_source, utm_medium, utm_campaign and ref) stay in sessionStorage for the browser session and accompany these events. We record the page pathname and hosting environment, never image contents. Our event storage does not retain IP addresses; rate limiting uses IP addresses transiently in server memory in one-minute windows. Expired entries are removed on a later request or when the server isolate is discarded. When configured, Cloudflare Web Analytics supplies cookieless traffic measurements. We do not use tracking cookies or fingerprinting.</p>
+      <h2>6. Contact Us</h2>
       <p>If you have any questions or privacy inquiries, contact us directly at <a href="mailto:support@devsnapkit.com">support@devsnapkit.com</a>.</p>
       <p class="legal-related">See also: <a href="/terms/">Terms of Service</a> · <a href="mailto:support@devsnapkit.com">support@devsnapkit.com</a></p>
     </article>
