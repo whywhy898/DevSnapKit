@@ -78,9 +78,7 @@ test('checking a pending order recovers a completed purchase through server capt
 });
 
 for (const [name, status, body] of [
-  ['unapproved order', 202, { success: false, unpaid: true, pending: false, status: 'CREATED' }],
-  ['unverified order', 403, { success: false }],
-  ['nonmatching order', 422, { success: false }],
+  ['voided order', 202, { success: false, unpaid: true, pending: false, status: 'VOIDED' }],
 ]) {
   test('checking a pending order allows discarding a server-confirmed ' + name, async () => {
     const { checkPendingPayPalOrder } = load();
@@ -92,6 +90,13 @@ for (const [name, status, body] of [
 }
 
 for (const [name, response] of [
+  ['unverified order', () => Response.json({ success: false }, { status: 403 })],
+  ['nonmatching order', () => Response.json({ success: false }, { status: 422 })],
+  ['provider order not found', () => Response.json({ success: false, error: 'Could not verify the PayPal order.' }, { status: 404 })],
+  ['missing route', () => new Response('<html>Not Found</html>', { status: 404 })],
+  ['404 claiming unpaid', () => Response.json({ success: false, unpaid: true, pending: false, status: 'VOIDED' }, { status: 404 })],
+  ...['CREATED', 'SAVED', 'PAYER_ACTION_REQUIRED', 'APPROVED', 'UNKNOWN', undefined].map(status =>
+    [String(status) + ' is not terminal unpaid', () => Response.json({ success: false, unpaid: true, pending: false, status }, { status: 202 })]),
   ['network error', () => { throw new TypeError('Failed to fetch'); }],
   ['server failure', () => Response.json({ success: false, unpaid: true }, { status: 503 })],
   ['pending capture', () => Response.json({ success: false, pending: true }, { status: 202 })],

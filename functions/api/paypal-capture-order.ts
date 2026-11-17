@@ -11,9 +11,10 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: P
     const order = await completedOrder(env, session, orderId, true, true);
     const captures = order?.purchase_units?.[0]?.payments?.captures;
     if (!order || order.status !== 'COMPLETED' || captures?.some((capture: any) => capture.status === 'PENDING')) {
-      const unpaid = ['CREATED', 'SAVED', 'PAYER_ACTION_REQUIRED', 'VOIDED'].includes(order?.status)
-        && !captures?.some((capture: any) => ['PENDING', 'COMPLETED'].includes(capture.status));
-      return paymentResponse({ success: false, unpaid, pending: !unpaid,
+      // Only a terminal order without any capture evidence authorizes another checkout.
+      const unpaid = order?.status === 'VOIDED'
+        && (!captures || (Array.isArray(captures) && captures.length === 0));
+      return paymentResponse({ success: false, unpaid, pending: !unpaid, status: order?.status,
         error: unpaid ? 'This order has not been paid.' : 'PayPal is still processing this payment. No key is issued until it completes.' }, 202);
     }
     const record = await fulfillOrder(env, order);

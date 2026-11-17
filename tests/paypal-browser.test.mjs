@@ -33,8 +33,8 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
   const base = await serveBuild(t);
   const browser = await launchBrowser(); t.after(() => browser.close());
   const results = [];
-  for (const [name, width] of [['creation-error', 1440], ['lost-callback', 390], ['reload-recovery', 1440], ['approval-open', 1440]]) {
-    const page = await browser.newPage();
+  for (const [name, width] of [['creation-error', 1440], ['lost-callback', 390], ['closed-tab-recovery', 1440], ['reload-recovery', 1440], ['approval-open', 1440]]) {
+    let page = await browser.newPage(), tabClosed = false;
     await page.setViewport({ width, height: 1050, deviceScaleFactor: 1 });
     let claimCount = 0, captureCount = 0;
     const errors = []; page.on('pageerror', e => errors.push(e.message));
@@ -48,14 +48,13 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
           try {
             const id = await config.createOrder();
             if (name === 'approval-open') window.finishPayPalApproval = () => config.onApprove({ orderID: id });
-            else if (name !== 'lost-callback') await config.onApprove({ orderID: id });
+            else if (!['lost-callback', 'closed-tab-recovery'].includes(name)) await config.onApprove({ orderID: id });
           }
           catch (e) { config.onError(e); }
         }; container.appendChild(button);
       } }) };
     }, name, order);
-    await page.setRequestInterception(true);
-    page.on('request', async request => {
+    const intercept = async request => {
       const url = new URL(request.url());
       const json = (data, status = 200) => request.respond({ status, contentType: 'application/json', body: JSON.stringify(data) });
       if (url.hostname === 'www.paypal.com') { await request.respond({ contentType: 'text/javascript', body: '' }); return; }
@@ -64,11 +63,13 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
       if (url.pathname === '/api/paypal-capture-order') { captureCount++; await json({ error: 'connection interrupted' }, 503); return; }
       if (url.pathname === '/api/claim-license') {
         if (name === 'approval-open') { await json({ success: false }, 403); return; }
+        if (name === 'closed-tab-recovery' && !tabClosed) { await json({ success: false }, 403); return; }
         claimCount++; await json(name === 'creation-error' || claimCount < 2 ? { success: false } : { success: true, licenseKey: key }, claimCount < 2 ? 403 : 200); return;
       }
       if (url.pathname.startsWith('/api/')) { await json({ valid: false }); return; }
       await request.continue();
-    });
+    };
+    await page.setRequestInterception(true); page.on('request', intercept);
     await page.goto(base, { waitUntil: 'networkidle0' });
     if (name !== 'reload-recovery') {
       const welcome = await page.$('button');
@@ -84,6 +85,16 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
       assert.ok(pricing.text.includes('Early bird'));
       assert.equal(pricing.strikethroughs, 0);
       await clickButton(page, 'Test PayPal checkout');
+    }
+    if (name === 'closed-tab-recovery') {
+      await page.waitForFunction(order => localStorage.getItem('devsnapkit_pending_paypal_order') === order, {}, order);
+      assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_license_key')), null);
+      await page.close(); tabClosed = true;
+      page = await browser.newPage();
+      await page.setViewport({ width, height: 1050, deviceScaleFactor: 1 });
+      page.on('pageerror', e => errors.push(e.message));
+      await page.setRequestInterception(true); page.on('request', intercept);
+      await page.goto(base, { waitUntil: 'networkidle0' });
     }
     if (name === 'approval-open') {
       await page.waitForFunction(() => typeof window.finishPayPalApproval === 'function');
@@ -116,7 +127,7 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
 test('pending checkout can be safely discarded or recovered through the browser UI', async t => {
   const base = await serveBuild(t);
   const browser = await launchBrowser(); t.after(() => browser.close());
-  for (const name of ['unpaid', 'unpaid-persistent', 'unpaid-close-button', 'unpaid-close-escape', 'unpaid-close-pending', 'unpaid-reopen-pending', 'paid', 'network', 'server', 'processing']) {
+  for (const name of ['unpaid', 'unpaid-persistent', 'unpaid-close-button', 'unpaid-close-escape', 'unpaid-close-pending', 'unpaid-reopen-pending', 'paid', 'network', 'server', 'processing', '404-json', '404-html', 'unknown', 'approved', 'forbidden', 'verification-error']) {
     const page = await browser.newPage();
     await page.setViewport({ width: name === 'unpaid' ? 390 : 1440, height: 1050, deviceScaleFactor: 1 });
     const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -160,8 +171,14 @@ test('pending checkout can be safely discarded or recovered through the browser 
         if (outcome === 'network') { await request.abort('failed'); return; }
         if (outcome === 'paid') { await json({ success: true, status: 'COMPLETED', licenseKey: key }); return; }
         if (outcome === 'server') { await json({ success: false }, 503); return; }
+        if (outcome === '404-json') { await json({ success: false, error: 'Could not verify the PayPal order.' }, 404); return; }
+        if (outcome === '404-html') { await request.respond({ status: 404, contentType: 'text/html', body: '<html>Not Found</html>' }); return; }
+        if (outcome === 'unknown') { await json({ success: false }, 202); return; }
+        if (outcome === 'approved') { await json({ success: false, pending: true, status: 'APPROVED' }, 202); return; }
+        if (outcome === 'forbidden') { await json({ success: false }, 403); return; }
+        if (outcome === 'verification-error') { await json({ success: false }, 422); return; }
         if (outcome === 'processing') { await json({ success: false, pending: true }, 202); return; }
-        await json({ success: false, unpaid: true, pending: false, status: 'CREATED' }, 202); return;
+        await json({ success: false, unpaid: true, pending: false, status: 'VOIDED' }, 202); return;
       }
       if (url.pathname.startsWith('/api/')) { await json({ valid: false }); return; }
       await request.continue();
@@ -177,10 +194,15 @@ test('pending checkout can be safely discarded or recovered through the browser 
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), order);
       assert.equal(await page.$(discardNotice), null, 'recovering an unpaid order does not discard it');
     }
-    await clickButton(page, 'Discard and pay again');
+    const beforeTripleClick = captureCount;
+    await page.evaluate(async () => {
+      const button = [...document.querySelectorAll('button')].find(b => b.textContent === 'Discard and pay again');
+      for (let i = 0; i < 3; i++) { button.click(); await new Promise(resolve => setTimeout(resolve, 1)); }
+    });
     const waitForHeldCheck = async () => {
       for (let i = 0; i < 100 && !releaseCheck; i++) await new Promise(resolve => setTimeout(resolve, 20));
       assert.equal(typeof releaseCheck, 'function');
+      assert.equal(captureCount, beforeTripleClick + 1, 'millisecond triple-click sends one capture per action window');
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), order);
       assert.equal(createCount, 0);
       assert.equal(await page.$(discardNotice), null, 'no notice while the status check is pending');
@@ -188,7 +210,15 @@ test('pending checkout can be safely discarded or recovered through the browser 
       assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Discard and pay again')?.getAttribute('aria-busy')), 'true');
       const beforeDoubleClick = captureCount;
       await clickButton(page, 'Discard and pay again');
+      await clickButton(page, 'Recover payment');
       assert.equal(captureCount, beforeDoubleClick, 'a second click while checking must not send another request');
+      if (name === 'processing') {
+        // Keep the response unresolved across multiple seconds of user interaction.
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        assert.equal(captureCount, beforeDoubleClick);
+        assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), order);
+        assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Discard and pay again')?.disabled), true);
+      }
       if (['unpaid-close-pending', 'unpaid-reopen-pending'].includes(name)) {
         await page.keyboard.press('Escape');
         if (name === 'unpaid-reopen-pending') await page.click('.pro-upgrade-button');
@@ -196,7 +226,7 @@ test('pending checkout can be safely discarded or recovered through the browser 
       const release = releaseCheck; releaseCheck = undefined; release();
     };
     await waitForHeldCheck();
-    if (['network', 'server', 'processing'].includes(name)) {
+    if (['network', 'server', 'processing', '404-json', '404-html', 'unknown', 'approved', 'forbidden', 'verification-error'].includes(name)) {
       await page.waitForFunction(() => document.querySelector('[role="alert"]')?.textContent.includes('retry'));
       await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Discard and pay again' && !b.disabled && b.getAttribute('aria-busy') === 'false'));
       assert.equal(await page.$(discardNotice), null, 'failed or inconclusive checks never show the notice');
@@ -204,8 +234,29 @@ test('pending checkout can be safely discarded or recovered through the browser 
       assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_license_key')), null);
       assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Test PayPal checkout' && b.getClientRects().length)), false);
       outcome = 'unpaid';
+      // Recovery uses the same guard and may clear the busy state without discarding.
+      const beforeRecovery = captureCount;
+      await page.evaluate(async () => {
+        const button = [...document.querySelectorAll('button')].find(b => b.textContent === 'Recover payment');
+        for (let i = 0; i < 3; i++) { button.click(); await new Promise(resolve => setTimeout(resolve, 1)); }
+      });
+      for (let i = 0; i < 100 && !releaseCheck; i++) await new Promise(resolve => setTimeout(resolve, 20));
+      assert.equal(typeof releaseCheck, 'function');
+      assert.equal(captureCount, beforeRecovery + 1, 'recovery triple-click starts exactly one request');
+      const recoverCaptureCount = captureCount;
+      await page.evaluate(async () => {
+        const button = [...document.querySelectorAll('button')].find(b => b.textContent === 'Recover payment');
+        for (let i = 0; i < 3; i++) { button.click(); await new Promise(resolve => setTimeout(resolve, 1)); }
+      });
+      assert.equal(captureCount, recoverCaptureCount, 'recovery cannot overlap an unresolved check');
+      releaseCheck(); releaseCheck = undefined;
+      await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Discard and pay again' && !b.disabled));
+      assert.equal(await page.evaluate(() => localStorage.getItem('devsnapkit_pending_paypal_order')), order);
+      assert.equal(await page.$(discardNotice), null);
       await clickButton(page, 'Discard and pay again');
-      await waitForHeldCheck();
+      for (let i = 0; i < 100 && !releaseCheck; i++) await new Promise(resolve => setTimeout(resolve, 20));
+      assert.equal(typeof releaseCheck, 'function');
+      releaseCheck(); releaseCheck = undefined;
     }
     if (name === 'paid') {
       await page.waitForFunction(key => [...document.querySelectorAll('input')].some(input => input.value === key), {}, key);

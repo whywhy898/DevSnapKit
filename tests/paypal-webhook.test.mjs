@@ -74,10 +74,12 @@ function setup(t, options = {}) {
     if (url.endsWith('/v2/checkout/orders')) return Response.json({ id: orderId }, { status: 201 });
     if (url === 'https://notify.example.test/payment') return Response.json({ ok: true });
     if (url.endsWith('/capture')) {
+      if (options.captureHttp) return Response.json({ details: [{ issue: 'TEST_PROVIDER_FAILURE' }] }, { status: options.captureHttp });
       if (options.alreadyCaptured) return Response.json({ details: [{ issue: 'ORDER_ALREADY_CAPTURED' }] }, { status: 422 });
       return Response.json(options.capture || options.order || canonical());
     }
     if (url.endsWith('/v2/checkout/orders/' + orderId)) {
+      if (options.readHttp) return Response.json({ name: 'RESOURCE_NOT_FOUND', debug_id: 'test-debug-id' }, { status: options.readHttp });
       const sequence = options.orderSequence;
       return Response.json(sequence ? sequence[Math.min(orderReads++, sequence.length - 1)] : options.order || canonical());
     }
@@ -188,17 +190,60 @@ test('pending provider capture returns processing without issuing a key', async 
   assert.equal(r.status, 202); assert.equal((await r.json()).pending, true); assert.equal(s.count(), 0);
 });
 
-for (const status of ['CREATED', 'SAVED', 'PAYER_ACTION_REQUIRED', 'VOIDED']) {
+for (const status of ['VOIDED']) {
   test('server recovery confirms an unpaid ' + status + ' order can be discarded', async t => {
     const order = canonical(status); delete order.purchase_units[0].payments;
     const s = setup(t, { order }); const r = await s.capture();
     assert.equal(r.status, 202);
     const result = await r.json();
-    assert.equal(result.unpaid, true); assert.equal(result.pending, false);
+    assert.equal(result.unpaid, true); assert.equal(result.pending, false); assert.equal(result.status, status);
     assert.equal(s.count(), 0);
     assert.equal(s.calls.some(x => x.url.endsWith('/capture')), false);
   });
 }
+
+for (const status of ['CREATED', 'SAVED', 'PAYER_ACTION_REQUIRED', 'UNKNOWN']) {
+  test('intermediate or unknown ' + status + ' order remains recoverable', async t => {
+    const order = canonical(status); delete order.purchase_units[0].payments;
+    const s = setup(t, { order }); const response = await s.capture(); const body = await response.json();
+    assert.equal(response.status, 202); assert.equal(body.unpaid, false); assert.equal(body.pending, true);
+    assert.equal(s.count(), 0); assert.equal(s.calls.some(x => x.url.endsWith('/capture')), false);
+  });
+}
+
+for (const mode of ['sandbox', 'live']) {
+  test(mode + ' order lookup 404 is unknown and cannot issue a key or capture', async t => {
+    const s = setup(t, { readHttp: 404 }); s.env.PAYPAL_MODE = mode;
+    const response = await s.capture(); const body = await response.json();
+    assert.equal(response.status, 404); assert.equal(body.success, false);
+    assert.equal(body.unpaid, undefined); assert.equal(body.licenseKey, undefined); assert.equal(s.count(), 0);
+    assert.equal(s.calls.some(x => x.url.endsWith('/capture')), false);
+    assert.ok(s.calls.every(x => x.url.startsWith(mode === 'sandbox' ? 'https://api-m.sandbox.paypal.com/' : 'https://api-m.paypal.com/')));
+    assert.match(body.error, /Could not verify/);
+    assert.equal(JSON.stringify(body).includes('test-debug-id'), false);
+  });
+}
+
+for (const readHttp of [401, 403, 429, 500]) {
+  test('upstream lookup ' + readHttp + ' remains retryable', async t => {
+    const s = setup(t, { readHttp }); const response = await s.capture(); const body = await response.json();
+    assert.equal(response.status, 503); assert.equal(body.unpaid, undefined); assert.equal(s.count(), 0);
+    assert.equal(s.calls.some(x => x.url.endsWith('/capture')), false);
+  });
+}
+
+test('an approved order with a capture failure is never terminal unpaid', async t => {
+  const order = canonical('APPROVED'); delete order.purchase_units[0].payments;
+  const s = setup(t, { order, captureHttp: 422 }); const response = await s.capture(); const body = await response.json();
+  assert.equal(response.status, 422); assert.equal(body.unpaid, undefined); assert.equal(s.count(), 0);
+  assert.equal(s.calls.filter(x => x.url.endsWith('/capture')).length, 1);
+});
+
+test('a voided order containing an unknown capture remains recoverable', async t => {
+  const order = canonical('VOIDED'); order.purchase_units[0].payments.captures[0].status = 'UNKNOWN';
+  const s = setup(t, { order }); const body = await (await s.capture()).json();
+  assert.equal(body.unpaid, false); assert.equal(body.pending, true); assert.equal(s.count(), 0);
+});
 
 test('pending provider capture must not be reported as safe to discard', async t => {
   const order = canonical(); order.purchase_units[0].payments.captures[0].status = 'PENDING';

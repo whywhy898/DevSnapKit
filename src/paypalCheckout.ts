@@ -47,8 +47,9 @@ export async function checkPendingPayPalOrder(orderId: string, signal: AbortSign
       && /^DSK-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/.test(data.licenseKey)) {
       return { status: 'paid', licenseKey: data.licenseKey };
     }
-    if (response.status === 403 || response.status === 422
-      || (response.ok && data?.success === false && data.unpaid === true && data.pending === false)) {
+    // Verification errors and intermediate states cannot prove that paying again is safe.
+    if (response.ok && data?.success === false && data.unpaid === true
+      && data.pending === false && data.status === 'VOIDED') {
       return { status: 'unpaid' };
     }
   } catch { /* An unavailable check is never proof that the order is unpaid. */ }
