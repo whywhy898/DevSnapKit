@@ -35,6 +35,7 @@ Thumbs.db
 
 # Test scripts, fixtures and evidence
 test_evidence_round8/
+test_evidence_payment_retry/
 scratch/
 test_*.mjs
 verify_*.mjs

@@ -1,5 +1,7 @@
 # Payment retry review — 2026-11-17
 
+Follow-up validation and sandbox handoff: [payment-retry-validation-follow-up.md](payment-retry-validation-follow-up.md). It adds local-only browser evidence and a future build revision indicator; it does not establish historical backend deployment provenance or diagnose the original 202/404.
+
 ## Scope and result
 
 Work was performed only in `D:/workspace/MarkMoney/.worktrees/shotcraft-payment-retry`, branch `fix/payment-retry`, starting clean at `bcf21d3d6be0e60d0f2c218a806cacbab6c212f8` (annotations-polish). The queued task's scheduling/branch instructions were superseded by the user's instruction to start here.

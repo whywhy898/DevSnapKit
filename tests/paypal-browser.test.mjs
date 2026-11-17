@@ -67,6 +67,9 @@ test('checkout errors and webhook recovery work through the actual browser UI', 
         claimCount++; await json(name === 'creation-error' || claimCount < 2 ? { success: false } : { success: true, licenseKey: key }, claimCount < 2 ? 403 : 200); return;
       }
       if (url.pathname.startsWith('/api/')) { await json({ valid: false }); return; }
+      if (url.origin !== new URL(base).origin && !['data:', 'blob:'].includes(url.protocol)) {
+        await request.abort('blockedbyclient'); return;
+      }
       await request.continue();
     };
     await page.setRequestInterception(true); page.on('request', intercept);
@@ -181,6 +184,9 @@ test('pending checkout can be safely discarded or recovered through the browser 
         await json({ success: false, unpaid: true, pending: false, status: 'VOIDED' }, 202); return;
       }
       if (url.pathname.startsWith('/api/')) { await json({ valid: false }); return; }
+      if (url.origin !== new URL(base).origin && !['data:', 'blob:'].includes(url.protocol)) {
+        await request.abort('blockedbyclient'); return;
+      }
       await request.continue();
     });
     await page.goto(base, { waitUntil: 'networkidle0' });

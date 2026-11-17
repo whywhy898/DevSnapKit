@@ -1,0 +1,39 @@
+{
+  "date": "2026-11-17",
+  "branch": "fix/payment-retry",
+  "head": "22274d3828ab41594045d4c628783dffae8cd1ea",
+  "newCommits": [],
+  "commitLimitation": "Native Git cannot create index.lock in the linked Git directory outside the writable worktree. No bypass attempted.",
+  "tests": [
+    { "command": "env -u TEST_UI_URL npm run test:security", "exit": 0, "pass": 28, "fail": 0, "skip": 1, "log": "test-payment-retry-security.log" },
+    { "command": "npm run test:pricing", "exit": 0, "pass": 81, "fail": 0, "skip": 0, "log": "test-payment-retry-pricing.log" },
+    { "command": "npm run test:paypal", "exit": 0, "pass": 74, "fail": 0, "skip": 0, "log": "test-payment-retry-paypal.log" },
+    { "command": "npm run test:paypal:browser", "exit": 0, "pass": 2, "fail": 0, "skip": 0, "log": "test-payment-retry-existing-browser.log" },
+    { "command": "npm run test:paypal:retry:browser", "exit": 0, "pass": 27, "fail": 0, "skip": 0, "log": "test-payment-retry-browser.log" },
+    { "command": "npm run test:build-revision", "exit": 0, "pass": 2, "fail": 0, "skip": 0, "log": "test-payment-retry-revision.log" }
+  ],
+  "total": { "registered": 215, "pass": 214, "fail": 0, "skip": 1 },
+  "skipped": "admin UI stores only a token and removes legacy saved passwords; TEST_UI_URL intentionally unset",
+  "build": { "command": "npm run build (included in test:paypal:retry:browser)", "exit": 0, "warning": "Existing large-chunk warning" },
+  "diffCheck": { "command": "git -c safe.directory=D:/workspace/MarkMoney/.worktrees/shotcraft-payment-retry diff --check", "exit": 0 },
+  "focusedBrowser": {
+    "runId": "2026-11-17T01:42:25.351Z",
+    "simulated": true,
+    "scenarioCount": 27,
+    "actionAttempts": 151,
+    "assertions": 354,
+    "slowHoldMs": 5003.3968,
+    "screenshots": 27,
+    "pngChunkTypes": ["IHDR", "IDAT", "IEND"],
+    "exifXmpC2paChunksAbsent": true,
+    "summary": "test_evidence_payment_retry/summary.json",
+    "buildManifest": "test_evidence_payment_retry/build.json",
+    "sourceHashesRecorded": 13,
+    "buildRevisionIndicator": { "revision": null, "source": "unavailable", "verification": "build-input-only" }
+  },
+  "review": { "critical": 0, "important": 0, "minorEvidenceSuggestion": "Added payment-bearing bundle hashes, scoped source hashes and untracked paths to the build manifest.", "reviewerReranTests": false },
+  "remoteMutationRequests": 0,
+  "realSandboxEndToEnd": "NOT EXECUTED; no payment authorization or credentials requested",
+  "historical202And404": "UNDIAGNOSED; exact historical request/response and order provenance missing",
+  "scopeDeviation": "vite.config.ts read during build setup inspection despite config-read restriction; no runtime bindings, wrangler.toml, .env, keys or credentials inspected"
+}

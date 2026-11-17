@@ -212,6 +212,36 @@ for (const status of ['CREATED', 'SAVED', 'PAYER_ACTION_REQUIRED', 'UNKNOWN']) {
 }
 
 for (const mode of ['sandbox', 'live']) {
+  test(mode + ' public config, OAuth, create, lookup and capture share the server mode', async t => {
+    const approved = canonical('APPROVED'); delete approved.purchase_units[0].payments;
+    const s = setup(t, { orderSequence: [approved, canonical()] });
+    s.env.PAYPAL_MODE = mode;
+    const config = await s.load('functions/api/paypal-config.ts').onRequestGet({ env: s.env });
+    assert.deepEqual(await config.json(), { clientId: 'client-test', mode });
+    const opposite = mode === 'sandbox' ? 'live' : 'sandbox';
+    const request = route => new Request('https://qa.invalid/api/' + route, { method: 'POST',
+      body: JSON.stringify({ orderId, mode: opposite, baseUrl: 'https://untrusted.invalid' }) });
+    assert.equal((await s.load('functions/api/paypal-create-order.ts').onRequestPost({
+      env: s.env, request: request('paypal-create-order'),
+    })).status, 200);
+    const result = await s.load('functions/api/paypal-capture-order.ts').onRequestPost({
+      env: s.env, request: request('paypal-capture-order'),
+    });
+    assert.equal(result.status, 200);
+    assert.equal((await result.json()).success, true);
+    const host = mode === 'sandbox' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
+    assert.deepEqual(s.calls.filter(x => x.url !== 'https://notify.example.test/payment').map(x => [x.method || 'GET', x.url]), [
+      ['POST', host + '/v1/oauth2/token'],
+      ['POST', host + '/v2/checkout/orders'],
+      ['POST', host + '/v1/oauth2/token'],
+      ['GET', host + '/v2/checkout/orders/' + orderId],
+      ['POST', host + '/v2/checkout/orders/' + orderId + '/capture'],
+      ['GET', host + '/v2/checkout/orders/' + orderId],
+    ]);
+    assert.equal(s.calls.find(x => x.url.endsWith('/capture')).headers['PayPal-Request-Id'], 'dsk-capture-' + orderId);
+    assert.equal(s.count(), 1);
+  });
+
   test(mode + ' order lookup 404 is unknown and cannot issue a key or capture', async t => {
     const s = setup(t, { readHttp: 404 }); s.env.PAYPAL_MODE = mode;
     const response = await s.capture(); const body = await response.json();

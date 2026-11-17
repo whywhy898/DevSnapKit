@@ -1,0 +1,58 @@
+{
+  "observedDate": "2026-11-17",
+  "method": "GET only; no remote order creation/capture or other POST",
+  "reportedCommit": "22274d3 (reported, not independently attested by deployed backend)",
+  "localStartingHead": "22274d3828ab41594045d4c628783dffae8cd1ea",
+  "origins": [
+    "https://d1121014.devsnapkit.pages.dev",
+    "https://fix-payment-retry.devsnapkit.pages.dev"
+  ],
+  "observationsOnBothOrigins": [
+    {
+      "atUtcRange": "2026-11-17T01:26:29.320Z/2026-11-17T01:26:29.328Z",
+      "route": "/",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "etag": "W/\"116346e92ea1c71d59d7dc4d2fbadeda\"",
+      "scripts": ["/assets/index-DvX8ttxZ.js", "/seo/attribution.js?v=e549147fa7"],
+      "revisionMeta": []
+    },
+    {
+      "atUtcRange": "2026-11-17T01:26:29.665Z/2026-11-17T01:26:29.679Z",
+      "route": "/build-revision.json",
+      "status": 404,
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "atUtcRange": "2026-11-17T01:26:30.014Z/2026-11-17T01:26:30.032Z",
+      "route": "/api/paypal-config",
+      "status": 200,
+      "contentType": "application/json",
+      "mode": "sandbox",
+      "note": "Only mode retained; client ID not recorded. This does not independently prove create/capture host, merchant or backend revision."
+    },
+    {
+      "atUtcRange": "2026-11-17T01:36:11.050Z/2026-11-17T01:36:11.051Z",
+      "route": "/assets/index-DvX8ttxZ.js",
+      "status": 200,
+      "bytes": 2182,
+      "sha256": "280770075956fd8e91688721b971b0d266952ca7aeaee401a289ce8f5534e9ab",
+      "byteIdenticalToLocalBuild": true
+    },
+    {
+      "atUtcRange": "2026-11-17T01:36:54.234Z/2026-11-17T01:36:54.307Z",
+      "route": "/assets/studio-DQW1rbDx.js",
+      "status": 200,
+      "bytes": 653141,
+      "sha256": "744d57dcc153b20c0b84a45c343faeeff7fbb539386f8ad8842fb18e6817e5ea",
+      "byteIdenticalToLocalBuild": true,
+      "note": "This is the bundle containing the payment UI and /api/paypal-capture-order reference. A frontend byte match does not identify Pages Functions code or runtime bindings."
+    }
+  ],
+  "limits": [
+    "No existing revision route found in reviewed source; deployed build-revision.json absent.",
+    "Cloudflare immutable deployment identifier is not a Git SHA.",
+    "No Cloudflare deployment manifest, Functions digest, runtime bindings, merchant/account provenance or historical request/response artifacts inspected.",
+    "A newly added revision indicator cannot retroactively prove this deployment."
+  ]
+}
