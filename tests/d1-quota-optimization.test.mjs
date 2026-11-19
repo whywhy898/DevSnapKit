@@ -622,6 +622,7 @@ function createDashboardHarness({ savedToken = null, failStats = false } = {}) {
   render();
   return {
     render,
+    storage,
     intervals,
     timeouts,
     fetchCalls,
@@ -647,6 +648,19 @@ test('5. AdminDashboard removes 30s polling & auto-retry, keeps single initial l
   assert.equal(saved.intervals.length, 0);
   assert.equal(saved.timeouts.filter(t => t.ms === 1500).length, 0);
   assert.ok(saved.text().includes('Manual Refresh'));
+
+  // Theme toggle updates localStorage shotcraft_theme_mode without triggering stats fetch
+  const themeBtn = saved.find(n => n.type === 'button' && n.props?.['aria-label'] === 'Toggle theme');
+  assert.ok(themeBtn, 'Expected theme toggle button');
+  assert.equal(saved.storage.get('shotcraft_theme_mode'), 'light');
+  themeBtn.props.onClick();
+  saved.render();
+  assert.equal(saved.storage.get('shotcraft_theme_mode'), 'dark');
+  assert.equal(saved.statsCalls().length, 1, 'Theme toggle must NOT trigger stats request');
+  saved.find(n => n.type === 'button' && n.props?.['aria-label'] === 'Toggle theme').props.onClick();
+  saved.render();
+  assert.equal(saved.storage.get('shotcraft_theme_mode'), 'light');
+  assert.equal(saved.statsCalls().length, 1);
 
   // Overlapping manual refresh clicks -> synchronous isFetchingRef blocks duplicate request
   let resolveSlow;
