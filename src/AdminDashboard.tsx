@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import SeoFunnel from './SeoFunnel';
 import type { SeoFunnelData } from '../functions/lib/seo-funnel';
 import { 
@@ -13,6 +13,8 @@ import {
 interface StatsData {
   seoFunnel?: SeoFunnelData;
   timestamp: string;
+  cached?: boolean;
+  cacheAgeSeconds?: number;
   system: {
     storageEngine: string;
     isD1Connected: boolean;
@@ -82,15 +84,14 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string>('');
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline'>('synced');
-  const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
+  const isFetchingRef = useRef<boolean>(false);
 
   const [orderSearch, setOrderSearch] = useState<string>('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'setup'>('overview');
 
-  // Check saved admin token on mount
+  // Check saved admin token on mount (single initial load; no background polling)
   useEffect(() => {
     const savedToken = localStorage.getItem('devsnapkit_admin_token');
     localStorage.removeItem('devsnapkit_admin_secret');
@@ -99,15 +100,6 @@ export default function AdminDashboard() {
       fetchStats(savedToken);
     }
   }, []);
-
-  // Periodic auto-refresh (silent background sync)
-  useEffect(() => {
-    if (!isAuthenticated || !autoRefresh) return;
-    const interval = setInterval(() => {
-      fetchStats(undefined, true);
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated, autoRefresh]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,71 +141,57 @@ export default function AdminDashboard() {
     setStats(null);
   };
 
-  const fetchStats = async (tokenOverride?: string, isBackground = false) => {
-    if (!isBackground) {
-      setIsLoading(true);
-      setLoadError('');
-    } else {
-      setSyncStatus('syncing');
+  const fetchStats = async (tokenOverride?: string, forceRefresh = false): Promise<boolean> => {
+    if (isFetchingRef.current) {
+      return false;
     }
+    isFetchingRef.current = true;
+    setIsLoading(true);
+    setLoadError('');
 
     const token = tokenOverride || localStorage.getItem('devsnapkit_admin_token') || '';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-    const executeFetch = async (attempt = 1): Promise<boolean> => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+    try {
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
+      const url = forceRefresh ? '/api/admin/stats?refresh=1' : '/api/admin/stats';
+      const res = await fetch(url, {
+        headers,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      let data: any = null;
       try {
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
+        data = await res.json();
+      } catch {
+        data = null;
+      }
 
-        const res = await fetch('/api/admin/stats', { 
-          headers,
-          signal: controller.signal 
-        });
-        clearTimeout(timeoutId);
-
-        const data = await res.json();
-
-        if (data.success) {
-          setStats(data);
-          setLoadError('');
-          setSyncStatus('synced');
-          return true;
-        } else {
-          if (!isBackground) {
-            setLoadError(data.error || 'Failed to load stats');
-          }
-          if (res.status === 401) {
-            handleLogout();
-          }
-          return false;
-        }
-      } catch (err: any) {
-        clearTimeout(timeoutId);
-        // On network error or timeout, auto-retry once
-        if (attempt === 1) {
-          await new Promise(r => setTimeout(r, 1500));
-          return executeFetch(2);
-        }
-
-        if (isBackground) {
-          setSyncStatus('offline');
-        } else {
-          setLoadError('Failed to fetch dashboard data: ' + (err.name === 'AbortError' ? 'Connection timed out' : err.message));
+      if (res.ok && data?.success) {
+        setStats(data);
+        setLoadError('');
+        return true;
+      } else {
+        setLoadError(data?.error || `Failed to load stats (HTTP ${res.status})`);
+        if (res.status === 401) {
+          handleLogout();
         }
         return false;
       }
-    };
-
-    try {
-      await executeFetch(1);
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      setLoadError('Failed to fetch dashboard data: ' + (err?.name === 'AbortError' ? 'Connection timed out' : (err?.message || 'Unknown error')));
+      return false;
     } finally {
-      if (!isBackground) {
-        setIsLoading(false);
-      }
+      clearTimeout(timeoutId);
+      isFetchingRef.current = false;
+      setIsLoading(false);
     }
   };
 
@@ -242,7 +220,7 @@ export default function AdminDashboard() {
       });
       const data = await res.json();
       if (data.success) {
-        await fetchStats();
+        await fetchStats(undefined, true);
         alert('已成功清空所有访问记录！');
       } else {
         alert('清空失败: ' + (data.error || '未知错误'));
@@ -414,28 +392,18 @@ export default function AdminDashboard() {
             </span>
           </div>
 
-          {syncStatus === 'offline' && (
-            <span className="hidden xl:inline-flex items-center gap-1.5 text-xs text-amber-300 bg-amber-950/40 border border-amber-800/40 px-2.5 py-1 rounded-lg">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-              <span>网络稍有波动，下次将自动同步</span>
-            </span>
-          )}
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border bg-slate-900 border-slate-800 text-slate-400">
+            <span>Manual Refresh</span>
+            {stats?.timestamp && (
+              <span className="text-slate-500 font-mono">
+                • {new Date(stats.timestamp).toLocaleTimeString()}
+                {stats.cached ? ' (Cached)' : ''}
+              </span>
+            )}
+          </span>
 
           <button
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            className={`hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
-              autoRefresh 
-                ? 'bg-indigo-950/40 border-indigo-700/50 text-indigo-300' 
-                : 'bg-slate-900 border-slate-800 text-slate-500'
-            }`}
-            title="Toggle auto-refresh every 30s"
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${autoRefresh ? 'bg-indigo-400' : 'bg-slate-600'}`} />
-            <span>Auto (30s)</span>
-          </button>
-
-          <button
-            onClick={() => fetchStats()}
+            onClick={() => fetchStats(undefined, true)}
             disabled={isLoading}
             className="p-2 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 rounded-lg transition-colors border border-slate-700/50"
             title="Refresh Data"
@@ -481,7 +449,7 @@ export default function AdminDashboard() {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => fetchStats()}
+                onClick={() => fetchStats(undefined, true)}
                 disabled={isLoading}
                 className="text-xs bg-red-900/80 px-3 py-1.5 rounded-lg font-semibold hover:bg-red-800 transition-colors"
               >
@@ -698,7 +666,7 @@ export default function AdminDashboard() {
               <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl">
                 <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
                   <Globe className="w-4 h-4 text-cyan-400" />
-                  <span>Top Visitor Countries (海外访客国家分布)</span>
+                  <span>Top Visitor Countries (近30天访客国家分布)</span>
                 </h3>
                 {stats?.topCountries && stats.topCountries.length > 0 ? (
                   <div className="space-y-2.5">

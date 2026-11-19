@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS orders (
 
 -- Indexes for lightning fast analytics
 CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
+CREATE INDEX IF NOT EXISTS idx_events_created_type ON events(created_at, event_type);
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
 CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);

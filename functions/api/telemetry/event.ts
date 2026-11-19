@@ -2,9 +2,62 @@
 // Ingests anonymous client-side telemetry events (page views, exports, clicks) into D1 and KV
 
 interface Env {
-  DB?: any;          // Cloudflare D1 database binding
-  DSK_KV?: any;      // Cloudflare KV binding
-  DSK_ORDERS?: any;  // Legacy KV binding
+  DB?: any;                    // Cloudflare D1 database binding
+  DSK_KV?: any;                // Cloudflare KV binding
+  DSK_ORDERS?: any;            // Legacy KV binding
+  ALLOW_PREVIEW_TELEMETRY?: string;
+}
+
+const MAX_BODY_BYTES = 4096;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_WRITES = 60;
+const RATE_LIMIT_MAX_BUCKETS = 5_000;
+
+const ALLOWED_EVENTS = new Set([
+  'page_view',
+  'seo_landing_view',
+  'seo_editor_open',
+  'upload_image',
+  'upload_logo',
+  'media_slot_add',
+  'media_slot_replace',
+  'preset_change',
+  'theme_change',
+  'bg_type_change',
+  'export_image',
+  'copy_image',
+  'pro_modal_open',
+  'checkout_click',
+]);
+
+const ipBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(request: Request): boolean {
+  const now = Date.now();
+  for (const [key, bucket] of ipBuckets) {
+    if (bucket.resetAt <= now) ipBuckets.delete(key);
+  }
+  const ip = request.headers.get('CF-Connecting-IP')?.trim() || 'unknown';
+  const existing = ipBuckets.get(ip);
+  if (existing) {
+    existing.count += 1;
+    return existing.count > RATE_LIMIT_MAX_WRITES;
+  }
+  if (ipBuckets.size >= RATE_LIMIT_MAX_BUCKETS) {
+    return true;
+  }
+  ipBuckets.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+  return false;
+}
+
+function isProductionTelemetryHost(request: Request, env: Env): boolean {
+  if (env.ALLOW_PREVIEW_TELEMETRY === 'true') return true;
+  try {
+    const host = new URL(request.url).hostname.toLowerCase();
+    return host === 'devsnapkit.com' || host === 'www.devsnapkit.com';
+  } catch {
+    return false;
+  }
 }
 
 export const onRequestPost = async ({ request, env }: { request: Request; env: Env }) => {
@@ -16,8 +69,42 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   };
 
   try {
-    const body: any = await request.json().catch(() => ({}));
-    const { event, sessionId, path, referrer, device, browser, metadata } = body;
+    const contentLength = Number(request.headers.get('Content-Length') || 0);
+    if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+      return new Response(JSON.stringify({ ok: false, error: 'Payload too large' }), {
+        status: 413,
+        headers: corsHeaders,
+      });
+    }
+
+    let rawText = '';
+    if (request.body) {
+      const reader = request.body.getReader();
+      const decoder = new TextDecoder();
+      let totalBytes = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalBytes += value.byteLength;
+        if (totalBytes > MAX_BODY_BYTES) {
+          await reader.cancel().catch(() => {});
+          return new Response(JSON.stringify({ ok: false, error: 'Payload too large' }), {
+            status: 413,
+            headers: corsHeaders,
+          });
+        }
+        rawText += decoder.decode(value, { stream: true });
+      }
+      rawText += decoder.decode();
+    }
+
+    let body: any = {};
+    try {
+      body = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      body = {};
+    }
+    const { event, sessionId, path, referrer, device, browser, metadata } = body || {};
 
     if (!event || typeof event !== 'string') {
       return new Response(JSON.stringify({ ok: false, error: 'Event type required' }), {
@@ -26,11 +113,31 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
       });
     }
 
+    if (!ALLOWED_EVENTS.has(event)) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'untracked_event' }), {
+        status: 200,
+        headers: corsHeaders,
+      });
+    }
+
+    if (!isProductionTelemetryHost(request, env)) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'non_production_host' }), {
+        status: 200,
+        headers: corsHeaders,
+      });
+    }
+
+    if (isRateLimited(request)) {
+      return new Response(JSON.stringify({ ok: false, error: 'Rate limit exceeded' }), {
+        status: 429,
+        headers: corsHeaders,
+      });
+    }
+
     const cfCountry = request.headers.get('cf-ipcountry') || 'XX';
-    const userAgent = request.headers.get('user-agent') || '';
-    const cleanSession = (sessionId || 'anon_' + Math.random().toString(36).substring(2, 10)).slice(0, 64);
-    const cleanPath = (path || '/').slice(0, 128);
-    const cleanReferrer = (referrer || '').slice(0, 256);
+    const cleanSession = (typeof sessionId === 'string' && sessionId ? sessionId : 'anon_' + Math.random().toString(36).substring(2, 10)).slice(0, 64);
+    const cleanPath = (typeof path === 'string' && path ? path : '/').slice(0, 128);
+    const cleanReferrer = (typeof referrer === 'string' ? referrer : '').slice(0, 256);
     const cleanDevice = device === 'mobile' ? 'mobile' : device === 'tablet' ? 'tablet' : 'desktop';
     const metaJson = metadata ? JSON.stringify(metadata).slice(0, 1024) : null;
     const today = new Date().toISOString().split('T')[0];
@@ -48,7 +155,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
           cleanReferrer,
           cfCountry,
           cleanDevice,
-          (browser || '').slice(0, 64),
+          (typeof browser === 'string' ? browser : '').slice(0, 64),
           metaJson
         ).run();
       } catch (dbErr: any) {
