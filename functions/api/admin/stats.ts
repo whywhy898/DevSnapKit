@@ -138,6 +138,13 @@ async function computeStatsPayload(env: Env): Promise<Record<string, unknown>> {
         overview.totalExports = Number(eventStats.total_exports || 0);
       }
 
+const REAL_ORDER_FILTER = `
+  COALESCE(payer_email, '') NOT LIKE 'sb-%@%.example.com'
+  AND COALESCE(payer_email, '') NOT LIKE '%@personal.example.com'
+  AND COALESCE(payer_email, '') NOT LIKE '%@business.example.com'
+  AND COALESCE(raw_payload, '') NOT LIKE '%"mode":"test"%'
+`;
+
       // Consolidated Today + All-Time orders (1 scan instead of 2)
       const orderStats = await env.DB.prepare(`
         SELECT
@@ -146,7 +153,7 @@ async function computeStatsPayload(env: Env): Promise<Record<string, unknown>> {
           COUNT(CASE WHEN created_at >= date('now', 'start of day') THEN 1 END) as today_orders,
           COALESCE(SUM(CASE WHEN created_at >= date('now', 'start of day') THEN CAST(amount AS REAL) ELSE 0 END), 0) as today_revenue
         FROM orders
-        WHERE status = 'COMPLETED'
+        WHERE status = 'COMPLETED' AND ${REAL_ORDER_FILTER}
       `).first();
 
       if (orderStats) {
@@ -181,7 +188,7 @@ async function computeStatsPayload(env: Env): Promise<Record<string, unknown>> {
           COUNT(*) as orders_count,
           COALESCE(SUM(CAST(amount AS REAL)), 0) as day_revenue
         FROM orders
-        WHERE status = 'COMPLETED' AND created_at >= date('now', '-14 days')
+        WHERE status = 'COMPLETED' AND created_at >= date('now', '-14 days') AND ${REAL_ORDER_FILTER}
         GROUP BY day
       `).all();
 
@@ -240,6 +247,7 @@ async function computeStatsPayload(env: Env): Promise<Record<string, unknown>> {
       const ordersRows = await env.DB.prepare(`
         SELECT order_id, txn_id, payer_email, amount, currency, status, license_key, created_at
         FROM orders
+        WHERE ${REAL_ORDER_FILTER}
         ORDER BY created_at DESC
         LIMIT 50
       `).all();
@@ -279,7 +287,11 @@ async function computeStatsPayload(env: Env): Promise<Record<string, unknown>> {
     try {
       const rawRecent = await kv.get('orders_recent');
       if (rawRecent) {
-        const list = JSON.parse(rawRecent);
+        const isTestKvOrder = (item: any) =>
+          item?.mode === 'test' ||
+          /^sb-.*@.*\.example\.com$/i.test(String(item?.payerEmail || '')) ||
+          /@(?:personal|business)\.example\.com$/i.test(String(item?.payerEmail || ''));
+        const list = JSON.parse(rawRecent).filter((item: any) => !isTestKvOrder(item));
         recentOrders = list;
         overview.totalOrders = list.length;
         overview.totalRevenue = list.reduce((acc: number, item: any) => acc + (parseFloat(item.amount) || 0), 0);

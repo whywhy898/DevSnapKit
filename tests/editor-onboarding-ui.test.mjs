@@ -125,7 +125,7 @@ test('upgrade, claim, shortcuts and legal dialogs dismiss with Esc from fields a
   assert.equal(await page.$eval('[data-pro-modal]', el => el.contains(document.activeElement)), true);
   await page.keyboard.down('Shift'); await page.keyboard.press('Tab'); await page.keyboard.up('Shift');
   assert.equal(await page.$eval('[data-pro-modal]', el => el.contains(document.activeElement)), true);
-  const claim = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(el => el.textContent.trim() === 'Claim with PayPal Transaction ID'));
+  const claim = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(el => el.textContent.trim() === 'Claim with Order ID'));
   await claim.asElement().click();
   await page.waitForSelector('[data-claim-modal]');
   await page.focus('[data-claim-modal] input'); await page.keyboard.press('Escape');
@@ -221,7 +221,7 @@ test('success dialog returns focus to its surviving opener after a license claim
   await page.focus(opener);
   await page.$eval('.pro-key-button', el => el.click());
   await page.waitForSelector('[data-claim-modal]');
-  await clickButton(page, 'Claim via PayPal');
+  await clickButton(page, 'Claim via Order ID');
   await page.type('[data-claim-modal] input', 'ORDER1234567890123');
   await clickButton(page, 'Verify Purchase & Retrieve Key');
   await page.waitForSelector('[aria-label="Payment verified"]');

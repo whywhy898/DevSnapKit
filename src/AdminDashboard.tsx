@@ -804,7 +804,7 @@ export default function AdminDashboard() {
                     <div className="p-2.5 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-between">
                       <div>
                         <div className="font-bold text-slate-800 dark:text-slate-200">5. 付费购买 Pro (Paid Orders)</div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400">完成 PayPal 结账并获取终身授权</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">完成 Creem 结账并获取终身授权</div>
                       </div>
                       <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-sm">
                         {stats?.overview?.totalOrders || 0}
@@ -888,7 +888,7 @@ export default function AdminDashboard() {
                                  v.event_type === 'theme_change' ? <><Sparkles className="w-3 h-3" /><span>Switch Theme</span></> :
                                  v.event_type === 'export_image' ? <><Download className="w-3 h-3" /><span>Export Mockup</span></> :
                                  v.event_type === 'copy_image' ? <><Copy className="w-3 h-3" /><span>Copy Image</span></> :
-                                 v.event_type === 'checkout_click' ? <><CreditCard className="w-3 h-3" /><span>PayPal Click</span></> :
+                                 v.event_type === 'checkout_click' ? <><CreditCard className="w-3 h-3" /><span>Checkout Click</span></> :
                                  <span>{v.event_type}</span>}
                               </span>
                             </td>
@@ -924,10 +924,10 @@ export default function AdminDashboard() {
                 <div>
                   <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <ShoppingCart className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                    <span>Real-Time PayPal Orders (实时订单与授权码发放记录)</span>
+                    <span>Real-Time Creem Orders (实时订单与授权码发放记录)</span>
                   </h3>
                   <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                    记录每笔真实 PayPal 付款流水，包括付款人邮箱、实付金额、交易单号与 Pro 授权密钥
+                    记录每笔真实 Creem 付款流水，包括付款人邮箱、实付金额、交易单号与 Pro 授权密钥
                   </p>
                 </div>
 
@@ -1086,7 +1086,7 @@ export default function AdminDashboard() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-400">
-                    买家完成 PayPal 支付时，系统自动发送邮件到你的邮箱。
+                    买家完成 Creem 支付时，系统自动发送邮件到你的邮箱。
                   </p>
                   <div className="pt-2 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
                     <div>推荐在 Pages 环境变量配置 <code className="bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-200 px-1 rounded">RESEND_API_KEY</code>（来自 resend.com，免费注册即可每月发 3000 封）。</div>

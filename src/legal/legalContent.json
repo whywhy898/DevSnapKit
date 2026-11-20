@@ -15,7 +15,7 @@
       },
       {
         "heading": "2. Payment & License Information",
-        "body": [{ "text": "Payments are securely processed by PayPal Inc. DevSnapKit never stores credit card details or financial credentials. When you purchase a Pro Lifetime Pass, we only verify the transaction reference to issue your cryptographic license key." }]
+        "body": [{ "text": "Payments are securely processed by Creem (Merchant of Record). DevSnapKit never stores credit card details or financial credentials. When you purchase a Pro Lifetime Pass, we only verify the transaction reference to issue your cryptographic license key." }]
       },
       {
         "heading": "3. Local Storage",

@@ -16,11 +16,11 @@ CREATE TABLE IF NOT EXISTS events (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Orders Table: PayPal Transactions & Pro Licenses
+-- 2. Orders Table: Creem Transactions & Pro Licenses
 CREATE TABLE IF NOT EXISTS orders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  order_id TEXT UNIQUE NOT NULL,     -- PayPal Order ID (e.g. 5XY892...)
-  txn_id TEXT,                       -- PayPal Capture Transaction ID
+  order_id TEXT UNIQUE NOT NULL,     -- Creem Checkout ID (e.g. ch_...)
+  txn_id TEXT,                       -- Creem Order / Transaction ID (e.g. ord_...)
   payer_email TEXT,                  -- Payer email
   amount TEXT NOT NULL DEFAULT '1.00',
   currency TEXT DEFAULT 'USD',

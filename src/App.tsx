@@ -41,7 +41,7 @@ import {
 import { MOCKUP_PRESETS } from './templates';
 import { GRADIENTS, PresetGradient } from './themes';
 import { verifyLicenseWithServer, claimLicenseViaApi } from './license';
-import { readPendingOrder, rememberPendingOrder, savePurchasedLicense, recoverPayPalLicense, checkPendingPayPalOrder } from './paypalCheckout';
+import { readPendingOrder, readConfirmedUnpaidOrder, markPendingOrderUnpaid, rememberPendingOrder, savePurchasedLicense, recoverCreemLicense, checkPendingCreemOrder, verifyCreemReturn } from './creemCheckout';
 import { LegalModals, LegalModalType } from './LegalModals';
 import { Modal } from './Modal';
 import { trackEvent } from './telemetry';
@@ -703,15 +703,19 @@ export default function App() {
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const paypalContainerRef = useRef<HTMLDivElement>(null);
+  const checkoutPopupRef = useRef<Window | null>(null);
   const [isCapturingPayment, setIsCapturingPayment] = useState<boolean>(false);
-  const [isPayPalCheckoutActive, setIsPayPalCheckoutActive] = useState(false);
+  const [isStartingCheckout, setIsStartingCheckout] = useState<boolean>(false);
+  const [isCheckoutWindowActive, setIsCheckoutWindowActive] = useState(false);
+  const [fallbackCheckoutUrl, setFallbackCheckoutUrl] = useState('');
   const [paymentError, setPaymentError] = useState('');
   const [showPaymentDiscardedNotice, setShowPaymentDiscardedNotice] = useState(false);
   const paymentNoticeSession = useRef(0);
-  const [pendingPayPalOrder, setPendingPayPalOrder] = useState(readPendingOrder);
+  const [pendingCreemOrder, setPendingCreemOrder] = useState(readPendingOrder);
+  const [confirmedUnpaidOrderId, setConfirmedUnpaidOrderId] = useState(readConfirmedUnpaidOrder);
+  const [pendingCreemReturnOrderId, setPendingCreemReturnOrderId] = useState('');
   const [paymentRecoveryAttempt, setPaymentRecoveryAttempt] = useState(0);
-  const [pendingPaymentAction, setPendingPaymentAction] = useState<'recover' | 'discard' | null>(null);
+  const [pendingPaymentAction, setPendingPaymentAction] = useState<'return' | 'recover' | 'discard' | null>(null);
   const purchaseCompleted = useRef(false);
   const [canvasDomSize, setCanvasDomSize] = useState<{ width: number; height: number }>({ width: 960, height: 600 });
 
@@ -1124,9 +1128,26 @@ export default function App() {
       });
     }
 
-    // Check URL parameters for direct deep-linking & PayPal return
+    // Check URL parameters for direct deep-linking & Creem return
     const params = new URLSearchParams(window.location.search);
-    if (params.get('claim') === 'true' || params.get('status') === 'success' || params.get('tx')) {
+    const creemCheckoutId = params.get('checkout_id')?.trim() || '';
+    const creemOrderId = params.get('order_id')?.trim() || '';
+    if (params.get('creem_return') === '1' || creemCheckoutId || creemOrderId) {
+      const storedPendingId = readPendingOrder();
+      const returnCheckoutId = creemCheckoutId || storedPendingId;
+      const primaryReturnId = returnCheckoutId || creemOrderId;
+      if (primaryReturnId) {
+        rememberPendingOrder(primaryReturnId);
+        markPendingOrderUnpaid('');
+        setConfirmedUnpaidOrderId('');
+        setPendingCreemOrder(primaryReturnId);
+        setPendingCreemReturnOrderId(creemOrderId && creemOrderId !== primaryReturnId ? creemOrderId : '');
+        setShowProModal(true);
+        setIsCapturingPayment(true);
+        setPendingPaymentAction('return');
+      }
+      window.history.replaceState({}, document.title, window.location.pathname + '?editor=1');
+    } else if (params.get('claim') === 'true' || params.get('status') === 'success' || params.get('tx')) {
       const initialTx = params.get('tx') || '';
       if (initialTx) {
         setClaimOrderId(initialTx);
@@ -1203,15 +1224,37 @@ export default function App() {
     setPurchasedLicenseKey(key);
     setIsProUnlocked(true);
     savePurchasedLicense(key);
-    setPendingPayPalOrder('');
+    setPendingCreemOrder('');
+    setConfirmedUnpaidOrderId('');
+    setPendingCreemReturnOrderId('');
     setPendingPaymentAction(null);
     setPaymentError('');
     setShowPaymentDiscardedNotice(false);
     setIsCapturingPayment(false);
-    setIsPayPalCheckoutActive(false);
+    setIsStartingCheckout(false);
+    setIsCheckoutWindowActive(false);
+    setFallbackCheckoutUrl('');
+    try {
+      if (checkoutPopupRef.current && !checkoutPopupRef.current.closed) {
+        checkoutPopupRef.current.close();
+      }
+    } catch { /* Cross-origin popup close is best-effort only. */ }
+    checkoutPopupRef.current = null;
     setShowProModal(false);
     setShowSuccessModal(true);
   }, []);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'devsnapkit_license_key' && event.newValue) {
+        completePurchase(event.newValue);
+      } else if (event.key === 'devsnapkit_unpaid_creem_checkout') {
+        setConfirmedUnpaidOrderId((event.newValue || '').trim());
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [completePurchase]);
 
   useEffect(() => {
     // Keep the confirmation until another checkout starts or this modal closes.
@@ -1222,144 +1265,111 @@ export default function App() {
   }, [showProModal]);
 
   useEffect(() => {
-    if (!pendingPayPalOrder) return;
+    if (!isCheckoutWindowActive) return;
+    const timer = setInterval(() => {
+      const popup = checkoutPopupRef.current;
+      if (!popup || popup.closed) {
+        checkoutPopupRef.current = null;
+        setIsCheckoutWindowActive(false);
+        try {
+          const storedKey = localStorage.getItem('devsnapkit_license_key');
+          if (!purchaseCompleted.current && storedKey && /^DSK-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/.test(storedKey)) {
+            completePurchase(storedKey);
+            return;
+          }
+        } catch { /* Ignore storage access restrictions. */ }
+        if (!purchaseCompleted.current && pendingCreemOrder) {
+          setPendingPaymentAction(current => current || 'recover');
+        }
+      }
+    }, 500);
+    return () => clearInterval(timer);
+  }, [isCheckoutWindowActive, pendingCreemOrder, completePurchase]);
+
+  useEffect(() => {
+    if (!pendingCreemOrder) return;
     const controller = new AbortController();
     if (pendingPaymentAction) {
       const noticeSession = paymentNoticeSession.current;
-      void checkPendingPayPalOrder(pendingPayPalOrder, controller.signal).then(result => {
+      const checkPromise =
+        pendingPaymentAction === 'return'
+          ? verifyCreemReturn(pendingCreemOrder, controller.signal, { orderId: pendingCreemReturnOrderId })
+          : checkPendingCreemOrder(pendingCreemOrder, controller.signal, { orderId: pendingCreemReturnOrderId });
+      void checkPromise.then(result => {
         if (controller.signal.aborted || purchaseCompleted.current) return;
+        setIsCapturingPayment(false);
         if (result.status === 'paid') {
           completePurchase(result.licenseKey);
         } else if (result.status === 'unpaid' && pendingPaymentAction === 'discard') {
           rememberPendingOrder('');
-          setPendingPayPalOrder('');
+          setPendingCreemOrder('');
+          setConfirmedUnpaidOrderId('');
+          setPendingCreemReturnOrderId('');
+          setFallbackCheckoutUrl('');
           setPaymentError('');
           // A check started before closing must not add a notice to a later modal.
           setShowPaymentDiscardedNotice(noticeSession === paymentNoticeSession.current);
+        } else if (result.status === 'unpaid') {
+          markPendingOrderUnpaid(pendingCreemOrder);
+          setConfirmedUnpaidOrderId(pendingCreemOrder);
+          setPaymentError('This order has not been paid. You can discard it and pay again.');
         } else {
-          setPaymentError(result.status === 'unpaid'
-            ? 'This order has not been paid. You can discard it and pay again.'
-            : 'Payment could not be confirmed. Please retry before paying again.');
+          setPaymentError('Payment could not be confirmed. Please retry before paying again.');
         }
         setPendingPaymentAction(null);
       });
       return () => controller.abort();
     }
-    void recoverPayPalLicense(pendingPayPalOrder, controller.signal).then(key => {
+    if (confirmedUnpaidOrderId === pendingCreemOrder) {
+      return;
+    }
+    void recoverCreemLicense(pendingCreemOrder, controller.signal, {
+      initialDelayMs: isCheckoutWindowActive ? 3000 : 0,
+    }).then(key => {
       if (key && !controller.signal.aborted) completePurchase(key);
     });
     return () => controller.abort();
-  }, [pendingPayPalOrder, paymentRecoveryAttempt, pendingPaymentAction, completePurchase]);
+  }, [pendingCreemOrder, confirmedUnpaidOrderId, pendingCreemReturnOrderId, paymentRecoveryAttempt, pendingPaymentAction, isCheckoutWindowActive, completePurchase]);
 
-  // Dynamically load PayPal JavaScript SDK using client ID from server config
-  useEffect(() => {
-    let isMounted = true;
-    fetch('/api/paypal-config')
-      .then(res => res.json())
-      .then(config => {
-        if (!isMounted) return;
-        if (!config.clientId) {
-          setPaymentError(config.error || 'PayPal checkout is temporarily unavailable. Please contact support@devsnapkit.com.');
-          return;
-        }
-        const scriptId = 'paypal-sdk-script';
-        if (!document.getElementById(scriptId)) {
-          const script = document.createElement('script');
-          script.id = scriptId;
-          script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(config.clientId)}&currency=${proPricing.currency}&components=buttons`;
-          script.async = true;
-          document.body.appendChild(script);
-        }
-      })
-      .catch(() => { if (isMounted) setPaymentError('PayPal checkout could not load. Please refresh or contact support@devsnapkit.com.'); });
-
-    return () => { isMounted = false; };
-  }, []);
-
-  // Render PayPal Smart Payment Buttons inside Pro Modal
-  useEffect(() => {
-    if (!showProModal || pendingPayPalOrder || !paypalContainerRef.current) return;
-
-    paypalContainerRef.current.innerHTML = '';
-
-    const renderButtons = () => {
-      if ((window as any).paypal && paypalContainerRef.current) {
-        try {
-          (window as any).paypal.Buttons({
-            style: {
-              layout: 'vertical',
-              color: 'gold',
-              shape: 'rect',
-              label: 'pay',
-              height: 44,
-            },
-            createOrder: async () => {
-              purchaseCompleted.current = false;
-              setShowPaymentDiscardedNotice(false);
-              setIsPayPalCheckoutActive(true);
-              setPaymentError('');
-              trackEvent('checkout_click');
-              const res = await fetch('/api/paypal-create-order', { method: 'POST' });
-              const data = await res.json();
-              if (!data.id) throw new Error(data.error || 'Failed to initialize PayPal order');
-              rememberPendingOrder(data.id);
-              setPendingPayPalOrder(data.id);
-              return data.id;
-            },
-            onApprove: async (data: any) => {
-              setIsPayPalCheckoutActive(false);
-              setIsCapturingPayment(true);
-              rememberPendingOrder(data.orderID);
-              setPendingPayPalOrder(data.orderID);
-              setPaymentRecoveryAttempt(value => value + 1);
-              try {
-                const res = await fetch('/api/paypal-capture-order', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ orderId: data.orderID })
-                });
-                const result = await res.json();
-                if (result.success && result.licenseKey) {
-                  completePurchase(result.licenseKey);
-                } else {
-                  if (!purchaseCompleted.current) setPaymentError(result.error || 'Payment is still being verified. We will recover your key once PayPal confirms it.');
-                }
-              } catch {
-                if (!purchaseCompleted.current) setPaymentError('The payment response was interrupted. We are checking your receipt; avoid paying again while verification is pending.');
-              } finally {
-                setIsCapturingPayment(false);
-              }
-            },
-            onCancel: () => {
-              setIsPayPalCheckoutActive(false);
-              rememberPendingOrder('');
-              setPendingPayPalOrder('');
-              setIsCapturingPayment(false);
-              setPaymentError('Checkout was cancelled. No license has been issued.');
-            },
-            onError: () => {
-              setIsPayPalCheckoutActive(false);
-              if (!purchaseCompleted.current) setPaymentError('PayPal checkout could not complete. If your card shows a charge, use Recover payment below before trying again.');
-            }
-          }).render(paypalContainerRef.current);
-        } catch (e) {
-          console.error('Failed to render PayPal Buttons:', e);
-        }
+  const handleStartCreemCheckout = useCallback(async () => {
+    purchaseCompleted.current = false;
+    setShowPaymentDiscardedNotice(false);
+    setFallbackCheckoutUrl('');
+    setIsStartingCheckout(true);
+    setPaymentError('');
+    trackEvent('checkout_click');
+    try {
+      const res = await fetch('/api/creem-create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currency: proPricing.currency }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.id || !data?.checkoutUrl) {
+        throw new Error(data?.error || 'Failed to initialize Creem checkout');
       }
-    };
-
-    if ((window as any).paypal) {
-      renderButtons();
-    } else {
-      const timer = setInterval(() => {
-        if ((window as any).paypal) {
-          clearInterval(timer);
-          renderButtons();
-        }
-      }, 300);
-      return () => clearInterval(timer);
+      rememberPendingOrder(data.id);
+      markPendingOrderUnpaid('');
+      setConfirmedUnpaidOrderId('');
+      setPendingCreemOrder(data.id);
+      setPaymentRecoveryAttempt(value => value + 1);
+      const popup = window.open(data.checkoutUrl, 'devsnapkit_creem_checkout', 'width=540,height=760');
+      if (popup && !popup.closed) {
+        checkoutPopupRef.current = popup;
+        setIsCheckoutWindowActive(true);
+      } else {
+        setFallbackCheckoutUrl(data.checkoutUrl);
+        setIsCheckoutWindowActive(false);
+      }
+    } catch (err: any) {
+      setIsCheckoutWindowActive(false);
+      if (!purchaseCompleted.current) {
+        setPaymentError(err?.message || 'Creem checkout could not complete. If your card shows a charge, use Recover payment below before trying again.');
+      }
+    } finally {
+      setIsStartingCheckout(false);
     }
-  }, [showProModal, pendingPayPalOrder, completePurchase]);
+  }, []);
 
   // Theme list
   const filteredGradients = GRADIENTS;
@@ -1762,10 +1772,10 @@ export default function App() {
     }
   };
 
-  // Claim Pro License via PayPal order proof
+  // Claim Pro License via Creem order proof
   const handleClaimLicense = async () => {
     if (!claimOrderId.trim()) {
-      setClaimError('Please provide your PayPal Order ID or Transaction ID. Email alone cannot retrieve a license.');
+      setClaimError('Please provide your Creem Order ID or Checkout ID. Email alone cannot retrieve a license.');
       return;
     }
 
@@ -4316,7 +4326,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
         </p>
       </footer>
 
-      {/* Pro Lifetime License Modal (with PayPal Integration) */}
+      {/* Pro Lifetime License Modal (with Creem Integration) */}
       {showProModal && (
         <Modal onClose={() => setShowProModal(false)} data-pro-modal aria-label="Upgrade to Pro" className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl md:max-w-2xl lg:max-w-3xl w-full p-5 sm:p-6 shadow-2xl relative my-auto">
@@ -4361,26 +4371,44 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                     Instant Checkout
                   </div>
 
-                  {/* PayPal Smart Payment Buttons Container */}
+                  {/* Creem Checkout Container */}
                   <div className="w-full min-h-[44px] space-y-1.5">
                     {showPaymentDiscardedNotice && <p role="status" aria-live="polite" className="text-xs leading-relaxed text-emerald-200">Previous payment discarded. You can pay again now.</p>}
-                    <div ref={paypalContainerRef} className={pendingPayPalOrder ? 'hidden' : 'w-full'} />
+                    {!pendingCreemOrder && (
+                      <button
+                        type="button"
+                        data-creem-checkout
+                        disabled={isStartingCheckout || isCapturingPayment}
+                        onClick={handleStartCreemCheckout}
+                        className="w-full min-h-[44px] bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs px-4 py-3 rounded-xl shadow-lg transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        <Zap className="w-4 h-4 fill-white" />
+                        <span>{isStartingCheckout ? 'Starting secure Creem checkout...' : `Checkout with Creem (${proPricing.displayPrice} ${proPricing.currency})`}</span>
+                      </button>
+                    )}
                     {isCapturingPayment && (
                       <div className="text-center py-2 text-xs font-semibold text-cyan-400 animate-pulse bg-cyan-950/40 border border-cyan-800/40 rounded-lg flex items-center justify-center gap-1.5">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Verifying PayPal payment and issuing license key...</span>
+                        <span>Verifying Creem payment and issuing license key...</span>
                       </div>
                     )}
                     {paymentError && <p role="alert" className="text-xs leading-relaxed text-rose-200 bg-rose-950/30 border border-rose-800/50 rounded-lg p-3">{paymentError}</p>}
-                    {pendingPayPalOrder && <div className="text-xs text-slate-300 rounded-lg border border-slate-700 p-3 space-y-2">
-                      <p>{isPayPalCheckoutActive ? 'Finish or close the PayPal window to continue.' : 'An unfinished payment is being checked. A pending card authorization alone does not confirm payment.'}</p>
+                    {pendingCreemOrder && <div className="text-xs text-slate-300 rounded-lg border border-slate-700 p-3 space-y-2">
+                      <p>{isCheckoutWindowActive ? 'Finish or close the Creem checkout window to continue.' : 'An unfinished payment is being checked. A pending card authorization alone does not confirm payment.'}</p>
+                      {fallbackCheckoutUrl && (
+                        <div>
+                          <a href={fallbackCheckoutUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-indigo-300 underline">
+                            Open Creem checkout <ArrowUpRight className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      )}
                       <div className="flex flex-wrap gap-x-4 gap-y-2">
-                        <button type="button" className="font-semibold text-cyan-300 underline disabled:opacity-50" disabled={!!pendingPaymentAction || isCapturingPayment || isPayPalCheckoutActive} onClick={() => {
-                          setPaymentError('Checking your PayPal receipt...');
+                        <button type="button" className="font-semibold text-cyan-300 underline disabled:opacity-50" disabled={!!pendingPaymentAction || isCapturingPayment || isCheckoutWindowActive} onClick={() => {
+                          setPaymentError('Checking your Creem receipt...');
                           setPendingPaymentAction('recover');
                         }}>Recover payment</button>
-                        <button type="button" className="font-semibold text-cyan-300 underline disabled:opacity-50" disabled={!!pendingPaymentAction || isCapturingPayment || isPayPalCheckoutActive} onClick={() => {
-                          setPaymentError('Checking your PayPal receipt...');
+                        <button type="button" className="font-semibold text-cyan-300 underline disabled:opacity-50" disabled={!!pendingPaymentAction || isCapturingPayment || isCheckoutWindowActive} onClick={() => {
+                          setPaymentError('Checking your Creem receipt...');
                           setPendingPaymentAction('discard');
                         }}>Discard and pay again</button>
                       </div>
@@ -4420,7 +4448,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                   {licenseError && <p className="text-[11px] text-rose-400 text-center">{licenseError}</p>}
                   
                   <p className="text-[10px] text-slate-500 text-center pt-0.5">
-                    Lost your key? <button type="button" onClick={() => { setShowProModal(false); setClaimModalTab('claim'); setShowClaimModal(true); }} className="text-indigo-400 hover:underline">Claim with PayPal Transaction ID</button>
+                    Lost your key? <button type="button" onClick={() => { setShowProModal(false); setClaimModalTab('claim'); setShowClaimModal(true); }} className="text-indigo-400 hover:underline">Claim with Order ID</button>
                   </p>
                 </div>
               </div>
@@ -4447,7 +4475,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
               </div>
               <h3 className="text-xl font-black text-white">DevSnapKit Pro License</h3>
               <p className="text-xs text-slate-300">
-                Activate an existing license key or retrieve your license using PayPal purchase details.
+                Activate an existing license key or retrieve your license using Creem purchase details.
               </p>
             </div>
 
@@ -4475,7 +4503,7 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 }`}
               >
                 <Receipt className="w-3.5 h-3.5" />
-                <span>Claim via PayPal</span>
+                <span>Claim via Order ID</span>
               </button>
             </div>
 
@@ -4509,24 +4537,24 @@ const isPhoneTheme = windowTheme === 'iphone-17' || windowTheme === 'phone-clay'
                 </button>
 
                 <p className="text-[11px] text-slate-400 text-center pt-1">
-                  Don't have your key handy? <button type="button" onClick={() => setClaimModalTab('claim')} className="text-indigo-400 hover:underline">Claim with PayPal Transaction Details</button>
+                  Don't have your key handy? <button type="button" onClick={() => setClaimModalTab('claim')} className="text-indigo-400 hover:underline">Claim with Order Details</button>
                 </p>
               </div>
             ) : (
-              /* Tab 2: Claim via PayPal Receipt */
+              /* Tab 2: Claim via Creem Receipt */
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-slate-400">PayPal Order ID / Transaction ID (Required)</label>
+                  <label className="text-[11px] font-semibold text-slate-400">Creem Order ID / Checkout ID (Required)</label>
                   <input
                     type="text"
                     value={claimOrderId}
                     onChange={(e) => setClaimOrderId(e.target.value)}
-                    placeholder="e.g. 8XY1234567890ABCD"
+                    placeholder="e.g. ord_4aDwWXjMLpes4Kj4XqNnUA"
                     className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
-                <p className="text-[11px] text-slate-400">Find your order or transaction ID on your PayPal receipt.</p>
+                <p className="text-[11px] text-slate-400">Find your Order ID (ord_...) or Checkout ID (ch_...) on your Creem receipt.</p>
 
                 {claimError && (
                   <p className="text-[11px] text-rose-400">{claimError}</p>

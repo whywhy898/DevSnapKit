@@ -48,7 +48,7 @@ export async function verifyLicenseWithServer(licenseKey: string): Promise<Licen
 }
 
 /**
- * Claims a Pro license key using a confirmed PayPal Order ID or Transaction ID.
+ * Claims a Pro license key using a confirmed Creem Order ID or Checkout ID.
  */
 export async function claimLicenseViaApi(orderId: string): Promise<{ success: boolean; licenseKey?: string; error?: string }> {
   try {

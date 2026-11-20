@@ -178,7 +178,7 @@ try {
   assert.equal(await page.$eval('[data-template-filter="16:9"]', el => el.getAttribute('aria-pressed')), 'true', 'filter is retained after closing Pro');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'Apply Big Type Launch template');
   await page.click('[aria-label="Apply Big Type Launch template"]');
-  await clickButton(page, 'Claim with PayPal Transaction ID');
+  await clickButton(page, 'Claim with Order ID');
   assert.equal(await page.$eval('dialog[data-template-gallery]', el => el.open), false, 'license recovery remains above the gallery');
   await page.click('[aria-label="Close license dialog"]');
   await page.waitForSelector('dialog[data-template-gallery][open]');

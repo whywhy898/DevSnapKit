@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { webcrypto } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { DatabaseSync } from 'node:sqlite';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -26,8 +27,8 @@ const { proPricing } = load('shared/pricing.ts');
 const verify = load('functions/api/verify-license.ts');
 const admin = load('functions/api/admin/auth.ts');
 const stats = load('functions/api/admin/stats.ts');
-const capture = load('functions/api/paypal-capture-order.ts');
-const create = load('functions/api/paypal-create-order.ts');
+const verifyCheckout = load('functions/api/creem-verify-checkout.ts');
+const create = load('functions/api/creem-create-checkout.ts');
 const secret = 'qa-only-license-secret-32-bytes-or-longer';
 const adminSecret = 'qa-only-admin-secret-32-bytes-or-longer';
 const env = { DSK_SERVER_SECRET: secret, ADMIN_SECRET: adminSecret };
@@ -54,7 +55,7 @@ for (const [name, handler, body, binding] of [
   ['claim', claim.onRequestPost, { orderId: 'ORDER-QA' }, { DB: paidDB }],
   ['verify', verify.onRequestPost, { licenseKey: 'DSK-AAAA-BBBB-CCCC' }, {}],
   ['admin', admin.onRequestPost, { secret: 'devsnapkit_admin_2026' }, {}],
-  ['capture', capture.onRequestPost, { orderId: 'ORDER-QA' }, {}],
+  ['verify-checkout', verifyCheckout.onRequestPost, { checkoutId: 'ch_ORDERQA123456' }, {}],
   ['create', create.onRequestPost, {}, {}],
 ]) {
   test(name + ' rejects missing configuration', async () => {
@@ -97,22 +98,67 @@ test('expired token is rejected', async () => {
   try { assert.equal((await getStats({ Authorization: 'Bearer ' + token })).status, 401); }
   finally { Date.now = now; }
 });
-test('capture issues a key accepted by configured verifier without real payment', async () => {
+test('verify-checkout issues a key accepted by configured verifier without real payment', async () => {
   const original = globalThis.fetch;
-  const licenseKey = await claim.generateSignedKey('CAPTURE-QA', secret);
+  const orderId = 'ord_CreemQa123456';
+  const checkoutId = 'ch_CreemQa123456';
+  const licenseKey = await claim.generateSignedKey(orderId.toUpperCase(), secret);
   const DB = { prepare: () => ({ bind() { return this; }, run: async () => ({ meta: { changes: 0 } }),
-    first: async () => ({ txn_id: 'CAPTURE-QA', status: 'COMPLETED', license_key: licenseKey }) }) };
-  globalThis.fetch = async url => String(url).includes('/oauth2/token')
-    ? new Response(JSON.stringify({ access_token: 'qa-token' }))
-    : new Response(JSON.stringify({ id: 'ORDER1234567890123', intent: 'CAPTURE', status: 'COMPLETED',
-      payer: { email_address: 'buyer@example.com' }, purchase_units: [{ reference_id: 'DSK_PRO_LIFETIME',
-        payee: { merchant_id: 'TEST-MERCHANT' }, amount: { value: proPricing.amount, currency_code: proPricing.currency },
-        payments: { captures: [{ id: 'CAPTURE-QA', status: 'COMPLETED', amount: { value: proPricing.amount, currency_code: proPricing.currency } }] } }] }));
+    first: async () => ({ txn_id: orderId, status: 'COMPLETED', license_key: licenseKey }) }) };
+  const amountCents = Math.round(Number(proPricing.amount) * 100);
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({
+      id: checkoutId,
+      status: 'completed',
+      product: 'prod_qa',
+      metadata: { referenceId: proPricing.referenceId },
+      customer: { email: 'buyer@example.com' },
+      order: {
+        id: orderId,
+        product: 'prod_qa',
+        currency: proPricing.currency,
+        amount: amountCents,
+        amount_paid: amountCents,
+        amount_due: 0,
+        status: 'paid',
+      },
+    }));
   try {
-    const res = await post(capture.onRequestPost, { orderId: 'ORDER1234567890123' }, { ...env, DB, PAYPAL_CLIENT_ID: 'qa-client', PAYPAL_CLIENT_SECRET: 'qa-secret', PAYPAL_MODE: 'sandbox' });
-    assert.equal(res.status, 200); const data = await res.json();
+    const res = await post(verifyCheckout.onRequestPost, { checkoutId }, {
+      ...env,
+      DB,
+      CREEM_API_KEY: 'creem_test_qa',
+      CREEM_PRODUCT_ID: 'prod_qa',
+      CREEM_MODE: 'test',
+    });
+    assert.equal(res.status, 200);
+    const data = await res.json();
     assert.equal((await (await post(verify.onRequestPost, { licenseKey: data.licenseKey })).json()).valid, true);
   } finally { globalThis.fetch = original; }
+});
+
+test('mixed-case Creem checkout and order IDs recover the exact same license key', async t => {
+  const sql = new DatabaseSync(':memory:');
+  sql.exec(fs.readFileSync(path.join(root, 'd1/schema.sql'), 'utf8'));
+  t.after(() => sql.close());
+  const checkoutId = 'ch_MixedCase123456';
+  const orderId = 'ord_MixedCase789012';
+  const expected = await claim.generateSignedKey(orderId.toUpperCase(), secret);
+  sql.prepare("INSERT INTO orders (order_id, txn_id, amount, currency, status, license_key) VALUES (?, ?, ?, ?, 'COMPLETED', ?)")
+    .run(checkoutId, orderId, proPricing.amount, proPricing.currency, expected);
+  const DB = {
+    prepare: query => ({
+      bind: (...args) => ({
+        first: async () => sql.prepare(query).get(...args) || null,
+      }),
+    }),
+  };
+  const bindings = { ...env, DB };
+  for (const id of [checkoutId, orderId, checkoutId.toUpperCase(), orderId.toLowerCase()]) {
+    const res = await post(claim.onRequestPost, { orderId: id }, bindings);
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).licenseKey, expected);
+  }
 });
 
 test('Order ID and Capture ID recover the same key', async () => {

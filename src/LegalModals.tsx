@@ -66,7 +66,7 @@ export const LegalModals: React.FC<LegalModalsProps> = ({ activeModal, onClose }
             <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
               <p className="font-semibold text-white">We want you to be 100% delighted with DevSnapKit.</p>
               <p>
-                If DevSnapKit does not save you hours of design time or make your product look significantly more professional, simply email us within <strong>30 days of purchase</strong> and we will issue a full 100% refund to your original PayPal or Card payment method.
+                If DevSnapKit does not save you hours of design time or make your product look significantly more professional, simply email us within <strong>30 days of purchase</strong> and we will issue a full 100% refund to your original payment method via Creem.
               </p>
             </div>
 
@@ -75,7 +75,7 @@ export const LegalModals: React.FC<LegalModalsProps> = ({ activeModal, onClose }
               Send an email to <a href="mailto:support@devsnapkit.com" className="text-indigo-400 underline font-mono">support@devsnapkit.com</a> with:
             </p>
             <ul className="list-disc list-inside space-y-1 text-slate-400 pl-2">
-              <li>Your PayPal Transaction ID or Payer Email</li>
+              <li>Your Creem Order ID or Payer Email</li>
               <li>Optional: A brief sentence on how we can improve (appreciated, but not required)</li>
             </ul>
             <p className="text-xs text-slate-400">

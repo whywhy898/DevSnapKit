@@ -1,21 +1,33 @@
 // Cloudflare Pages Function: /api/claim-license
-// Claims a Pro license key ONLY for verified payments confirmed by PayPal
+// Claims a Pro license key ONLY for verified payments confirmed by Creem
 import { ConfigurationError, generateSignedKey, requireSecret } from '../lib/security';
+import {
+  isTestModeEnv,
+  readCheckout,
+  readTransactionById,
+  readTransactionByOrderId,
+  validatePaidTransaction,
+  validatePurchase,
+  type CreemEnv,
+} from '../lib/creem';
 export { generateSignedKey } from '../lib/security';
 
-interface Env {
-  DSK_SERVER_SECRET?: string;
-  DB?: any;
+interface Env extends CreemEnv {
   DSK_KV?: any;
   DSK_ORDERS?: any;
 }
 
-// In-memory set of confirmed PayPal transactions on this edge instance
+// In-memory set of confirmed Creem transactions on this edge instance
 export const confirmedTransactions = new Set<string>();
+const confirmedSeeds = new Map<string, string>();
 
-export function markTransactionVerified(txId: string) {
+export function markTransactionVerified(txId: string, canonicalSeed?: string) {
   if (txId && typeof txId === 'string') {
-    confirmedTransactions.add(txId.trim().toUpperCase());
+    const normalized = txId.trim().toUpperCase();
+    confirmedTransactions.add(normalized);
+    if (canonicalSeed && typeof canonicalSeed === 'string' && canonicalSeed.trim()) {
+      confirmedSeeds.set(normalized, canonicalSeed.trim().toUpperCase());
+    }
   }
 }
 
@@ -52,7 +64,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'PayPal Order ID or Transaction ID is required. Email alone cannot retrieve a license.'
+          error: 'Creem Order ID, Checkout ID, or Transaction ID is required. Email alone cannot retrieve a license.'
         }),
         { status: 400, headers: corsHeaders }
       );
@@ -61,17 +73,17 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     const cleanTx = (orderId || '').trim().toUpperCase();
     let seed = cleanTx;
 
-    // STRICT CHECK: Is this transaction verified by PayPal?
+    // STRICT CHECK: Is this transaction verified by Creem?
     let isDbVerified = false;
 
     // 1. Check in Cloudflare D1 if bound
     if (env.DB) {
       try {
-        const query = "SELECT txn_id, status FROM orders WHERE status = 'COMPLETED' AND (order_id = ? OR txn_id = ?)";
+        const query = "SELECT txn_id, status FROM orders WHERE status = 'COMPLETED' AND (UPPER(order_id) = ? OR UPPER(txn_id) = ?)";
         const res = await env.DB.prepare(query).bind(cleanTx, cleanTx).first();
         if (res?.status === 'COMPLETED') {
           isDbVerified = true;
-          seed = res.txn_id || cleanTx;
+          seed = String(res.txn_id || cleanTx).trim().toUpperCase();
         }
       } catch (dbErr) {
         console.error('[D1 License Check Error]', dbErr);
@@ -87,20 +99,69 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
         try {
           const order = JSON.parse(record);
           isKvVerified = order?.status === 'COMPLETED' || order?.paymentStatus === 'Completed';
-          if (isKvVerified && !isDbVerified) seed = order.txnId || cleanTx;
+          if (isKvVerified && !isDbVerified) seed = String(order.txnId || cleanTx).trim().toUpperCase();
         } catch { /* Invalid records are not payment proof. */ }
       }
     }
 
     // 3. Check in confirmed transactions registry
-    const isIpnVerified = cleanTx && confirmedTransactions.has(cleanTx);
+    const isIpnVerified = Boolean(cleanTx && confirmedTransactions.has(cleanTx));
+    if (isIpnVerified && !isDbVerified && !isKvVerified) {
+      seed = confirmedSeeds.get(cleanTx) || cleanTx;
+    }
 
-    // If transaction is NOT confirmed by PayPal, STRICTLY REJECT!
-    if (!isDbVerified && !isKvVerified && !isIpnVerified) {
+    // 4. Stateless fallback in Test Mode when Preview has no D1 bound
+    let isTestApiVerified = false;
+    const rawId = orderId.trim();
+    if (!isDbVerified && !isKvVerified && !isIpnVerified && !env.DB && isTestModeEnv(env)) {
+      try {
+        if (/^ch(?:k)?_[A-Za-z0-9]{6,64}$/i.test(rawId)) {
+          const checkout = await readCheckout(env, rawId);
+          validatePurchase(checkout, env);
+          const checkoutStatus = String(checkout?.status || '').toLowerCase();
+          const orderStatus = String(checkout?.order?.status || '').toLowerCase();
+          if (['completed', 'paid'].includes(checkoutStatus) && orderStatus === 'paid' && typeof checkout?.order?.id === 'string') {
+            isTestApiVerified = true;
+            seed = checkout.order.id.trim().toUpperCase();
+            markTransactionVerified(checkout.id, checkout.order.id);
+            markTransactionVerified(checkout.order.id, checkout.order.id);
+          }
+        } else if (/^ord_[A-Za-z0-9]{6,64}$/i.test(rawId)) {
+          const tx = await readTransactionByOrderId(env, rawId);
+          if (tx && String(tx?.status || '').toLowerCase() === 'paid') {
+            validatePaidTransaction(tx, env);
+            const canonicalOrderId = typeof tx.order === 'string' ? tx.order.trim() : rawId;
+            isTestApiVerified = true;
+            seed = canonicalOrderId.toUpperCase();
+            markTransactionVerified(canonicalOrderId, canonicalOrderId);
+            if (typeof tx.id === 'string' && tx.id.trim()) {
+              markTransactionVerified(tx.id.trim(), canonicalOrderId);
+            }
+          }
+        } else if (/^tran_[A-Za-z0-9]{6,64}$/i.test(rawId)) {
+          const tx = await readTransactionById(env, rawId);
+          if (tx && String(tx?.status || '').toLowerCase() === 'paid') {
+            validatePaidTransaction(tx, env);
+            const canonicalOrderId = typeof tx.order === 'string' ? tx.order.trim() : '';
+            if (canonicalOrderId) {
+              isTestApiVerified = true;
+              seed = canonicalOrderId.toUpperCase();
+              markTransactionVerified(canonicalOrderId, canonicalOrderId);
+              markTransactionVerified(rawId, canonicalOrderId);
+            }
+          }
+        }
+      } catch {
+        /* Unverified or unpaid test checkout falls through to 403. */
+      }
+    }
+
+    // If transaction is NOT confirmed by Creem, STRICTLY REJECT!
+    if (!isDbVerified && !isKvVerified && !isIpnVerified && !isTestApiVerified) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Purchase could not be verified. Check your PayPal Order ID or Transaction ID, or contact support@devsnapkit.com.'
+          error: 'Purchase could not be verified. Check your Creem Order ID or Checkout ID, or contact support@devsnapkit.com.'
         }),
         { status: 403, headers: corsHeaders }
       );

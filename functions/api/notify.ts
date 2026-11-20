@@ -45,7 +45,7 @@ export async function sendOrderNotification(payload: OrderNotificationPayload, e
                 <td style="padding: 12px 0; font-weight: 600; color: #f8fafc;">${payload.payerEmail}</td>
               </tr>
               <tr style="border-bottom: 1px solid #334155;">
-                <td style="padding: 12px 0; color: #94a3b8;">PayPal 交易单号:</td>
+                <td style="padding: 12px 0; color: #94a3b8;">交易单号 (Creem):</td>
                 <td style="padding: 12px 0; font-family: monospace; color: #cbd5e1;">${payload.txnId || payload.orderId}</td>
               </tr>
               <tr style="border-bottom: 1px solid #334155;">

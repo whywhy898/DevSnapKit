@@ -9,7 +9,7 @@ const checks = [
   ['canvas text', 'npm.cmd', ['run', 'test:text:v1']],
   ['SEO', 'npm.cmd', ['run', 'test:seo']],
   ['security', 'npm.cmd', ['run', 'test:security']],
-  ['payment', 'npm.cmd', ['run', 'test:paypal']],
+  ['payment', 'npm.cmd', ['run', 'test:creem']],
   ['legacy Poster', 'npm.cmd', ['run', 'test:poster:v1']],
   ['build', 'npm.cmd', ['run', 'build']],
   ...(process.env.TEMPLATE_CHECK_BROWSER ? [['canvas text browser', process.execPath, ['tests/run-canvas-text-browser.mjs']]] : []),

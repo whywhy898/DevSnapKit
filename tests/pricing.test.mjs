@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { webcrypto } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -28,8 +29,8 @@ function loader(pricingOverride = {}, now = Date.now) {
     const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: {
       target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX,
     } }).outputText;
-    new Function('require', 'module', 'exports', 'Date', code)(name => name.startsWith('.')
-      ? load(path.resolve(path.dirname(filename), name)) : require(name), mod, mod.exports, ClockDate);
+    new Function('require', 'module', 'exports', 'Date', 'crypto', code)(name => name.startsWith('.')
+      ? load(path.resolve(path.dirname(filename), name)) : require(name), mod, mod.exports, ClockDate, webcrypto);
     if (filename === path.join(root, 'shared/pricing.ts')) {
       mod.exports.proPricing = { ...mod.exports.proPricing, ...pricingOverride };
     }
@@ -49,12 +50,31 @@ function database(t) {
   } } };
 }
 function order(amount = loader()('shared/pricing.ts').proPricing.amount) {
-  return { id: 'ORDER1234567890123', intent: 'CAPTURE', status: 'COMPLETED',
-    purchase_units: [{ reference_id: 'DSK_PRO_LIFETIME', description: 'DevSnapKit Pro Lifetime Pass',
-      amount: { currency_code: 'USD', value: amount }, payee: { merchant_id: 'OUR-MERCHANT' },
-      payments: { captures: [{ id: 'CAPTURE12345678901', status: 'COMPLETED', final_capture: true,
-        amount: { currency_code: 'USD', value: amount }, payee: { merchant_id: 'OUR-MERCHANT' } }] } }],
+  return {
+    id: 'ch_1QyIQDw9cbFWdA1ry5Qc6I',
+    object: 'checkout',
+    status: 'completed',
+    product: 'prod_test_dsk',
+    metadata: { referenceId: 'DSK_PRO_LIFETIME' },
+    customer: { email: 'buyer@example.test' },
+    order: {
+      id: 'ord_4aDwWXjMLpes4Kj4XqNnUA',
+      object: 'order',
+      product: 'prod_test_dsk',
+      currency: 'USD',
+      amount,
+      amount_paid: amount,
+      amount_due: 0,
+      status: 'paid',
+    },
   };
+}
+
+async function signCreemWebhook(rawBody, webhookSecret) {
+  const enc = new TextEncoder();
+  const key = await webcrypto.subtle.importKey('raw', enc.encode(webhookSecret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await webcrypto.subtle.sign('HMAC', key, enc.encode(rawBody));
+  return Array.from(new Uint8Array(sig), b => b.toString(16).padStart(2, '0')).join('');
 }
 
 test('one config defines the early-bird offer, 24-hour grace period and stable product identity', () => {
@@ -72,10 +92,12 @@ test('the previous price expires 24 hours after the deployment timestamp', () =>
   for (const timestamp of [changedAt, '2032-08-09T01:02:03.456Z', '2032-08-09T01:02:03+00:00']) {
     const start = Date.parse(timestamp), end = start + 24 * 60 * 60 * 1000;
     for (const now of [start, end - 1, end, end + 1]) {
-      const { validatePurchase } = loader({}, () => now)('functions/lib/paypal.ts');
+      const { validatePurchase } = loader({}, () => now)('functions/lib/creem.ts');
       const env = { PRICE_CHANGED_AT: timestamp };
       assert.doesNotThrow(() => validatePurchase(order('9.90'), env));
+      assert.doesNotThrow(() => validatePurchase(order(990), env));
       assert.throws(() => validatePurchase(order('0.01'), env), error => error.status === 422);
+      assert.throws(() => validatePurchase(order(1), env), error => error.status === 422);
       if (now < end) assert.doesNotThrow(() => validatePurchase(order('1.00'), env));
       else assert.throws(() => validatePurchase(order('1.00'), env), error => error.status === 422);
     }
@@ -87,7 +109,7 @@ for (const timestamp of [undefined, '', 'invalid', '0', '2030-04-05', '2030-04-0
   test(`missing/invalid PRICE_CHANGED_AT ${JSON.stringify(timestamp)} fails closed and warns`, t => {
     const warnings = [];
     t.mock.method(console, 'warn', message => warnings.push(message));
-    const { validatePurchase } = loader({}, () => priceChange)('functions/lib/paypal.ts');
+    const { validatePurchase } = loader({}, () => priceChange)('functions/lib/creem.ts');
     const env = { PRICE_CHANGED_AT: timestamp };
     assert.throws(() => validatePurchase(order('1.00'), env), error => error.status === 422);
     assert.ok(warnings.some(message => /PRICE_CHANGED_AT/.test(message)));
@@ -137,23 +159,24 @@ test('order creation and copy read changed values from the shared config', async
   const load = loader({ amount: '7.50', displayPrice: '$7.50', description: 'Configured pass' });
   const { DB } = database(t); const original = globalThis.fetch; let body;
   globalThis.fetch = async (url, init) => {
-    if (String(url).endsWith('/v1/oauth2/token')) return Response.json({ access_token: 'test-token' });
-    body = JSON.parse(init.body); return Response.json({ id: 'ORDER1234567890123' });
+    body = JSON.parse(init.body);
+    return Response.json({ id: 'ch_1QyIQDw9cbFWdA1ry5Qc6I', checkout_url: 'https://checkout.creem.io/ch_1QyIQDw9cbFWdA1ry5Qc6I' });
   };
   t.after(() => { globalThis.fetch = original; });
-  const response = await load('functions/api/paypal-create-order.ts').onRequestPost({
-    env: { DB, DSK_SERVER_SECRET: secret, PAYPAL_CLIENT_ID: 'test', PAYPAL_CLIENT_SECRET: 'test' },
+  const response = await load('functions/api/creem-create-checkout.ts').onRequestPost({
+    request: new Request('https://devsnapkit.com/api/creem-create-checkout', { method: 'POST' }),
+    env: { DB, DSK_SERVER_SECRET: secret, CREEM_API_KEY: 'creem_test_key', CREEM_PRODUCT_ID: 'prod_test_dsk', CREEM_MODE: 'test' },
   });
   assert.equal(response.status, 200);
-  assert.deepEqual(body.purchase_units[0], { reference_id: 'DSK_PRO_LIFETIME', description: 'Configured pass',
-    amount: { value: '7.50', currency_code: 'USD' } });
+  assert.equal(body.product_id, 'prod_test_dsk');
+  assert.deepEqual(body.metadata, { referenceId: 'DSK_PRO_LIFETIME', description: 'Configured pass', amount: '7.50', currency: 'USD' });
   const { productCopy } = load('src/productCopy.ts');
   assert.equal(productCopy.price, 'One-time payment of $7.50 USD. Lifetime Pro access. No recurring subscriptions.');
   assert.match(productCopy.tooltip, /\$7\.50 lifetime/);
   const app = read('src/App.tsx');
   assert.match(app, /className="pro-price">\{proPricing\.displayPrice\}/);
   assert.match(app, /<ProPrice\s*\/>/);
-  assert.match(app, /currency=\$\{(?:encodeURIComponent\()?proPricing\.currency/);
+  assert.match(app, /proPricing\.currency/);
 });
 
 test('admin defaults use config while recorded historical amounts are preserved', async t => {
@@ -176,10 +199,10 @@ for (const [configured, purchased, captured] of [['1.00', '7.50', '7.50'], ['7.5
   test(`fulfillment accepts previous ${purchased} before expiry after config becomes ${configured} and keeps license activation`, async t => {
     const load = loader({ amount: configured, previousPrice: { amount: purchased, graceHours: 24 } }, () => expiry - 1);
     const { DB, sql } = database(t);
-    const purchase = order(purchased); purchase.purchase_units[0].payments.captures[0].amount.value = captured;
-    assert.equal(load('functions/lib/paypal.ts').validatePurchase(purchase, priceEnv), purchase.purchase_units[0]);
-    const result = await load('functions/lib/paypal.ts').fulfillOrder({ ...priceEnv, DB, DSK_SERVER_SECRET: secret }, purchase);
-    assert.equal(result.amount, captured); assert.equal(sql.prepare('SELECT COUNT(*) n FROM orders').get().n, 1);
+    const purchase = order(purchased); purchase.order.amount_paid = captured;
+    assert.equal(load('functions/lib/creem.ts').validatePurchase(purchase, priceEnv), purchase);
+    const result = await load('functions/lib/creem.ts').fulfillOrder({ ...priceEnv, DB, DSK_SERVER_SECRET: secret }, purchase);
+    assert.equal(result.amount, purchased); assert.equal(sql.prepare('SELECT COUNT(*) n FROM orders').get().n, 1);
     const response = await load('functions/api/verify-license.ts').onRequestPost({ env: { DSK_SERVER_SECRET: secret },
       request: new Request('https://qa.invalid', { method: 'POST', body: JSON.stringify({ licenseKey: result.licenseKey }) }) });
     assert.equal((await response.json()).valid, true);
@@ -196,7 +219,7 @@ for (const [name, now, timestamp] of [
     const load = loader({ amount: '7.50' }, () => now);
     const { DB, sql } = database(t); const purchase = order('1.00');
     const env = { DB, DSK_SERVER_SECRET: secret, PRICE_CHANGED_AT: timestamp };
-    const { validatePurchase, fulfillOrder } = load('functions/lib/paypal.ts');
+    const { validatePurchase, fulfillOrder } = load('functions/lib/creem.ts');
     assert.throws(() => validatePurchase(purchase, env), error => error.status === 422);
     await assert.rejects(() => fulfillOrder(env, purchase), error => error.status === 422);
     assert.equal(sql.prepare('SELECT COUNT(*) n FROM orders').get().n, 0);
@@ -206,45 +229,41 @@ for (const [name, now, timestamp] of [
 test('current price remains accepted after the previous price expires', async t => {
   const load = loader({ amount: '7.50' }, () => expiry + 1);
   const { DB } = database(t); const purchase = order('7.50');
-  const { validatePurchase, fulfillOrder } = load('functions/lib/paypal.ts');
-  assert.equal(validatePurchase(purchase, priceEnv), purchase.purchase_units[0]);
+  const { validatePurchase, fulfillOrder } = load('functions/lib/creem.ts');
+  assert.equal(validatePurchase(purchase, priceEnv), purchase);
   assert.equal((await fulfillOrder({ ...priceEnv, DB, DSK_SERVER_SECRET: secret }, purchase)).amount, '7.50');
 });
 
 for (const [name, mutate] of [
-  ['unaccepted one-cent order with matching capture', o => {
-    o.purchase_units[0].amount.value = '0.01'; o.purchase_units[0].payments.captures[0].amount.value = '0.01';
+  ['unaccepted one-cent order with matching payment', o => {
+    o.order.amount = '0.01'; o.order.amount_paid = '0.01';
   }],
-  ['capture amount', o => { o.purchase_units[0].payments.captures[0].amount.value = '0.01'; }],
-  ['order currency', o => { o.purchase_units[0].amount.currency_code = 'EUR'; }],
-  ['capture currency', o => { o.purchase_units[0].payments.captures[0].amount.currency_code = 'EUR'; }],
-  ['product identifier', o => { o.purchase_units[0].reference_id = 'OTHER_PRODUCT'; }],
-  ['incomplete order', o => { o.status = 'APPROVED'; }],
-  ['pending capture', o => { o.purchase_units[0].payments.captures[0].status = 'PENDING'; }],
-  ['nonfinal capture', o => { o.purchase_units[0].payments.captures[0].final_capture = false; }],
-  ['payee mismatch', o => { o.purchase_units[0].payments.captures[0].payee.merchant_id = 'OTHER'; }],
-  ['missing merchant', o => { delete o.purchase_units[0].payee; }],
-  ['multiple captures', o => { o.purchase_units[0].payments.captures.push(o.purchase_units[0].payments.captures[0]); }],
-  ['multiple units', o => { o.purchase_units.push(o.purchase_units[0]); }],
-  ...['0.00', '-1.00', 'NaN', '1e2', '7.501', '', 7.5, '7.50\n', ' 7.50', '7.50 '].map(value => [`invalid amount ${JSON.stringify(value)}`, o => {
-    o.purchase_units[0].amount.value = value; o.purchase_units[0].payments.captures[0].amount.value = value;
+  ['mismatched amount_paid', o => { o.order.amount_paid = '0.01'; }],
+  ['order currency', o => { o.order.currency = 'EUR'; }],
+  ['product identifier', o => { o.product = 'OTHER_PRODUCT'; o.order.product = 'OTHER_PRODUCT'; }],
+  ['metadata referenceId', o => { o.metadata.referenceId = 'OTHER_PRODUCT'; }],
+  ['incomplete checkout', o => { o.status = 'pending'; }],
+  ['unpaid order', o => { o.order.status = 'pending'; }],
+  ['amount due remaining', o => { o.order.amount_due = 100; }],
+  ...['0.00', '-1.00', 'NaN', '1e2', '7.501', '', 7.5, 0, -100, '7.50\n', ' 7.50', '7.50 '].map(value => [`invalid amount ${JSON.stringify(value)}`, o => {
+    o.order.amount = value; o.order.amount_paid = value;
   }]),
 ]) {
   test(`fulfillment rejects ${name} without persisting a license`, async t => {
     const load = loader(); const { DB, sql } = database(t); const purchase = order(); mutate(purchase);
-    await assert.rejects(() => load('functions/lib/paypal.ts').fulfillOrder({ DB, DSK_SERVER_SECRET: secret }, purchase),
+    await assert.rejects(() => load('functions/lib/creem.ts').fulfillOrder({ DB, DSK_SERVER_SECRET: secret, CREEM_PRODUCT_ID: 'prod_test_dsk' }, purchase),
       error => error.status === 422);
     assert.equal(sql.prepare('SELECT COUNT(*) n FROM orders').get().n, 0);
   });
 }
 
 test('purchase validation compares current amounts in cents and rejects unaccepted positive prices', () => {
-  const { validatePurchase } = loader()('functions/lib/paypal.ts');
-  for (const amount of ['9.9', '9.90', '09.90']) assert.doesNotThrow(() => validatePurchase(order(amount), {}));
-  for (const amount of ['0.01', '7.50']) assert.throws(() => validatePurchase(order(amount), {}), error => error.status === 422);
+  const { validatePurchase } = loader()('functions/lib/creem.ts');
+  for (const amount of ['9.9', '9.90', '09.90', 990]) assert.doesNotThrow(() => validatePurchase(order(amount), {}));
+  for (const amount of ['0.01', '7.50', 1, 750]) assert.throws(() => validatePurchase(order(amount), {}), error => error.status === 422);
 });
 
-for (const endpoint of ['paypal-capture-order', 'paypal-webhook', 'paypal-ipn']) {
+for (const endpoint of ['creem-verify-checkout', 'creem-webhook']) {
   for (const [name, now, timestamp, purchased, captured, expected] of [
     ['previous price before expiry', expiry - 1, changedAt, '1.00', '01.0', 200],
     ['previous price at expiry', expiry, changedAt, '1.00', '1.00', 422],
@@ -255,41 +274,34 @@ for (const endpoint of ['paypal-capture-order', 'paypal-webhook', 'paypal-ipn'])
       [`current price with timestamp ${timestamp}`, expiry + 1, timestamp, '9.90', '9.90', 200],
       [`one-cent order with timestamp ${timestamp}`, priceChange, timestamp, '0.01', '0.01', 422],
     ]),
-    ['mismatched capture at another accepted price', expiry - 1, changedAt, '9.90', '1.00', 422],
+    ['mismatched amount_paid at another accepted price', expiry - 1, changedAt, '9.90', '1.00', 422],
   ]) {
     test(`${endpoint} validates ${name} before making a license claimable`, async t => {
       const load = loader({}, () => now); const { DB, sql } = database(t);
-      const purchase = order(purchased), unit = purchase.purchase_units[0], capture = unit.payments.captures[0];
-      capture.amount.value = captured;
-      const kv = new Map(); const original = globalThis.fetch;
+      const purchase = order(purchased);
+      purchase.order.amount_paid = captured;
+      const original = globalThis.fetch;
       globalThis.fetch = async url => {
         url = String(url);
-        if (url === 'https://ipnpb.paypal.com/cgi-bin/webscr') return new Response('VERIFIED');
-        if (url.endsWith('/v1/oauth2/token')) return Response.json({ access_token: 'test-token' });
-        if (url.endsWith('/verify-webhook-signature')) return Response.json({ verification_status: 'SUCCESS' });
-        if (url.endsWith(`/v2/payments/captures/${capture.id}`)) return Response.json({
-          ...capture, supplementary_data: { related_ids: { order_id: purchase.id } },
-        });
-        if (url.endsWith(`/v2/checkout/orders/${purchase.id}`)) return Response.json(purchase);
+        if (url.includes(`/v1/checkouts?checkout_id=${encodeURIComponent(purchase.id)}`)) return Response.json(purchase);
         throw new Error(`Unexpected provider request: ${url}`);
       };
       t.after(() => { globalThis.fetch = original; });
-      const env = { DB, DSK_SERVER_SECRET: secret, PRICE_CHANGED_AT: timestamp, PAYPAL_CLIENT_ID: 'test', PAYPAL_CLIENT_SECRET: 'test',
-        PAYPAL_WEBHOOK_ID: 'test-webhook', DSK_ORDERS: { async put(key, value) { kv.set(key, value); },
-          async get(key) { return kv.get(key) || null; } } };
-      const body = endpoint === 'paypal-capture-order' ? JSON.stringify({ orderId: purchase.id }) : endpoint === 'paypal-ipn'
-        ? new URLSearchParams({ payment_status: 'Completed', txn_id: capture.id, mc_gross: captured, mc_currency: 'USD' }).toString()
-        : JSON.stringify({ id: 'EVENT-TEST', event_type: 'PAYMENT.CAPTURE.COMPLETED', resource: {
-          id: capture.id, supplementary_data: { related_ids: { order_id: purchase.id } },
-        } });
-      const headers = Object.fromEntries(['paypal-auth-algo', 'paypal-cert-url', 'paypal-transmission-id',
-        'paypal-transmission-sig', 'paypal-transmission-time'].map(name => [name, 'test']));
+      const webhookSecret = 'whsec_pricing_test_secret_32_characters';
+      const env = { DB, DSK_SERVER_SECRET: secret, PRICE_CHANGED_AT: timestamp, CREEM_API_KEY: 'creem_test_key',
+        CREEM_PRODUCT_ID: 'prod_test_dsk', CREEM_WEBHOOK_SECRET: webhookSecret, CREEM_MODE: 'test' };
+      const body = endpoint === 'creem-verify-checkout'
+        ? JSON.stringify({ checkoutId: purchase.id })
+        : JSON.stringify({ id: 'evt_test', eventType: 'checkout.completed', object: { id: purchase.id, order: { id: purchase.order.id } } });
+      const headers = endpoint === 'creem-webhook'
+        ? { 'content-type': 'application/json', 'creem-signature': await signCreemWebhook(body, webhookSecret) }
+        : { 'content-type': 'application/json' };
       const response = await load(`functions/api/${endpoint}.ts`).onRequestPost({ env,
         request: new Request(`https://qa.invalid/api/${endpoint}`, { method: 'POST', headers, body }) });
       assert.equal(response.status, expected);
       assert.equal(sql.prepare('SELECT COUNT(*) n FROM orders').get().n, expected === 200 ? 1 : 0);
       const claim = await load('functions/api/claim-license.ts').onRequestPost({ env,
-        request: new Request('https://qa.invalid/api/claim-license', { method: 'POST', body: JSON.stringify({ orderId: capture.id }) }) });
+        request: new Request('https://qa.invalid/api/claim-license', { method: 'POST', body: JSON.stringify({ orderId: purchase.order.id }) }) });
       assert.equal(claim.status, expected === 200 ? 200 : 403);
     });
   }

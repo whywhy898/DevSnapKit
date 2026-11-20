@@ -139,8 +139,8 @@ test('comparison pages carry a dated, sourced comparison table and the verified 
 });
 
 test('verified product claims stay true to the code', () => {
-  const paypal = readFileSync(new URL('functions/api/paypal-create-order.ts', root), 'utf8');
-  assert.match(paypal, /value: proPricing\.amount/);
+  const creem = readFileSync(new URL('functions/api/creem-create-checkout.ts', root), 'utf8');
+  assert.match(creem, /amount: proPricing\.amount/);
   assert.match(readFileSync(new URL('shared/pricing.ts', root), 'utf8'), /amount: ['"]1\.00['"]/);
   assert.match(read('privacy/index.html'), /Zero-Upload/);
   const themes = readFileSync(new URL('src/themes.ts', root), 'utf8');

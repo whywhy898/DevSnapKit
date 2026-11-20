@@ -6,6 +6,7 @@ interface Env {
   DSK_KV?: any;                // Cloudflare KV binding
   DSK_ORDERS?: any;            // Legacy KV binding
   ALLOW_PREVIEW_TELEMETRY?: string;
+  CREEM_MODE?: string;
 }
 
 const MAX_BODY_BYTES = 4096;
@@ -115,6 +116,13 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
 
     if (!ALLOWED_EVENTS.has(event)) {
       return new Response(JSON.stringify({ ok: true, skipped: 'untracked_event' }), {
+        status: 200,
+        headers: corsHeaders,
+      });
+    }
+
+    if (event === 'checkout_click' && (env.CREEM_MODE || '').trim().toLowerCase() === 'test') {
+      return new Response(JSON.stringify({ ok: true, skipped: 'test_mode' }), {
         status: 200,
         headers: corsHeaders,
       });
